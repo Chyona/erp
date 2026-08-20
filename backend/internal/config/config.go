@@ -19,6 +19,7 @@ type Config struct {
 	Server   ServerConfig   `mapstructure:"server"`
 	Database DatabaseConfig `mapstructure:"database"`
 	Logger   LoggerConfig   `mapstructure:"logger"`
+	Storage  StorageConfig  `mapstructure:"storage"`
 }
 
 // ServerConfig HTTP 服务相关配置。
@@ -48,6 +49,40 @@ type LoggerConfig struct {
 	Filename   string `mapstructure:"filename"`
 	MaxSize    int    `mapstructure:"max_size"`    // 单个日志文件最大体积（MB）
 	MaxBackups int    `mapstructure:"max_backups"` // 最多保留的历史日志文件数量
+}
+
+// StorageConfig 对象存储配置，对应 config.yaml 的 storage 段。
+type StorageConfig struct {
+	BasePath            string           `mapstructure:"base_path"`
+	SignedURLExpireDays int              `mapstructure:"signed_url_expire_days"`
+	COS                 COSStorageConfig `mapstructure:"cos"`
+	OSS                 OSSStorageConfig `mapstructure:"oss"`
+	TOS                 TOSStorageConfig `mapstructure:"tos"`
+}
+
+// COSStorageConfig 腾讯云 COS 配置。
+type COSStorageConfig struct {
+	SecretID   string `mapstructure:"secret_id"`
+	SecretKey  string `mapstructure:"secret_key"`
+	BucketName string `mapstructure:"bucket_name"`
+	Region     string `mapstructure:"region"`
+}
+
+// OSSStorageConfig 阿里云 OSS 配置。
+type OSSStorageConfig struct {
+	AccessKeyID     string `mapstructure:"access_key_id"`
+	AccessKeySecret string `mapstructure:"access_key_secret"`
+	BucketName      string `mapstructure:"bucket_name"`
+	Endpoint        string `mapstructure:"endpoint"`
+}
+
+// TOSStorageConfig 火山引擎 TOS 配置。
+type TOSStorageConfig struct {
+	AccessKeyID     string `mapstructure:"access_key_id"`
+	AccessKeySecret string `mapstructure:"access_key_secret"`
+	BucketName      string `mapstructure:"bucket_name"`
+	Region          string `mapstructure:"region"`
+	Endpoint        string `mapstructure:"endpoint"`
 }
 
 // DSN 生成 PostgreSQL 连接字符串。
@@ -162,5 +197,56 @@ func applyEnvOverrides(cfg *Config) {
 		if n, err := strconv.Atoi(val); err == nil {
 			cfg.Logger.MaxBackups = n
 		}
+	}
+
+	if val, ok := os.LookupEnv("APP_STORAGE_BASE_PATH"); ok {
+		cfg.Storage.BasePath = val
+	}
+	if val, ok := os.LookupEnv("APP_STORAGE_SIGNED_URL_EXPIRE_DAYS"); ok {
+		if n, err := strconv.Atoi(val); err == nil {
+			cfg.Storage.SignedURLExpireDays = n
+		}
+	}
+
+	if val, ok := os.LookupEnv("APP_STORAGE_COS_SECRET_ID"); ok {
+		cfg.Storage.COS.SecretID = val
+	}
+	if val, ok := os.LookupEnv("APP_STORAGE_COS_SECRET_KEY"); ok {
+		cfg.Storage.COS.SecretKey = val
+	}
+	if val, ok := os.LookupEnv("APP_STORAGE_COS_BUCKET_NAME"); ok {
+		cfg.Storage.COS.BucketName = val
+	}
+	if val, ok := os.LookupEnv("APP_STORAGE_COS_REGION"); ok {
+		cfg.Storage.COS.Region = val
+	}
+
+	if val, ok := os.LookupEnv("APP_STORAGE_OSS_ACCESS_KEY_ID"); ok {
+		cfg.Storage.OSS.AccessKeyID = val
+	}
+	if val, ok := os.LookupEnv("APP_STORAGE_OSS_ACCESS_KEY_SECRET"); ok {
+		cfg.Storage.OSS.AccessKeySecret = val
+	}
+	if val, ok := os.LookupEnv("APP_STORAGE_OSS_BUCKET_NAME"); ok {
+		cfg.Storage.OSS.BucketName = val
+	}
+	if val, ok := os.LookupEnv("APP_STORAGE_OSS_ENDPOINT"); ok {
+		cfg.Storage.OSS.Endpoint = val
+	}
+
+	if val, ok := os.LookupEnv("APP_STORAGE_TOS_ACCESS_KEY_ID"); ok {
+		cfg.Storage.TOS.AccessKeyID = val
+	}
+	if val, ok := os.LookupEnv("APP_STORAGE_TOS_ACCESS_KEY_SECRET"); ok {
+		cfg.Storage.TOS.AccessKeySecret = val
+	}
+	if val, ok := os.LookupEnv("APP_STORAGE_TOS_BUCKET_NAME"); ok {
+		cfg.Storage.TOS.BucketName = val
+	}
+	if val, ok := os.LookupEnv("APP_STORAGE_TOS_REGION"); ok {
+		cfg.Storage.TOS.Region = val
+	}
+	if val, ok := os.LookupEnv("APP_STORAGE_TOS_ENDPOINT"); ok {
+		cfg.Storage.TOS.Endpoint = val
 	}
 }

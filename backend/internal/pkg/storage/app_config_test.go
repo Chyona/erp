@@ -3,7 +3,7 @@ package storage
 import (
 	"testing"
 
-	appconfig "live-mixer/internal/config"
+	appconfig "erp/internal/config"
 )
 
 func TestConfigFromApp(t *testing.T) {

@@ -22,3 +22,23 @@ logger:
   filename: "logs/base.log"  # 日志文件路径
   max_size: 10               # 单个日志文件最大 10MB
   max_backups: 10            # 最多保留 10 个历史日志文件
+
+storage:
+  base_path: ""
+  signed_url_expire_days: 30
+  cos:
+    secret_id: ""
+    secret_key: ""
+    bucket_name: ""
+    region: ""
+  oss:
+    access_key_id: ""
+    access_key_secret: ""
+    bucket_name: ""
+    endpoint: ""
+  tos:
+    access_key_id: ""
+    access_key_secret: ""
+    bucket_name: ""
+    region: ""
+    endpoint: ""
