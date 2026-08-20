@@ -1,0 +1,142 @@
+import { useMemo, useState } from 'react';
+import { Button, Input, Popover, Select, Space } from 'antd';
+import {
+  CalendarOutlined,
+  DoubleLeftOutlined,
+  DoubleRightOutlined,
+  ReloadOutlined
+} from '@ant-design/icons';
+import { formatReportPeriod } from '../utils/reportPeriod';
+
+const REPORT_TYPE_OPTIONS = [
+  { value: 'month', label: '月报' },
+  { value: 'quarter', label: '季报' }
+];
+
+const MONTHS = Array.from({ length: 12 }, (_, index) => index + 1);
+const QUARTERS = [1, 2, 3, 4];
+
+function PeriodPickerPanel({ period, panelYear, onPanelYearChange, onSelect, onClose }) {
+  const changeYear = (delta) => onPanelYearChange(panelYear + delta);
+
+  return (
+    <div className="report-period-picker">
+      <div className="report-period-picker__header">
+        <Button
+          type="text"
+          size="small"
+          icon={<DoubleLeftOutlined />}
+          onClick={() => changeYear(-1)}
+        />
+        <span className="report-period-picker__year">{panelYear}年</span>
+        <Button
+          type="text"
+          size="small"
+          icon={<DoubleRightOutlined />}
+          onClick={() => changeYear(1)}
+        />
+      </div>
+
+      {period.type === 'month' ? (
+        <div className="report-period-picker__grid report-period-picker__grid--month">
+          {MONTHS.map((month) => {
+            const selected = panelYear === period.year && month === period.month;
+            return (
+              <button
+                key={month}
+                type="button"
+                className={`report-period-picker__item${selected ? ' report-period-picker__item--active' : ''}`}
+                onClick={() => {
+                  onSelect({ ...period, year: panelYear, month });
+                  onClose();
+                }}
+              >
+                {month}月
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="report-period-picker__grid report-period-picker__grid--quarter">
+          {QUARTERS.map((quarter) => {
+            const selected = panelYear === period.year && quarter === period.quarter;
+            return (
+              <button
+                key={quarter}
+                type="button"
+                className={`report-period-picker__item${selected ? ' report-period-picker__item--active' : ''}`}
+                onClick={() => {
+                  onSelect({ ...period, year: panelYear, quarter });
+                  onClose();
+                }}
+              >
+                Q{quarter}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function ReportPeriodFilter({
+  value,
+  onChange,
+  onRefresh,
+  loading = false,
+  typeOptions = REPORT_TYPE_OPTIONS
+}) {
+  const [open, setOpen] = useState(false);
+  const [panelYear, setPanelYear] = useState(value.year);
+
+  const displayText = useMemo(() => formatReportPeriod(value), [value]);
+
+  const handleTypeChange = (type) => {
+    onChange({ ...value, type });
+  };
+
+  const handleOpenChange = (nextOpen) => {
+    if (nextOpen) {
+      setPanelYear(value.year);
+    }
+    setOpen(nextOpen);
+  };
+
+  return (
+    <Space wrap className="report-period-filter" size={12}>
+      <Select
+        value={value.type}
+        options={typeOptions}
+        onChange={handleTypeChange}
+        className="report-period-filter__type"
+      />
+      <Popover
+        trigger="click"
+        open={open}
+        onOpenChange={handleOpenChange}
+        placement="bottomLeft"
+        overlayClassName="report-period-picker-popover"
+        content={
+          <PeriodPickerPanel
+            period={value}
+            panelYear={panelYear}
+            onPanelYearChange={setPanelYear}
+            onSelect={onChange}
+            onClose={() => setOpen(false)}
+          />
+        }
+      >
+        <Input
+          readOnly
+          value={displayText}
+          className="report-period-filter__input"
+          suffix={<CalendarOutlined className="report-period-filter__calendar" />}
+        />
+      </Popover>
+      <Button icon={<ReloadOutlined />} loading={loading} onClick={onRefresh}>
+        刷新
+      </Button>
+    </Space>
+  );
+}

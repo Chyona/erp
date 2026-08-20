@@ -1,0 +1,166 @@
+import { useEffect, useState } from 'react';
+import { Button, Modal, Form, Input, Select, Typography, App } from 'antd';
+import { PlusOutlined } from '@ant-design/icons';
+import { Accounts } from '../services/accounts';
+import { useApp } from '../context/AppContext';
+import ScrollTable from '../components/ScrollTable';
+import { confirmDanger } from '../utils/confirmAction';
+
+const { Title } = Typography;
+
+const CATEGORIES = ['资产', '负债', '所有者权益', '成本', '损益'];
+
+export default function AccountsPage() {
+  const { message, modal } = App.useApp();
+  const { accounts, setAccounts, refreshKey, refresh } = useApp();
+  const [list, setList] = useState([]);
+  const [categoryFilter, setCategoryFilter] = useState('');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [form] = Form.useForm();
+
+  useEffect(() => {
+    (async () => {
+      const accs = await Accounts.getAll();
+      setAccounts(accs);
+      setList(categoryFilter ? accs.filter((a) => a.category === categoryFilter) : accs);
+    })();
+  }, [refreshKey, categoryFilter, setAccounts]);
+
+  const openModal = (account = null) => {
+    setEditing(account);
+    form.setFieldsValue(
+      account || { category: '资产', direction: 'debit' }
+    );
+    setModalOpen(true);
+  };
+
+  const handleSave = async () => {
+    try {
+      const values = await form.validateFields();
+      await Accounts.save({
+        id: editing?.id || null,
+        code: values.code.trim(),
+        name: values.name.trim(),
+        category: values.category,
+        direction: values.direction
+      });
+      message.success('科目保存成功');
+      setModalOpen(false);
+      refresh();
+    } catch (err) {
+      message.error(err.message || '保存失败');
+    }
+  };
+
+  const handleDelete = async (record) => {
+    const ok = await confirmDanger(modal, {
+      title: '确定删除该科目？',
+      content: `科目「${record.code} ${record.name}」删除后不可恢复。若已有凭证引用该科目，请勿删除。`
+    });
+    if (!ok) return;
+    try {
+      await Accounts.remove(record.id);
+      message.success('科目已删除');
+      refresh();
+    } catch (err) {
+      message.error(err.message || '删除失败');
+    }
+  };
+
+  const columns = [
+    { title: '编码', dataIndex: 'code', width: 100 },
+    { title: '名称', dataIndex: 'name' },
+    { title: '类别', dataIndex: 'category', width: 120 },
+    {
+      title: '余额方向',
+      dataIndex: 'direction',
+      width: 100,
+      render: (d) => (d === 'debit' ? '借方' : '贷方')
+    },
+    {
+      title: '操作',
+      key: 'actions',
+      width: 160,
+      render: (_, record) => (
+        <>
+          <Button size="small" onClick={() => openModal(record)} style={{ marginRight: 8 }}>
+            编辑
+          </Button>
+          <Button size="small" danger onClick={() => handleDelete(record)}>
+            删除
+          </Button>
+        </>
+      )
+    }
+  ];
+
+  return (
+    <div className="page-table-layout">
+      <div className="page-header">
+        <Title level={2} style={{ margin: 0 }}>
+          会计科目
+        </Title>
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()}>
+          新增科目
+        </Button>
+      </div>
+
+      <div className="page-table-toolbar">
+        <Select
+          placeholder="全部类别"
+          allowClear
+          style={{ width: 160 }}
+          value={categoryFilter || undefined}
+          onChange={(v) => setCategoryFilter(v || '')}
+          options={CATEGORIES.map((c) => ({ value: c, label: c }))}
+        />
+      </div>
+
+      <ScrollTable
+        rowKey="id"
+        columns={columns}
+        dataSource={list}
+        pagination={{
+          pageSize: 100,
+          showSizeChanger: true,
+          pageSizeOptions: [20, 50, 100],
+          showTotal: (total) => `共 ${total} 条`
+        }}
+        locale={{ emptyText: '暂无科目' }}
+      />
+
+      <Modal
+        title={editing ? '编辑科目' : '新增科目'}
+        open={modalOpen}
+        onCancel={() => setModalOpen(false)}
+        onOk={handleSave}
+        destroyOnHidden
+      >
+        <Form form={form} layout="vertical">
+          <Form.Item
+            name="code"
+            label="科目编码"
+            rules={[{ required: true, message: '请输入科目编码' }, { pattern: /^[0-9]+$/, message: '只能输入数字' }]}
+          >
+            <Input />
+          </Form.Item>
+          <Form.Item name="name" label="科目名称" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="category" label="类别" rules={[{ required: true }]}>
+            <Select options={CATEGORIES.map((c) => ({ value: c, label: c }))} />
+          </Form.Item>
+          <Form.Item name="direction" label="余额方向">
+            <Select
+              options={[
+                { value: 'debit', label: '借方' },
+                { value: 'credit', label: '贷方' }
+              ]}
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
+    </div>
+  );
+}

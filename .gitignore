@@ -1,4 +1,9 @@
+# ui dependencies
 frontend/node_modules
 frontend/dist
 frontend/.DS_Store
 frontend/*.local
+frontend/.env
+
+# backend dependencies
+backend/.env
