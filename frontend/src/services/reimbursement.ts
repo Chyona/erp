@@ -1,7 +1,9 @@
 import { DB } from './db';
 import { Accounts } from './accounts';
 import { Voucher } from './voucher';
+import { TaxDeclaration } from './taxDeclaration';
 import {
+  formatQuarterLabel,
   formatTaxExemptionPeriod,
   reportPeriodEndDate,
   voucherInReportPeriod
@@ -27,8 +29,9 @@ function extractPerson(...texts) {
 
 function extractCategory(text) {
   if (!text) return '其他';
-  if (/【采购】/.test(text)) return '采购';
-  if (/【餐饮】/.test(text)) return '餐饮';
+  if (/【采购】/.test(text) || /【办公费】/.test(text)) return '采购';
+  if (/【餐饮】/.test(text)) return '福利';
+  if (/【福利费】/.test(text) || /【福利】/.test(text)) return '福利';
   return '其他';
 }
 
@@ -70,7 +73,7 @@ function buildPersonGroups(advances, vouchers, period) {
     if (!map.has(person)) {
       map.set(person, {
         person,
-        categories: { 采购: 0, 餐饮: 0, 其他: 0 },
+        categories: { 采购: 0, 福利: 0, 其他: 0 },
         total: 0,
         advances: [],
         reimbursementVoucher: findReimbursementVoucher(vouchers, period, person)
@@ -86,13 +89,15 @@ function buildPersonGroups(advances, vouchers, period) {
   return [...map.values()].sort((a, b) => b.total - a.total);
 }
 
-/** 月底报销汇总：按垫付人统计当月 2241 贷方垫付 */
-export async function getPeriodSummary(period) {
-  if (period.type !== 'month') {
-    throw new Error('月底报销仅支持按月汇总');
-  }
+function monthToQuarterPeriod(period: { year: number; month: number }) {
+  return {
+    type: 'quarter' as const,
+    year: period.year,
+    quarter: Math.ceil(period.month / 3)
+  };
+}
 
-  const vouchers = await Voucher.getAll();
+function collectAdvances(vouchers, period) {
   const advances = [];
 
   for (const voucher of vouchers) {
@@ -125,6 +130,36 @@ export async function getPeriodSummary(period) {
     }
   }
 
+  return advances;
+}
+
+/** 月底报销汇总：按垫付人统计当月 2241 贷方垫付 */
+export async function getPeriodSummary(period) {
+  if (period.type !== 'month') {
+    throw new Error('月底报销仅支持按月汇总');
+  }
+
+  const quarterPeriod = monthToQuarterPeriod(period);
+  const quarterLabel = formatQuarterLabel(quarterPeriod.year, quarterPeriod.quarter);
+  const quarterDeclared = await TaxDeclaration.isQuarterDeclared(quarterPeriod);
+  const vouchers = await Voucher.getAll();
+  const advances = collectAdvances(vouchers, period);
+  const advanceTotal = roundMoney(advances.reduce((sum, item) => sum + item.amount, 0));
+
+  if (quarterDeclared) {
+    return {
+      period,
+      advances,
+      personGroups: [],
+      pendingGroups: [],
+      pendingTotal: 0,
+      pendingPeople: 0,
+      advanceTotal,
+      quarterDeclared: true,
+      quarterLabel
+    };
+  }
+
   const personGroups = buildPersonGroups(advances, vouchers, period);
   const pendingGroups = personGroups.filter((g) => !g.reimbursementVoucher);
   const pendingTotal = roundMoney(
@@ -137,12 +172,22 @@ export async function getPeriodSummary(period) {
     personGroups,
     pendingGroups,
     pendingTotal,
-    pendingPeople: pendingGroups.length
+    pendingPeople: pendingGroups.length,
+    advanceTotal,
+    quarterDeclared: false,
+    quarterLabel
   };
 }
 
 /** 为指定垫付人生成还垫付凭证 */
 export async function createReimbursementVoucher(period, person, { approve = true } = {}) {
+  const quarterPeriod = monthToQuarterPeriod(period);
+  if (await TaxDeclaration.isQuarterDeclared(quarterPeriod)) {
+    throw new Error(
+      `${formatQuarterLabel(quarterPeriod.year, quarterPeriod.quarter)} 已申报，不可再生成还垫付凭证。${TaxDeclaration.DECLARED_QUARTER_READONLY_TIP}`
+    );
+  }
+
   const summary = await getPeriodSummary(period);
   const group = summary.personGroups.find((g) => g.person === person);
 

@@ -7,7 +7,7 @@ import {
 const SETTING_KEY = 'declaredQuarters';
 
 export const DECLARED_QUARTER_READONLY_TIP =
-  '该季度已结项，凭证不可增删改，且不可反结转。如需调整请先在系统设置中取消结项标记';
+  '该季度已申报，凭证不可增删改，且不可反结转。如需调整请先在系统设置中取消申报标记';
 
 export type DeclaredQuarterRecord = {
   periodKey: string;
@@ -63,7 +63,7 @@ async function assertDateNotInDeclaredQuarter(dateStr: string): Promise<void> {
   if (!(await isDateInDeclaredQuarter(dateStr))) return;
   const period = quarterFromDate(dateStr);
   throw new Error(
-    `${formatQuarterLabel(period.year, period.quarter)} 已结项。${DECLARED_QUARTER_READONLY_TIP}`
+    `${formatQuarterLabel(period.year, period.quarter)} 已申报。${DECLARED_QUARTER_READONLY_TIP}`
   );
 }
 
@@ -71,7 +71,7 @@ async function markQuarterDeclared(period: QuarterPeriod): Promise<DeclaredQuart
   const key = taxExemptionPeriodKey(period);
   const list = await getDeclaredQuarters();
   if (list.some((record) => record.periodKey === key)) {
-    throw new Error(`${formatQuarterLabel(period.year, period.quarter)} 已结项`);
+    throw new Error(`${formatQuarterLabel(period.year, period.quarter)} 已申报`);
   }
 
   const { Voucher } = await import('./voucher');
@@ -84,7 +84,7 @@ async function markQuarterDeclared(period: QuarterPeriod): Promise<DeclaredQuart
     declaredAt: new Date().toISOString()
   };
   await DB.setSetting(SETTING_KEY, [...list, record]);
-  await DB.addAuditLog('标记结项', '税务', formatQuarterLabel(period.year, period.quarter));
+  await DB.addAuditLog('标记已申报', '税务', formatQuarterLabel(period.year, period.quarter));
   return record;
 }
 
@@ -93,14 +93,14 @@ async function unmarkQuarterDeclared(period: QuarterPeriod): Promise<void> {
   const list = await getDeclaredQuarters();
   const next = list.filter((record) => record.periodKey !== key);
   if (next.length === list.length) {
-    throw new Error(`${formatQuarterLabel(period.year, period.quarter)} 未结项`);
+    throw new Error(`${formatQuarterLabel(period.year, period.quarter)} 未申报`);
   }
 
   const { Voucher } = await import('./voucher');
   await Voucher.unlockManyInQuarter(period);
 
   await DB.setSetting(SETTING_KEY, next);
-  await DB.addAuditLog('取消结项', '税务', formatQuarterLabel(period.year, period.quarter));
+  await DB.addAuditLog('取消申报', '税务', formatQuarterLabel(period.year, period.quarter));
 }
 
 /** 启动时补齐：已结项季度内凭证状态同步为已结项 */

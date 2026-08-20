@@ -12,6 +12,7 @@ import VoucherDetailModal from './VoucherDetailModal';
 import { useApp } from '../context/AppContext';
 import { confirmDanger } from '../utils/confirmAction';
 import ReportPeriodFilter from './ReportPeriodFilter';
+import WorkbenchPanelIntro from './WorkbenchPanelIntro';
 import { defaultProfitLossClosingPeriod, taxExemptionPeriodKey } from '../utils/reportPeriod';
 
 const { Text } = Typography;
@@ -176,7 +177,7 @@ export default function MonthEndClosingPanel() {
 
   const handleReverse = async () => {
     if (summary?.declared) {
-      message.warning('该季度已结项，不可反结转');
+      message.warning('该季度已申报，不可反结转');
       return;
     }
     if (!summary?.profitLossVoucher && !summary?.taxVoucher) {
@@ -224,26 +225,26 @@ export default function MonthEndClosingPanel() {
       return;
     }
     if (summary.declared) {
-      message.info('该季度已结项');
+      message.info('该季度已申报');
       return;
     }
 
     const ok = await confirmDanger(modal, {
-      title: '标记结项',
+      title: '标记已申报',
       content: (
         <div>
           <Alert
             type="warning"
             showIcon
-            message="标记后该季度凭证不可增删改，且不可反结转。"
+            message="标记后该季度为已申报状态，凭证不可增删改，且不可反结转。"
             style={{ marginBottom: 12 }}
           />
           <p style={{ marginBottom: 0 }}>
-            期间：{summary.periodLabel}。请确认已向税务机关完成申报后再标记结项。
+            期间：{summary.periodLabel}。请确认已向税务机关完成申报后再标记。
           </p>
         </div>
       ),
-      okText: '确认结项'
+      okText: '确认已申报'
     });
     if (!ok) return;
 
@@ -254,7 +255,7 @@ export default function MonthEndClosingPanel() {
         year: period.year,
         quarter: period.quarter!
       });
-      message.success(`${summary.periodLabel} 已结项`);
+      message.success(`${summary.periodLabel} 已申报`);
       refresh();
       loadSummary();
     } catch (err) {
@@ -276,12 +277,7 @@ export default function MonthEndClosingPanel() {
 
   return (
     <div className="tax-exemption-panel">
-      <Alert
-        type="info"
-        showIcon
-        style={{ marginBottom: 16 }}
-        message="一键完成当季普票减免结转与损益结转。结转完成后可手动标记结项（确认已向税务机关申报后，该季度数据不可删改、不可反结转）。"
-      />
+      <WorkbenchPanelIntro message="一键完成当季普票减免结转与损益结转。结转完成后可手动标记已申报（确认已向税务机关申报后，该季度数据不可删改、不可反结转）。" />
 
       <div className="closing-prerequisites" style={{ marginBottom: 16 }}>
         <Text strong style={{ display: 'block', marginBottom: 8 }}>
@@ -354,11 +350,11 @@ export default function MonthEndClosingPanel() {
         )}
         {fullyClosed && !declared ? (
           <Button type="primary" ghost loading={markingDeclared} onClick={handleMarkDeclared}>
-            标记结项
+            标记已申报
           </Button>
         ) : null}
         {declared ? (
-          <Button disabled>已结项</Button>
+          <Button disabled>已申报</Button>
         ) : null}
         {summary?.taxVoucher ? (
           <Button onClick={() => setViewId(summary.taxVoucher!.id)}>
@@ -414,7 +410,7 @@ export default function MonthEndClosingPanel() {
           type="info"
           showIcon
           style={{ margin: '12px 0' }}
-          message={`${summary?.periodLabel || ''} 已结项（凭证不可增删改，不可反结转）。`}
+          message={`${summary?.periodLabel || ''} 已申报（凭证不可增删改，不可反结转）。`}
         />
       ) : null}
 
@@ -472,13 +468,13 @@ export default function MonthEndClosingPanel() {
 
       {!loading && fullyClosed && !declared && (
         <Text type="secondary" style={{ display: 'block', marginTop: 12 }}>
-          该期间{closingLabel}已完成。确认已向税务机关申报后，请点击「标记结项」；如需调整请先在标记前使用「反结转」。
+          该期间{closingLabel}已完成。确认已向税务机关申报后，请点击「标记已申报」；如需调整请先在标记前使用「反结转」。
         </Text>
       )}
 
       {!loading && declared && (
         <Text type="secondary" style={{ display: 'block', marginTop: 12 }}>
-          该季度已结项。如需修改，请先在系统设置中取消结项标记。
+          该季度已申报。如需修改，请先在系统设置中取消申报标记。
         </Text>
       )}
 

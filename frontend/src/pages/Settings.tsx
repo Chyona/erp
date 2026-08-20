@@ -145,16 +145,16 @@ export default function Settings() {
         </Space.Compact>
       </Card>
 
-      <Card title="申报结项" style={{ maxWidth: 720, marginTop: 24 }}>
+      <Card title="已申报季度" style={{ maxWidth: 720, marginTop: 24 }}>
         <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
-          已结项的季度数据不可增删改、不可反结转。仅在确需更正时可取消结项标记。
+          已申报的季度数据不可增删改、不可反结转。仅在确需更正时可取消申报标记。
         </Typography.Paragraph>
         <Table
           size="small"
           bordered
           rowKey="periodKey"
           pagination={false}
-          locale={{ emptyText: '暂无已结项季度' }}
+          locale={{ emptyText: '暂无已申报季度' }}
           dataSource={declaredQuarters}
           columns={[
             {
@@ -163,7 +163,7 @@ export default function Settings() {
               render: (_, record) => formatQuarterLabel(record.year, record.quarter)
             },
             {
-              title: '结项时间',
+              title: '申报时间',
               dataIndex: 'declaredAt',
               render: (value: string) => new Date(value).toLocaleString('zh-CN')
             },
@@ -172,7 +172,7 @@ export default function Settings() {
               width: 120,
               render: (_, record) => (
                 <Popconfirm
-                  title="取消结项标记？"
+                  title="取消申报标记？"
                   description={`取消后 ${formatQuarterLabel(record.year, record.quarter)} 将可再次修改凭证和反结转。`}
                   okText="确认取消"
                   cancelText="保留"
@@ -183,7 +183,7 @@ export default function Settings() {
                         year: record.year,
                         quarter: record.quarter
                       });
-                      message.success('已取消结项标记');
+                      message.success('已取消申报标记');
                       await loadDeclaredQuarters();
                       refresh();
                     } catch (err) {

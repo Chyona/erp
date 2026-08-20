@@ -405,7 +405,7 @@ export async function reverseClosing(period: ReportPeriod, closingId?: string) {
       })
     ) {
       throw new Error(
-        `${formatReportPeriod(period)} 已结项，不可反结转。${TaxDeclaration.DECLARED_QUARTER_READONLY_TIP}`
+        `${formatReportPeriod(period)} 已申报，不可反结转。${TaxDeclaration.DECLARED_QUARTER_READONLY_TIP}`
       );
     }
   }

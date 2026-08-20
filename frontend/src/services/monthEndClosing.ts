@@ -20,7 +20,7 @@ async function assertPeriodNotDeclared(period: ReportPeriod) {
   if (period.type !== 'quarter' || !period.quarter) return;
   if (await TaxDeclaration.isQuarterDeclared({ type: 'quarter', year: period.year, quarter: period.quarter })) {
     throw new Error(
-      `${formatReportPeriod(period)} 已结项，不可变更结转数据。${TaxDeclaration.DECLARED_QUARTER_READONLY_TIP}`
+      `${formatReportPeriod(period)} 已申报，不可变更结转数据。${TaxDeclaration.DECLARED_QUARTER_READONLY_TIP}`
     );
   }
 }
@@ -68,7 +68,7 @@ export async function getUnifiedSummary(period: ReportPeriod) {
   if (profitLoss.draftCount > 0) {
     blockReason = `该期间还有 ${profitLoss.draftCount} 张草稿凭证未审核，请先审核后再结转`;
   } else if (declared) {
-    blockReason = `${periodLabel} 已结项`;
+    blockReason = `${periodLabel} 已申报`;
   } else if (fullyClosed) {
     blockReason = `${periodLabel} 已完成${closingLabel}`;
   } else if (staleAfterProfitLoss) {

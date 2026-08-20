@@ -9,11 +9,13 @@ import {
   Tag,
   App
 } from 'antd';
+import { CheckCircleFilled } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { Reimbursement } from '../services/reimbursement';
 import { useApp } from '../context/AppContext';
 import { confirmDanger } from '../utils/confirmAction';
 import ReportPeriodFilter from './ReportPeriodFilter';
+import WorkbenchPanelIntro from './WorkbenchPanelIntro';
 import {
   defaultReportPeriod,
   formatTaxExemptionPeriod,
@@ -71,7 +73,7 @@ export default function MonthEndReimbursementPanel() {
             归还总额：<strong>¥{group.total.toFixed(2)}</strong>（{group.advances.length} 笔垫付）
           </p>
           <p style={{ marginBottom: 0, color: '#64748b', fontSize: 12 }}>
-            分录：借 2241 其他应付款（按采购/餐饮等分行）→ 贷 1002 银行存款。
+            分录：借 2241 其他应付款（按采购/福利/其他分行）→ 贷 1002 银行存款。
           </p>
         </div>
       ),
@@ -106,8 +108,8 @@ export default function MonthEndReimbursementPanel() {
       render: (v) => (v ? `¥${v.toFixed(2)}` : '—')
     },
     {
-      title: '餐饮',
-      dataIndex: ['categories', '餐饮'],
+      title: '福利',
+      dataIndex: ['categories', '福利'],
       width: 96,
       align: 'right',
       render: (v) => (v ? `¥${v.toFixed(2)}` : '—')
@@ -183,15 +185,11 @@ export default function MonthEndReimbursementPanel() {
     { title: '摘要', dataIndex: 'summary', ellipsis: true }
   ];
 
+  const quarterDeclared = Boolean(summary?.quarterDeclared);
+
   return (
     <div className="month-end-reimbursement-panel">
-      <Alert
-        type="info"
-        showIcon
-        style={{ marginBottom: 16 }}
-        message="月底汇总个人垫付报销"
-        description="发生时记借费用贷 2241（摘要含垫付人）；月底在此按人汇总，一键生成借 2241、贷银行存款的还垫付凭证。"
-      />
+      <WorkbenchPanelIntro message="摘要末尾写（xx垫付），月底按人汇总生成还垫付凭证。" />
 
       <Space wrap style={{ marginBottom: 16 }} align="start">
         <ReportPeriodFilter
@@ -204,60 +202,82 @@ export default function MonthEndReimbursementPanel() {
         <Button onClick={() => navigate('/ledger')}>打开明细账</Button>
       </Space>
 
-      <div className="tax-exemption-panel__stats">
-        <Text>
-          待归还：<strong>{summary?.pendingPeople || 0}</strong> 人，合计{' '}
-          <strong>¥{(summary?.pendingTotal || 0).toFixed(2)}</strong>
-        </Text>
-        <Text type="secondary">
-          已归还 {summary?.personGroups.filter((g) => g.reimbursementVoucher).length || 0} 人 ·
-          垫付明细 {summary?.advances.length || 0} 笔
-        </Text>
-      </div>
-
-      {summary?.personGroups.length > 0 && (
-        <>
-          <Text strong style={{ display: 'block', margin: '12px 0 8px' }}>
-            按垫付人汇总
+      {quarterDeclared && !loading ? (
+        <div className="reimbursement-declared-state">
+          <CheckCircleFilled className="reimbursement-declared-state__icon" aria-hidden />
+          <Text strong className="reimbursement-declared-state__title">
+            {summary.quarterLabel} 已申报
           </Text>
-          <div className="app-table">
-            <Table
-              size="small"
-              bordered
-              rowKey="person"
-              columns={groupColumns}
-              dataSource={summary.personGroups}
-              pagination={false}
-              loading={loading}
-            />
-          </div>
-        </>
-      )}
-
-      {summary?.advances.length > 0 && (
-        <>
-          <Text strong style={{ display: 'block', margin: '16px 0 8px' }}>
-            垫付明细
+          <Text type="secondary" className="reimbursement-declared-state__desc">
+            还垫付已在凭证中处理，此处不再展示垫付数据。
           </Text>
-          <div className="app-table">
-            <Table
-              size="small"
-              bordered
-              rowKey="id"
-              columns={detailColumns}
-              dataSource={summary.advances}
-              pagination={false}
-              loading={loading}
-            />
-          </div>
-        </>
-      )}
+          <Space wrap className="reimbursement-declared-state__actions">
+            <Button type="primary" ghost onClick={() => navigate('/vouchers')}>
+              查看凭证
+            </Button>
+            <Button onClick={() => navigate('/ledger')}>打开明细账</Button>
+          </Space>
+        </div>
+      ) : null}
 
-      {!loading && !summary?.advances.length && (
-        <Text type="secondary">
-          {periodLabel} 暂无个人垫付记录。请先在凭证摘要中标注「（××垫付）」并记贷 2241。
-        </Text>
-      )}
+      {!quarterDeclared ? (
+        <>
+          <div className="tax-exemption-panel__stats">
+            <Text>
+              待归还：<strong>{summary?.pendingPeople || 0}</strong> 人，合计{' '}
+              <strong>¥{(summary?.pendingTotal || 0).toFixed(2)}</strong>
+            </Text>
+            <Text type="secondary">
+              已归还 {summary?.personGroups.filter((g) => g.reimbursementVoucher).length || 0} 人 ·
+              垫付明细 {summary?.advances.length || 0} 笔
+            </Text>
+          </div>
+
+          {summary?.personGroups.length > 0 && (
+            <>
+              <Text strong style={{ display: 'block', margin: '12px 0 8px' }}>
+                按垫付人汇总
+              </Text>
+              <div className="app-table">
+                <Table
+                  size="small"
+                  bordered
+                  rowKey="person"
+                  columns={groupColumns}
+                  dataSource={summary.personGroups}
+                  pagination={false}
+                  loading={loading}
+                />
+              </div>
+            </>
+          )}
+
+          {summary?.advances.length > 0 && (
+            <>
+              <Text strong style={{ display: 'block', margin: '16px 0 8px' }}>
+                垫付明细
+              </Text>
+              <div className="app-table">
+                <Table
+                  size="small"
+                  bordered
+                  rowKey="id"
+                  columns={detailColumns}
+                  dataSource={summary.advances}
+                  pagination={false}
+                  loading={loading}
+                />
+              </div>
+            </>
+          )}
+
+          {!loading && !summary?.advances.length && (
+            <Text type="secondary">
+              {periodLabel} 暂无垫付记录。记账时摘要末尾写（xx垫付），如（thm垫付），并贷 2241。
+            </Text>
+          )}
+        </>
+      ) : null}
     </div>
   );
 }

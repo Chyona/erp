@@ -376,7 +376,7 @@ export async function reverseCarryForward(period, carryForwardId) {
       })
     ) {
       throw new Error(
-        `${formatTaxExemptionPeriod(period)} 已结项，不可反结转。${TaxDeclaration.DECLARED_QUARTER_READONLY_TIP}`
+        `${formatTaxExemptionPeriod(period)} 已申报，不可反结转。${TaxDeclaration.DECLARED_QUARTER_READONLY_TIP}`
       );
     }
   }
