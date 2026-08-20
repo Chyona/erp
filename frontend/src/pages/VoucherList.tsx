@@ -1,6 +1,14 @@
-import { useEffect, useState } from 'react';
-import { Button, Checkbox, DatePicker, Dropdown, Input, Select, Space, Typography, App } from 'antd';
-import { PlusOutlined, SearchOutlined, DownloadOutlined, UploadOutlined, DeleteOutlined } from '@ant-design/icons';
+import { useEffect, useMemo, useState } from 'react';
+import { Button, Checkbox, Dropdown, Space, Typography, App } from 'antd';
+import type { MenuProps } from 'antd';
+import {
+  PlusOutlined,
+  DownloadOutlined,
+  UploadOutlined,
+  DeleteOutlined,
+  MoreOutlined,
+  ReloadOutlined
+} from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { Voucher } from '../services/voucher';
 import { ExportUtil } from '../services/export';
@@ -8,30 +16,61 @@ import { DB } from '../services/db';
 import VoucherTable from '../components/VoucherTable';
 import VoucherDetailModal from '../components/VoucherDetailModal';
 import VoucherImportModal from '../components/VoucherImportModal';
+import VoucherFilterPanel, { EMPTY_VOUCHER_FILTERS } from '../components/VoucherFilterPanel';
+import VoucherTimeFilter from '../components/VoucherTimeFilter';
+import { defaultTimeFilter } from '../utils/voucherTimeFilter';
+import type { VoucherTimeFilterState } from '../utils/voucherTimeFilter';
 import { useApp } from '../context/AppContext';
-import { confirmDanger } from '../utils/confirmAction';
+import { isCarryForwardVoucher } from '../utils/carryForwardVoucher';
+import type { VoucherFilters } from '../types';
 
 const { Title } = Typography;
-const { RangePicker } = DatePicker;
+
+function countActiveFilters(filters: VoucherFilters) {
+  const keys: (keyof VoucherFilters)[] = [
+    'voucherNumber',
+    'status',
+    'summary',
+    'accountCode',
+    'amountMin',
+    'amountMax',
+    'businessType',
+    'signatory',
+    'remark'
+  ];
+  return keys.filter((key) => {
+    const value = filters[key];
+    return value !== '' && value != null;
+  }).length;
+}
+
+const INITIAL_TIME_FILTER = defaultTimeFilter();
 
 export default function VoucherList() {
   const navigate = useNavigate();
   const { message, modal } = App.useApp();
   const { refreshKey, accounts, refresh } = useApp();
   const [vouchers, setVouchers] = useState([]);
-  const [filters, setFilters] = useState({
-    startDate: '',
-    endDate: '',
-    status: '',
-    keyword: ''
+  const [filters, setFilters] = useState<VoucherFilters>({
+    ...EMPTY_VOUCHER_FILTERS,
+    startDate: INITIAL_TIME_FILTER.startDate,
+    endDate: INITIAL_TIME_FILTER.endDate
   });
-  const [dateRange, setDateRange] = useState(null);
-  const [viewId, setViewId] = useState(null);
+  const [draftFilters, setDraftFilters] = useState<VoucherFilters>({
+    ...EMPTY_VOUCHER_FILTERS,
+    startDate: INITIAL_TIME_FILTER.startDate,
+    endDate: INITIAL_TIME_FILTER.endDate
+  });
+  const [timeFilter, setTimeFilter] = useState<VoucherTimeFilterState>(INITIAL_TIME_FILTER);
+  const [viewId, setViewId] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [showSubtotal, setShowSubtotal] = useState(true);
-  const [selectedIds, setSelectedIds] = useState([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [filterOpen, setFilterOpen] = useState(false);
 
-  const loadList = async (nextFilters = filters) => {
+  const activeFilterCount = useMemo(() => countActiveFilters(filters), [filters]);
+
+  const loadList = async (nextFilters: VoucherFilters = filters) => {
     const list = await Voucher.getAll(nextFilters);
     setVouchers(list);
     setSelectedIds((prev) => prev.filter((id) => list.some((v) => v.id === id)));
@@ -41,14 +80,43 @@ export default function VoucherList() {
     loadList();
   }, [refreshKey]);
 
-  const applyFilters = (patch) => {
+  const applyFilters = (patch: Partial<VoucherFilters>, options: { closePanel?: boolean } = {}) => {
     const next = { ...filters, ...patch };
+    setFilters(next);
+    setDraftFilters(next);
+    loadList(next);
+    if (options.closePanel) setFilterOpen(false);
+  };
+
+  const handleTimeQuery = (startDate: string, endDate: string) => {
+    applyFilters({ startDate, endDate });
+  };
+
+  const handleFilterSearch = () => {
+    applyFilters(
+      {
+        ...draftFilters,
+        startDate: filters.startDate,
+        endDate: filters.endDate
+      },
+      { closePanel: true }
+    );
+  };
+
+  const handleFilterReset = () => {
+    const next = {
+      ...EMPTY_VOUCHER_FILTERS,
+      startDate: filters.startDate,
+      endDate: filters.endDate
+    };
+    setDraftFilters(next);
     setFilters(next);
     loadList(next);
   };
 
-  const handleSearch = () => {
+  const handleRefresh = () => {
     loadList();
+    refresh();
   };
 
   const handleExport = async () => {
@@ -74,10 +142,22 @@ export default function VoucherList() {
 
   const selectedApprovedCount = selectedIds.filter((id) => {
     const voucher = vouchers.find((v) => v.id === id);
-    return voucher?.status === Voucher.STATUS.APPROVED;
+    return voucher?.status === Voucher.STATUS.APPROVED && !isCarryForwardVoucher(voucher);
   }).length;
 
-  const finishBatchAction = (result, { successKey, successLabel, skippedHint }) => {
+  const selectedDeletableCount = selectedIds.filter((id) => {
+    const voucher = vouchers.find((v) => v.id === id);
+    return (
+      voucher &&
+      (voucher.status === Voucher.STATUS.DRAFT || voucher.status === Voucher.STATUS.APPROVED) &&
+      !isCarryForwardVoucher(voucher)
+    );
+  }).length;
+
+  const finishBatchAction = (
+    result: { skipped: number; failed: { id: string; voucherNo?: string }[]; [key: string]: unknown },
+    { successKey, successLabel, skippedHint }: { successKey: string; successLabel: string; skippedHint: string }
+  ) => {
     if (result[successKey]) {
       message.success(`已成功${successLabel} ${result[successKey]} 张凭证`);
     }
@@ -137,29 +217,42 @@ export default function VoucherList() {
     });
   };
 
-  const handleRemoveUnlocked = async () => {
-    const all = await Voucher.getAll();
-    const unlocked = all.filter((v) => v.status !== Voucher.STATUS.LOCKED);
-    const lockedCount = all.length - unlocked.length;
-
-    if (!unlocked.length) {
-      message.info('当前没有可删除的未锁定凭证');
+  const handleBatchDelete = () => {
+    if (!selectedDeletableCount) {
+      message.warning('请先勾选要删除的凭证');
       return;
     }
 
-    const ok = await confirmDanger(modal, {
-      title: '确定删除全部未锁定凭证？',
-      content: `将永久删除 ${unlocked.length} 张凭证（草稿/已审核）及其附件，此操作不可恢复。${
-        lockedCount ? `已锁定 ${lockedCount} 张将保留。` : ''
-      }`,
-      okText: `删除 ${unlocked.length} 张`
+    modal.confirm({
+      title: '批量删除',
+      content: `确定删除选中的 ${selectedDeletableCount} 张凭证及其附件？此操作不可恢复。`,
+      okText: `删除 ${selectedDeletableCount} 张`,
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: async () => {
+        const result = await Voucher.removeMany(selectedIds);
+        finishBatchAction(result, {
+          successKey: 'deleted',
+          successLabel: '删除',
+          skippedHint: '所选凭证中没有可删除的凭证'
+        });
+      }
     });
-    if (!ok) return;
+  };
 
-    const result = await Voucher.removeAllUnlocked();
-    message.success(`已删除 ${result.deleted} 张未锁定凭证`);
-    refresh();
-    loadList();
+  const moreMenuItems: MenuProps['items'] = [
+    { key: 'export', label: '导出 CSV', icon: <DownloadOutlined /> },
+    { key: 'import', label: '导入历史凭证', icon: <UploadOutlined /> }
+  ];
+
+  const handleMoreMenuClick: MenuProps['onClick'] = ({ key }) => {
+    if (key === 'export') {
+      handleExport();
+      return;
+    }
+    if (key === 'import') {
+      setImportOpen(true);
+    }
   };
 
   return (
@@ -173,63 +266,55 @@ export default function VoucherList() {
         </Button>
       </div>
 
-      <div className="page-table-toolbar">
-        <Space wrap>
-        <RangePicker
-          value={dateRange}
-          onChange={(dates) => {
-            setDateRange(dates);
-            applyFilters({
-              startDate: dates?.[0] ? dates[0].format('YYYY-MM-DD') : '',
-              endDate: dates?.[1] ? dates[1].format('YYYY-MM-DD') : ''
-            });
-          }}
-        />
-        <Select
-          placeholder="全部状态"
-          allowClear
-          style={{ width: 120 }}
-          value={filters.status || undefined}
-          onChange={(v) => applyFilters({ status: v || '' })}
-          options={[
-            { value: 'draft', label: '草稿' },
-            { value: 'approved', label: '已审核' },
-            { value: 'locked', label: '已锁定' }
-          ]}
-        />
-        <Input
-          placeholder="搜索摘要/凭证号/科目"
-          style={{ width: 200 }}
-          value={filters.keyword}
-          onChange={(e) => setFilters((f) => ({ ...f, keyword: e.target.value }))}
-          onPressEnter={handleSearch}
-        />
-        <Button type="primary" icon={<SearchOutlined />} onClick={handleSearch}>
-          查询
-        </Button>
-        <Checkbox checked={showSubtotal} onChange={(e) => setShowSubtotal(e.target.checked)}>
-          显示凭证金额小计
-        </Checkbox>
-        <Button icon={<DownloadOutlined />} onClick={handleExport}>
-          导出 CSV
-        </Button>
-        <Button icon={<UploadOutlined />} onClick={() => setImportOpen(true)}>
-          导入历史凭证
-        </Button>
-        <Dropdown.Button
-          onClick={handleBatchApprove}
-          menu={{
-            items: [{ key: 'unapprove', label: '反审核' }],
-            onClick: ({ key }) => {
-              if (key === 'unapprove') handleBatchUnapprove();
+      <div className="page-table-toolbar voucher-list-toolbar">
+        <div className="voucher-list-toolbar__main">
+          <VoucherTimeFilter
+            value={timeFilter}
+            onChange={setTimeFilter}
+            onQuery={handleTimeQuery}
+            filterOpen={filterOpen}
+            onFilterOpenChange={(open) => {
+              setFilterOpen(open);
+              if (open) setDraftFilters(filters);
+            }}
+            activeFilterCount={activeFilterCount}
+            filterContent={
+              <VoucherFilterPanel
+                value={draftFilters}
+                onChange={setDraftFilters}
+                onSearch={handleFilterSearch}
+                onReset={handleFilterReset}
+              />
             }
-          }}
-        >
-          审核
-        </Dropdown.Button>
-        <Button danger icon={<DeleteOutlined />} onClick={handleRemoveUnlocked}>
-          删除未锁定凭证
-        </Button>
+          />
+
+          <Checkbox checked={showSubtotal} onChange={(e) => setShowSubtotal(e.target.checked)}>
+            显示凭证金额小计
+          </Checkbox>
+
+          <Button icon={<ReloadOutlined />} onClick={handleRefresh}>
+            刷新
+          </Button>
+        </div>
+
+        <Space wrap className="voucher-list-toolbar__actions">
+          <Dropdown.Button
+            onClick={handleBatchApprove}
+            menu={{
+              items: [{ key: 'unapprove', label: '反审核' }],
+              onClick: ({ key }) => {
+                if (key === 'unapprove') handleBatchUnapprove();
+              }
+            }}
+          >
+            审核
+          </Dropdown.Button>
+          <Button danger icon={<DeleteOutlined />} onClick={handleBatchDelete}>
+            删除
+          </Button>
+          <Dropdown menu={{ items: moreMenuItems, onClick: handleMoreMenuClick }}>
+            <Button icon={<MoreOutlined />}>更多</Button>
+          </Dropdown>
         </Space>
       </div>
 

@@ -127,14 +127,22 @@ export default function VoucherImportModal({ open, accounts, onClose, onSuccess 
         skipDuplicates
       });
 
-      const parts = [`成功 ${result.imported} 张`];
-      if (result.skipped) parts.push(`跳过重复 ${result.skipped} 张`);
-      if (result.failed) parts.push(`失败 ${result.failed} 张`);
+      const total = preview.vouchers.length;
+      const segments = [`文件共 ${total} 张`];
+      if (result.imported > 0) {
+        segments.push(`成功导入 ${result.imported} 张`);
+      } else {
+        segments.push('无新增导入');
+      }
+      if (result.skipped) segments.push(`跳过重复 ${result.skipped} 张`);
+      if (result.failed) segments.push(`失败 ${result.failed} 张`);
+
+      const summary = `导入完成：${segments.join('，')}（以文件统计为准，不受列表筛选影响）`;
 
       if (result.failed) {
-        message.warning(`导入完成：${parts.join('，')}。请展开查看失败原因。`);
+        message.warning(`${summary}。请展开查看失败原因。`);
       } else {
-        message.success(`导入完成：${parts.join('，')}`);
+        message.success(summary);
       }
 
       if (result.skipped && result.imported === 0) {

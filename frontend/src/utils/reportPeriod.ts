@@ -11,9 +11,14 @@ export function defaultReportPeriod() {
   };
 }
 
-/** 普票减免结转默认按当前季度 */
+/** 财务报表默认按当前季度 */
+export function defaultReportsPeriod() {
+  return { ...defaultReportPeriod(), type: 'quarter' as const };
+}
+
+/** 普票减免结转默认与损益结转一致，按月 */
 export function defaultTaxExemptionPeriod() {
-  return { ...defaultReportPeriod(), type: 'quarter' };
+  return { ...defaultReportPeriod(), type: 'month' as 'month' | 'quarter' };
 }
 
 export function reportPeriodToDateRange(period) {
@@ -94,6 +99,35 @@ export function formatStoredTaxExemptionPeriod(voucher) {
     voucher.taxExemptionPeriodType || 'month'
   );
   return formatTaxExemptionPeriod(period);
+}
+
+/** 损益结转默认按当前月份 */
+export function defaultProfitLossClosingPeriod() {
+  return { ...defaultReportPeriod(), type: 'month' as const };
+}
+
+export function formatStoredProfitLossClosingPeriod(voucher: {
+  profitLossClosingPeriod?: string;
+  profitLossClosingPeriodType?: string;
+}) {
+  if (!voucher?.profitLossClosingPeriod) return '';
+  const period = parseTaxExemptionPeriodKey(
+    voucher.profitLossClosingPeriod,
+    voucher.profitLossClosingPeriodType || 'month'
+  );
+  return formatReportPeriod({ ...period, type: 'month' });
+}
+
+export function expectedProfitLossClosingDate(voucher: {
+  profitLossClosingPeriod?: string;
+  profitLossClosingPeriodType?: string;
+}) {
+  if (!voucher?.profitLossClosingPeriod) return '';
+  const period = parseTaxExemptionPeriodKey(
+    voucher.profitLossClosingPeriod,
+    voucher.profitLossClosingPeriodType || 'month'
+  );
+  return reportPeriodEndDate({ ...period, type: 'month' });
 }
 
 /** 结转凭证应使用的日期：当前期间最后一天 */

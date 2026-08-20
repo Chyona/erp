@@ -24,8 +24,11 @@ import VoucherSheetTools from '../components/VoucherSheetTools';
 import VoucherFormActions from '../components/VoucherFormActions';
 import { buildAttachmentFileName } from '../utils/attachmentName';
 import { INVOICE_TYPE, INVOICE_TYPE_OPTIONS } from '../constants/invoice';
+import { isCarryForwardVoucher, CARRY_FORWARD_VOUCHER_READONLY_TIP } from '../utils/carryForwardVoucher';
 import {
   expectedCarryForwardDate,
+  expectedProfitLossClosingDate,
+  formatStoredProfitLossClosingPeriod,
   formatStoredTaxExemptionPeriod
 } from '../utils/reportPeriod';
 
@@ -91,8 +94,10 @@ export default function VoucherForm() {
   const [adjacent, setAdjacent] = useState({ older: null, newer: null });
   const [eyeCare, setEyeCare] = useState(() => localStorage.getItem(EYE_CARE_KEY) === '1');
   const [carryForwardPeriodLabel, setCarryForwardPeriodLabel] = useState('');
+  const [carryForwardReadOnly, setCarryForwardReadOnly] = useState(false);
 
-  const readOnly = isEdit && !Voucher.canEditVoucher(voucherStatus);
+  const readOnly =
+    isEdit && (carryForwardReadOnly || !Voucher.canEditVoucher(voucherStatus));
 
   const voucherDate = Form.useWatch('voucherDate', form);
   const businessType = Form.useWatch('businessType', form);
@@ -137,9 +142,17 @@ export default function VoucherForm() {
         navigate('/vouchers');
         return;
       }
+      if (isCarryForwardVoucher(v)) {
+        setCarryForwardReadOnly(true);
+        message.warning(CARRY_FORWARD_VOUCHER_READONLY_TIP);
+      }
       form.setFieldsValue({
         voucherDate: dayjs(
-          v.isTaxExemptionCarryForward ? expectedCarryForwardDate(v) || v.date : v.date
+          v.isTaxExemptionCarryForward
+            ? expectedCarryForwardDate(v) || v.date
+            : v.isProfitLossClosing
+              ? expectedProfitLossClosingDate(v) || v.date
+              : v.date
         ),
         attachmentCount: v.attachmentCount || 0,
         businessType: v.businessType || '其他',
@@ -152,7 +165,11 @@ export default function VoucherForm() {
       setVoucherNumber(v.voucherNumber);
       setVoucherStatus(v.status || Voucher.STATUS.DRAFT);
       setCarryForwardPeriodLabel(
-        v.isTaxExemptionCarryForward ? formatStoredTaxExemptionPeriod(v) : ''
+        v.isTaxExemptionCarryForward
+          ? formatStoredTaxExemptionPeriod(v)
+          : v.isProfitLossClosing
+            ? formatStoredProfitLossClosingPeriod(v)
+            : ''
       );
       setReviewedBy(v.reviewedBy || v.postedBy || '');
       setIsRedLetter(Voucher.isRedLetterVoucher(v));
@@ -444,6 +461,9 @@ export default function VoucherForm() {
       let isTaxExemptionCarryForward = false;
       let taxExemptionPeriod = '';
       let taxExemptionPeriodType = 'month';
+      let isProfitLossClosing = false;
+      let profitLossClosingPeriod = '';
+      let profitLossClosingPeriodType = 'month';
 
       if (isEdit) {
         const existing = await Voucher.getById(id);
@@ -452,6 +472,9 @@ export default function VoucherForm() {
         isTaxExemptionCarryForward = existing?.isTaxExemptionCarryForward || false;
         taxExemptionPeriod = existing?.taxExemptionPeriod || '';
         taxExemptionPeriodType = existing?.taxExemptionPeriodType || 'month';
+        isProfitLossClosing = existing?.isProfitLossClosing || false;
+        profitLossClosingPeriod = existing?.profitLossClosingPeriod || '';
+        profitLossClosingPeriodType = existing?.profitLossClosingPeriodType || 'month';
       }
 
       const voucherData = {
@@ -464,6 +487,11 @@ export default function VoucherForm() {
                 taxExemptionPeriod,
                 taxExemptionPeriodType
               })
+            : isProfitLossClosing && profitLossClosingPeriod
+              ? expectedProfitLossClosingDate({
+                  profitLossClosingPeriod,
+                  profitLossClosingPeriodType
+                })
             : values.voucherDate.format('YYYY-MM-DD'),
         attachmentCount: attachments.length,
         businessType: values.businessType,
@@ -482,6 +510,9 @@ export default function VoucherForm() {
         isTaxExemptionCarryForward,
         taxExemptionPeriod,
         taxExemptionPeriodType,
+        isProfitLossClosing,
+        profitLossClosingPeriod,
+        profitLossClosingPeriodType,
         entries,
         invoiceNumbers: values.invoiceNumbers?.trim() || '',
         remark: values.remark?.trim() || '',
@@ -636,6 +667,14 @@ export default function VoucherForm() {
 
       <div className="page-form-body">
         <Card loading={loading} className={`voucher-form-card${readOnly ? ' voucher-form-card--readonly' : ''}`}>
+          {carryForwardReadOnly ? (
+            <Alert
+              type="info"
+              showIcon
+              message={CARRY_FORWARD_VOUCHER_READONLY_TIP}
+              style={{ marginBottom: 16 }}
+            />
+          ) : null}
           <Form form={form} layout="vertical" className="voucher-form">
             <Form.Item name="voucherDate" hidden rules={[{ required: true, message: '请选择日期' }]}>
               <DatePicker />

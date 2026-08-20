@@ -141,14 +141,14 @@ function trialBalanceToCSV(data) {
 }
 
 function incomeStatementToCSV(data) {
-  const rows = [`利润表,${data.startDate} 至 ${data.endDate}`, '项目,行次,本年累计金额,本期金额'];
+  const rows = [`利润表,${data.startDate} 至 ${data.endDate}`, '项目,行次,本期金额,本年累计金额'];
   for (const line of data.rows) {
     rows.push(
       [
         `"${line.label}"`,
         line.row ?? '',
-        fmtAmount(line.ytdAmount),
-        fmtAmount(line.periodAmount)
+        fmtAmount(line.periodAmount),
+        fmtAmount(line.ytdAmount)
       ].join(',')
     );
   }

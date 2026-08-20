@@ -54,6 +54,9 @@ export interface Voucher {
   taxExemptionVoucherId?: string;
   taxExemptionPeriod?: string;
   taxExemptionPeriodType?: string;
+  isProfitLossClosing?: boolean;
+  profitLossClosingPeriod?: string;
+  profitLossClosingPeriodType?: string;
   createdAt?: string;
   updatedAt?: string;
   approvedAt?: string;
@@ -68,11 +71,32 @@ export type VoucherInput = Partial<Voucher> & {
   entries: VoucherEntry[];
 };
 
+/** 普票减免结转明细：每条 2221 贷方分录一行 */
+export interface TaxExemptionTaxLine {
+  id: string;
+  voucherId: string;
+  voucherNo: string;
+  date: string;
+  taxAmount: number;
+  entrySummary: string;
+  remark: string;
+  entryIndex: number;
+}
+
 export interface VoucherFilters {
   startDate?: string;
   endDate?: string;
   status?: VoucherStatus | string;
   keyword?: string;
+  voucherType?: string;
+  voucherNumber?: string;
+  summary?: string;
+  accountCode?: string;
+  amountMin?: number | string;
+  amountMax?: number | string;
+  businessType?: string;
+  signatory?: string;
+  remark?: string;
 }
 
 export interface Attachment {

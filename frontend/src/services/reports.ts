@@ -23,15 +23,16 @@ function blankMoney(v) {
   return Math.abs(n) < 0.005 ? null : n;
 }
 
+/** 按科目性质固定列：借方科目只在借方列、贷方科目只在贷方列，异常余额用负数表示 */
 function toDebitCreditColumns(balance, direction) {
   const b = roundMoney(balance);
   if (Math.abs(b) < 0.005) {
     return { debit: null, credit: null };
   }
   if (direction === 'debit') {
-    return b >= 0 ? { debit: b, credit: null } : { debit: null, credit: -b };
+    return { debit: b, credit: null };
   }
-  return b >= 0 ? { debit: null, credit: b } : { debit: -b, credit: null };
+  return { debit: null, credit: b };
 }
 
 async function getApprovedVouchersUpTo(endDate) {
@@ -41,7 +42,18 @@ async function getApprovedVouchersUpTo(endDate) {
 
 function buildAccountSums(
   vouchers: VoucherRecord[],
-  { beforeDate, fromDate, toDate }: { beforeDate?: string; fromDate?: string; toDate?: string } = {}
+  {
+    beforeDate,
+    fromDate,
+    toDate,
+    excludeProfitLossClosing = false
+  }: {
+    beforeDate?: string;
+    fromDate?: string;
+    toDate?: string;
+    /** 利润表用：排除损益结转凭证，保留普票减免等业务结转 */
+    excludeProfitLossClosing?: boolean;
+  } = {}
 ) {
   const sums = new Map();
   for (const v of vouchers) {
@@ -49,6 +61,7 @@ function buildAccountSums(
     if (beforeDate && d >= beforeDate) continue;
     if (fromDate && d < fromDate) continue;
     if (toDate && d > toDate) continue;
+    if (excludeProfitLossClosing && v.isProfitLossClosing) continue;
     for (const e of v.entries || []) {
       if (!e.accountId) continue;
       const cur = sums.get(e.accountId) || { debit: 0, credit: 0 };
@@ -69,6 +82,14 @@ function periodAmount(debit, credit, direction) {
     return roundMoney(debit - credit);
   }
   return roundMoney(credit - debit);
+}
+
+/** 发生额分列展示借方、贷方合计（含结转凭证，不轧差） */
+function grossOccurrenceColumns(debit, credit) {
+  return {
+    debit: blankMoney(debit),
+    credit: blankMoney(credit)
+  };
 }
 
 const COST_ACCOUNT_CODES = new Set(['4301', '5401']);
@@ -134,10 +155,8 @@ async function getTrialBalance(startDate, endDate) {
     const endingBal = accountBalance(ending.debit, ending.credit, account.direction);
     const openingCols = toDebitCreditColumns(openingBal, account.direction);
     const endingCols = toDebitCreditColumns(endingBal, account.direction);
-    const periodDebit = blankMoney(period.debit);
-    const periodCredit = blankMoney(period.credit);
-    const ytdDebit = blankMoney(ytd.debit);
-    const ytdCredit = blankMoney(ytd.credit);
+    const periodCols = grossOccurrenceColumns(period.debit, period.credit);
+    const ytdCols = grossOccurrenceColumns(ytd.debit, ytd.credit);
 
     rows.push({
       key: account.id,
@@ -146,20 +165,20 @@ async function getTrialBalance(startDate, endDate) {
       categoryLabel: resolveAccountCategoryLabel(account),
       openingDebit: openingCols.debit,
       openingCredit: openingCols.credit,
-      periodDebit,
-      periodCredit,
-      ytdDebit,
-      ytdCredit,
+      periodDebit: periodCols.debit,
+      periodCredit: periodCols.credit,
+      ytdDebit: ytdCols.debit,
+      ytdCredit: ytdCols.credit,
       endingDebit: endingCols.debit,
       endingCredit: endingCols.credit
     });
 
     totals.openingDebit += openingCols.debit || 0;
     totals.openingCredit += openingCols.credit || 0;
-    totals.periodDebit += periodDebit || 0;
-    totals.periodCredit += periodCredit || 0;
-    totals.ytdDebit += ytdDebit || 0;
-    totals.ytdCredit += ytdCredit || 0;
+    totals.periodDebit += periodCols.debit || 0;
+    totals.periodCredit += periodCols.credit || 0;
+    totals.ytdDebit += ytdCols.debit || 0;
+    totals.ytdCredit += ytdCols.credit || 0;
     totals.endingDebit += endingCols.debit || 0;
     totals.endingCredit += endingCols.credit || 0;
   }
@@ -236,8 +255,16 @@ async function getIncomeStatement(startDate, endDate) {
   const accounts = await Accounts.getAll();
   const vouchers = await getApprovedVouchersUpTo(endDate);
   const yearStart = `${endDate.slice(0, 4)}-01-01`;
-  const periodSums = buildAccountSums(vouchers, { fromDate: startDate, toDate: endDate });
-  const ytdSums = buildAccountSums(vouchers, { fromDate: yearStart, toDate: endDate });
+  const periodSums = buildAccountSums(vouchers, {
+    fromDate: startDate,
+    toDate: endDate,
+    excludeProfitLossClosing: true
+  });
+  const ytdSums = buildAccountSums(vouchers, {
+    fromDate: yearStart,
+    toDate: endDate,
+    excludeProfitLossClosing: true
+  });
 
   const periodByCode = buildPLByCode(accounts, periodSums);
   const ytdByCode = buildPLByCode(accounts, ytdSums);

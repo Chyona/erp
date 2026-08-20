@@ -1,6 +1,18 @@
 import { DB } from './db';
 import { Accounts } from './accounts';
 import { buildAttachmentFileName } from '../utils/attachmentName';
+import {
+  matchSignatory,
+  matchVoucherAmount,
+  parseCodeRanges,
+  parseNumberRanges,
+  parseVoucherNum as parseVoucherNumber
+} from '../utils/voucherFilter';
+import {
+  CARRY_FORWARD_VOUCHER_READONLY_TIP,
+  isCarryForwardVoucher
+} from '../utils/carryForwardVoucher';
+import { normalizeVoucherFinanceInterestEntries } from '../utils/financeExpenseEntry';
 import type {
   Attachment,
   LedgerResult,
@@ -22,6 +34,20 @@ function canModifyAttachments(status: VoucherStatus) {
 
 function canEditVoucher(status: VoucherStatus) {
   return status === STATUS.DRAFT;
+}
+
+type VoucherMutationOptions = {
+  allowCarryForwardBypass?: boolean;
+};
+
+function assertCarryForwardMutable(
+  voucher: Pick<VoucherRecord, 'isTaxExemptionCarryForward' | 'isProfitLossClosing'> | null | undefined,
+  options: VoucherMutationOptions = {}
+) {
+  if (options.allowCarryForwardBypass) return;
+  if (isCarryForwardVoucher(voucher)) {
+    throw new Error(CARRY_FORWARD_VOUCHER_READONLY_TIP);
+  }
 }
 
 function isRedLetterVoucher(voucher: Pick<VoucherRecord, 'reversedFromId' | 'reversedFromNo' | 'remark' | 'entries'> | null | undefined) {
@@ -139,38 +165,40 @@ function generateChecksum(voucher: VoucherInput | VoucherRecord) {
 }
 
 async function save(voucherData: VoucherInput, approve = false): Promise<VoucherRecord> {
-  const totals = calcTotals(voucherData.entries);
+  const normalized = normalizeVoucherFinanceInterestEntries(voucherData);
+  const totals = calcTotals(normalized.entries);
   if (!totals.balanced) {
     throw new Error(
       `借贷不平衡，借方 ${totals.debit.toFixed(2)}，贷方 ${totals.credit.toFixed(2)}`
     );
   }
-  if (voucherData.entries.length < 2) {
+  if (normalized.entries.length < 2) {
     throw new Error('至少需要两条分录');
   }
-  for (const e of voucherData.entries) {
+  for (const e of normalized.entries) {
     if (!e.accountId) throw new Error('请选择会计科目');
     if (!e.summary) throw new Error('请填写摘要');
   }
 
-  const isNew = !voucherData.id;
+  const isNew = !normalized.id;
   if (isNew) {
-    voucherData.id = DB.generateId();
-    voucherData.createdAt = new Date().toISOString();
-    if (!voucherData.voucherNumber) {
-      voucherData.voucherNumber = await getNextNumber(voucherData.voucherType, voucherData.date);
+    normalized.id = DB.generateId();
+    normalized.createdAt = new Date().toISOString();
+    if (!normalized.voucherNumber) {
+      normalized.voucherNumber = await getNextNumber(normalized.voucherType, normalized.date);
     } else {
       const conflict = await findNumberConflict(
-        voucherData.voucherType,
-        getYearMonth(voucherData.date),
-        voucherData.voucherNumber
+        normalized.voucherType,
+        getYearMonth(normalized.date),
+        normalized.voucherNumber
       );
       if (conflict) {
-        throw new Error(`凭证字号 ${voucherData.voucherType}-${voucherData.voucherNumber} 已存在`);
+        throw new Error(`凭证字号 ${normalized.voucherType}-${normalized.voucherNumber} 已存在`);
       }
     }
   } else {
-    const existing = await DB.get('vouchers', voucherData.id);
+    const existing = await DB.get('vouchers', normalized.id);
+    assertCarryForwardMutable(existing);
     if (existing && existing.status === STATUS.LOCKED) {
       throw new Error('凭证已锁定，不可修改');
     }
@@ -179,23 +207,23 @@ async function save(voucherData: VoucherInput, approve = false): Promise<Voucher
     }
   }
 
-  voucherData.voucherNo = `${voucherData.voucherType}-${voucherData.voucherNumber}`;
-  voucherData.totalDebit = totals.debit;
-  voucherData.totalCredit = totals.credit;
-  voucherData.status = (approve ? STATUS.APPROVED : STATUS.DRAFT) as VoucherStatus;
-  voucherData.updatedAt = new Date().toISOString();
-  if (approve) voucherData.approvedAt = new Date().toISOString();
-  voucherData.checksum = generateChecksum(voucherData);
+  normalized.voucherNo = `${normalized.voucherType}-${normalized.voucherNumber}`;
+  normalized.totalDebit = totals.debit;
+  normalized.totalCredit = totals.credit;
+  normalized.status = (approve ? STATUS.APPROVED : STATUS.DRAFT) as VoucherStatus;
+  normalized.updatedAt = new Date().toISOString();
+  if (approve) normalized.approvedAt = new Date().toISOString();
+  normalized.checksum = generateChecksum(normalized);
 
-  await DB.put('vouchers', voucherData as VoucherRecord);
+  await DB.put('vouchers', normalized as VoucherRecord);
 
   await DB.addAuditLog(
     isNew ? (approve ? '新建并审核' : '新建草稿') : approve ? '修改并审核' : '修改草稿',
     '凭证',
-    `${voucherData.voucherNo} 金额 ${totals.debit.toFixed(2)}`
+    `${normalized.voucherNo} 金额 ${totals.debit.toFixed(2)}`
   );
 
-  return voucherData as VoucherRecord;
+  return normalized as VoucherRecord;
 }
 
 async function lock(id) {
@@ -265,6 +293,14 @@ async function unapproveMany(ids: string[]) {
       result.skipped++;
       continue;
     }
+    if (isCarryForwardVoucher(voucher)) {
+      result.failed.push({
+        id,
+        voucherNo: voucher.voucherNo,
+        message: '系统结转凭证不可反审核'
+      });
+      continue;
+    }
     try {
       voucher.status = STATUS.DRAFT;
       voucher.approvedAt = undefined;
@@ -290,6 +326,7 @@ async function unapproveMany(ids: string[]) {
 async function unapprove(id) {
   const voucher = await DB.get('vouchers', id);
   if (!voucher) throw new Error('凭证不存在');
+  assertCarryForwardMutable(voucher);
   if (voucher.status === STATUS.LOCKED) {
     throw new Error('已锁定的凭证不可反审核');
   }
@@ -327,9 +364,10 @@ async function removeVoucherData(voucher) {
   await DB.remove('vouchers', voucher.id);
 }
 
-async function remove(id) {
+async function remove(id, options: VoucherMutationOptions = {}) {
   const voucher = await DB.get('vouchers', id);
   if (!voucher) return;
+  assertCarryForwardMutable(voucher, options);
   if (voucher.status === STATUS.LOCKED) {
     throw new Error('已锁定的凭证不可删除');
   }
@@ -337,9 +375,10 @@ async function remove(id) {
   await DB.addAuditLog('删除', '凭证', voucher.voucherNo);
 }
 
-async function forceRemove(id) {
+async function forceRemove(id, options: VoucherMutationOptions = {}) {
   const voucher = await DB.get('vouchers', id);
   if (!voucher) return;
+  assertCarryForwardMutable(voucher, options);
   await removeVoucherData(voucher);
   await DB.addAuditLog('强制删除', '凭证', voucher.voucherNo);
 }
@@ -351,6 +390,51 @@ async function removeByVoucherNo(voucherNo) {
     throw new Error(`未找到凭证 ${voucherNo}`);
   }
   await forceRemove(voucher.id);
+}
+
+/** 批量删除未锁定凭证（草稿、已审核） */
+async function removeMany(ids: string[]) {
+  const uniqueIds = [...new Set(ids)];
+  const result = { deleted: 0, skipped: 0, failed: [] };
+
+  for (const id of uniqueIds) {
+    const voucher = await DB.get('vouchers', id);
+    if (!voucher) {
+      result.skipped++;
+      continue;
+    }
+    if (voucher.status === STATUS.LOCKED) {
+      result.failed.push({
+        id,
+        voucherNo: voucher.voucherNo,
+        message: '已锁定，不可删除'
+      });
+      continue;
+    }
+    if (isCarryForwardVoucher(voucher)) {
+      result.failed.push({
+        id,
+        voucherNo: voucher.voucherNo,
+        message: '系统结转凭证不可删除'
+      });
+      continue;
+    }
+    try {
+      await removeVoucherData(voucher);
+      result.deleted++;
+    } catch (err) {
+      result.failed.push({
+        id,
+        voucherNo: voucher.voucherNo,
+        message: err.message || '删除失败'
+      });
+    }
+  }
+
+  if (result.deleted > 0) {
+    await DB.addAuditLog('批量删除', '凭证', `成功删除 ${result.deleted} 张凭证`);
+  }
+  return result;
 }
 
 /** 批量删除所有未锁定凭证（草稿、已审核） */
@@ -375,9 +459,52 @@ async function getAll(filters: VoucherFilters = {}) {
   let vouchers = await DB.getAll('vouchers');
   vouchers.sort(compareVouchersDesc);
 
-  if (filters.startDate) vouchers = vouchers.filter((v) => v.date >= filters.startDate);
-  if (filters.endDate) vouchers = vouchers.filter((v) => v.date <= filters.endDate);
+  if (filters.startDate) vouchers = vouchers.filter((v) => v.date >= filters.startDate!);
+  if (filters.endDate) vouchers = vouchers.filter((v) => v.date <= filters.endDate!);
   if (filters.status) vouchers = vouchers.filter((v) => v.status === filters.status);
+  if (filters.voucherType) {
+    vouchers = vouchers.filter((v) => v.voucherType === filters.voucherType);
+  }
+
+  const numberRanges = parseNumberRanges(filters.voucherNumber || '');
+  if (numberRanges) {
+    vouchers = vouchers.filter((v) => numberRanges.includes(parseVoucherNumber(v.voucherNumber)));
+  }
+
+  const summaryKw = (filters.summary || '').trim().toLowerCase();
+  if (summaryKw) {
+    vouchers = vouchers.filter((v) =>
+      v.entries.some((e) => (e.summary || '').toLowerCase().includes(summaryKw))
+    );
+  }
+
+  const codeRanges = parseCodeRanges(filters.accountCode || '');
+  if (codeRanges) {
+    vouchers = vouchers.filter((v) =>
+      v.entries.some((e) => {
+        const code = String(e.accountCode || '').trim();
+        return code && codeRanges.includes(code);
+      })
+    );
+  }
+
+  if (filters.amountMin || filters.amountMax) {
+    vouchers = vouchers.filter((v) => matchVoucherAmount(v, filters.amountMin, filters.amountMax));
+  }
+
+  if (filters.businessType) {
+    vouchers = vouchers.filter((v) => v.businessType === filters.businessType);
+  }
+
+  if (filters.signatory) {
+    vouchers = vouchers.filter((v) => matchSignatory(v, filters.signatory!));
+  }
+
+  const remarkKw = (filters.remark || '').trim().toLowerCase();
+  if (remarkKw) {
+    vouchers = vouchers.filter((v) => (v.remark || '').toLowerCase().includes(remarkKw));
+  }
+
   if (filters.keyword) {
     const kw = filters.keyword.toLowerCase();
     vouchers = vouchers.filter(
@@ -502,6 +629,7 @@ async function addAttachmentToVoucher(voucherId, file) {
 async function reverse(id) {
   const source = await DB.get('vouchers', id);
   if (!source) throw new Error('凭证不存在');
+  assertCarryForwardMutable(source);
   if (source.status === STATUS.LOCKED) {
     throw new Error('已锁定的凭证不可冲销');
   }
@@ -546,6 +674,7 @@ async function reverse(id) {
 async function reorder(voucherId, beforeNumber) {
   const source = await DB.get('vouchers', voucherId);
   if (!source) throw new Error('凭证不存在');
+  assertCarryForwardMutable(source);
   if (source.status === STATUS.LOCKED) {
     throw new Error('已锁定的凭证不可调整顺序');
   }
@@ -679,6 +808,7 @@ export const Voucher = {
   STATUS,
   STATUS_LABEL,
   ATTACHMENT_READONLY_TIP,
+  CARRY_FORWARD_VOUCHER_READONLY_TIP,
   canModifyAttachments,
   canEditVoucher,
   isRedLetterVoucher,
@@ -690,6 +820,7 @@ export const Voucher = {
   remove,
   forceRemove,
   removeByVoucherNo,
+  removeMany,
   removeAllUnlocked,
   getAll,
   getById,

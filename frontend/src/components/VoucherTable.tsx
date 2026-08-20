@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { Voucher } from '../services/voucher';
 import type { Voucher as VoucherRecord } from '../types';
 import { useApp } from '../context/AppContext';
+import { isCarryForwardVoucher } from '../utils/carryForwardVoucher';
 import StatusBadge from './StatusBadge';
 import VoucherMoreActions from './VoucherMoreActions';
 
@@ -118,7 +119,9 @@ export default function VoucherTable({
     () =>
       pagedVouchers
         .filter(
-          (v) => v.status === Voucher.STATUS.DRAFT || v.status === Voucher.STATUS.APPROVED
+          (v) =>
+            (v.status === Voucher.STATUS.DRAFT || v.status === Voucher.STATUS.APPROVED) &&
+            !isCarryForwardVoucher(v)
         )
         .map((v) => v.id),
     [pagedVouchers]
@@ -157,7 +160,7 @@ export default function VoucherTable({
   };
 
   const openVoucher = (voucher) => {
-    if (voucher.status === Voucher.STATUS.LOCKED) {
+    if (voucher.status === Voucher.STATUS.LOCKED || isCarryForwardVoucher(voucher)) {
       onView?.(voucher.id);
       return;
     }
@@ -173,46 +176,49 @@ export default function VoucherTable({
         title="查看"
         onClick={() => onView?.(voucher.id)}
       />
-      {voucher.status === 'locked' ? (
-        <Popconfirm
-          title="确定强制删除已锁定凭证？"
-          description={`凭证 ${voucher.voucherNo} 及关联附件删除后不可恢复。`}
-          okText="强制删除"
-          cancelText="取消"
-          okButtonProps={{ danger: true }}
-          onConfirm={async () => {
-            try {
-              await Voucher.forceRemove(voucher.id);
-              message.success('凭证已删除');
-              notifyDataChanged();
-            } catch (err) {
-              message.error(err.message);
-            }
-          }}
-        >
-          <Button type="text" size="small" danger icon={<DeleteOutlined />} title="强制删除" />
-        </Popconfirm>
-      ) : (
-        <Popconfirm
-          title="确定删除该凭证？"
-          description={`凭证 ${voucher.voucherNo} 及关联附件删除后不可恢复。`}
-          okText="确定删除"
-          cancelText="取消"
-          okButtonProps={{ danger: true }}
-          onConfirm={async () => {
-            try {
-              await Voucher.remove(voucher.id);
-              message.success('凭证已删除');
-              notifyDataChanged();
-            } catch (err) {
-              message.error(err.message);
-            }
-          }}
-        >
-          <Button type="text" size="small" danger icon={<DeleteOutlined />} title="删除" />
-        </Popconfirm>
-      )}
-      <VoucherMoreActions voucher={voucher} onRefresh={onRefresh} />
+      {!isCarryForwardVoucher(voucher) &&
+        (voucher.status === 'locked' ? (
+          <Popconfirm
+            title="确定强制删除已锁定凭证？"
+            description={`凭证 ${voucher.voucherNo} 及关联附件删除后不可恢复。`}
+            okText="强制删除"
+            cancelText="取消"
+            okButtonProps={{ danger: true }}
+            onConfirm={async () => {
+              try {
+                await Voucher.forceRemove(voucher.id);
+                message.success('凭证已删除');
+                notifyDataChanged();
+              } catch (err) {
+                message.error(err.message);
+              }
+            }}
+          >
+            <Button type="text" size="small" danger icon={<DeleteOutlined />} title="强制删除" />
+          </Popconfirm>
+        ) : (
+          <Popconfirm
+            title="确定删除该凭证？"
+            description={`凭证 ${voucher.voucherNo} 及关联附件删除后不可恢复。`}
+            okText="确定删除"
+            cancelText="取消"
+            okButtonProps={{ danger: true }}
+            onConfirm={async () => {
+              try {
+                await Voucher.remove(voucher.id);
+                message.success('凭证已删除');
+                notifyDataChanged();
+              } catch (err) {
+                message.error(err.message);
+              }
+            }}
+          >
+            <Button type="text" size="small" danger icon={<DeleteOutlined />} title="删除" />
+          </Popconfirm>
+        ))}
+      {!isCarryForwardVoucher(voucher) ? (
+        <VoucherMoreActions voucher={voucher} onRefresh={onRefresh} />
+      ) : null}
     </Space>
   );
 
@@ -303,13 +309,14 @@ export default function VoucherTable({
             onCell: (record) => mergeCell(record.groupRowSpan),
             render: (_, record) => {
               const voucher = record.voucher;
-              const selectable =
-                voucher.status === Voucher.STATUS.DRAFT ||
-                voucher.status === Voucher.STATUS.APPROVED;
+              const rowSelectable =
+                (voucher.status === Voucher.STATUS.DRAFT ||
+                  voucher.status === Voucher.STATUS.APPROVED) &&
+                !isCarryForwardVoucher(voucher);
               return (
                 <Checkbox
                   checked={selectedSet.has(voucher.id)}
-                  disabled={!selectable}
+                  disabled={!rowSelectable}
                   onChange={(e) => toggleVoucherSelect(voucher.id, e.target.checked)}
                 />
               );

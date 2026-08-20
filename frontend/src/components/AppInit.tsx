@@ -2,10 +2,11 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Spin } from 'antd';
 import { DB } from '../services/db';
 import { Accounts } from '../services/accounts';
+import { repairFinanceInterestEntries } from '../services/financeExpenseRepair';
 import { useApp } from '../context/AppContext';
 
 export default function AppInit({ children }: { children: ReactNode }) {
-  const { setCompanyName, setAccounts, refreshKey } = useApp();
+  const { setCompanyName, setAccounts, refresh, refreshKey } = useApp();
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -13,18 +14,22 @@ export default function AppInit({ children }: { children: ReactNode }) {
     (async () => {
       await DB.open();
       await Accounts.init();
+      const repaired = await repairFinanceInterestEntries();
       const name = await DB.getSetting('companyName');
       const accs = await Accounts.getAll();
       if (!cancelled) {
         setCompanyName(typeof name === 'string' ? name : '');
         setAccounts(accs);
         setReady(true);
+        if (repaired > 0) {
+          refresh();
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [refreshKey, setCompanyName, setAccounts]);
+  }, [refreshKey, setCompanyName, setAccounts, refresh]);
 
   if (!ready) {
     return (

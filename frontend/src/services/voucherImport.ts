@@ -174,6 +174,7 @@ async function importVouchers(vouchers, { skipDuplicates = true, approve = false
   const existing = await Voucher.getAll();
   const existingKeys = new Set(existing.map((v) => voucherImportKey(v)));
   const result = {
+    total: vouchers.length,
     imported: 0,
     skipped: 0,
     failed: 0,
@@ -230,6 +231,7 @@ async function importVouchers(vouchers, { skipDuplicates = true, approve = false
         taxExemptionDone: false,
         taxExemptionVoucherId: '',
         isTaxExemptionCarryForward: false,
+        isProfitLossClosing: false,
         taxExemptionPeriod: '',
         taxExemptionPeriodType: 'month',
         entries: raw.entries,
@@ -259,11 +261,11 @@ async function importVouchers(vouchers, { skipDuplicates = true, approve = false
     }
   }
 
-  if (result.imported > 0) {
+  if (result.imported > 0 || result.skipped > 0 || result.failed > 0) {
     await DB.addAuditLog(
       '导入',
       '凭证',
-      `成功 ${result.imported} 张，跳过 ${result.skipped} 张，失败 ${result.failed} 张`
+      `文件共 ${result.total} 张，成功 ${result.imported} 张，跳过 ${result.skipped} 张，失败 ${result.failed} 张`
     );
   }
 

@@ -17,16 +17,45 @@ import BalanceSheetView from '../components/BalanceSheetView';
 import IncomeStatementView from '../components/IncomeStatementView';
 import ReportPeriodFilter from '../components/ReportPeriodFilter';
 import {
-  defaultReportPeriod,
+  defaultReportsPeriod,
   reportPeriodToDateRange
 } from '../utils/reportPeriod';
 import { mergeBalanceSheetRows } from '../utils/balanceSheetRows';
 
 const { Title, Text } = Typography;
 
-function amountCell(v) {
+function isNegativeAmount(v: unknown) {
+  return v != null && Number(v) < -0.005;
+}
+
+function trialBalanceAmountCell(v: unknown) {
   if (v == null || Math.abs(Number(v)) < 0.005) return '';
   return Number(v).toFixed(2);
+}
+
+function amountCell(v: unknown) {
+  return trialBalanceAmountCell(v);
+}
+
+function trialAmountColumn(
+  title: string,
+  dataIndex: string,
+  width: number,
+  highlightNegative = false
+) {
+  return {
+    title,
+    dataIndex,
+    align: 'right' as const,
+    width,
+    render: trialBalanceAmountCell,
+    onCell: highlightNegative
+      ? (record: Record<string, unknown>) =>
+          isNegativeAmount(record[dataIndex])
+            ? { className: 'trial-balance-report__cell--negative' }
+            : {}
+      : undefined
+  };
 }
 
 const TRIAL_BALANCE_SCROLL_X = 1280;
@@ -38,80 +67,44 @@ const trialColumns: ColumnsType<any> = [
   {
     title: '期初余额',
     children: [
-      {
-        title: '借方',
-        dataIndex: 'openingDebit',
-        align: 'right',
-        width: 110,
-        render: amountCell
-      },
-      {
-        title: '贷方',
-        dataIndex: 'openingCredit',
-        align: 'right',
-        width: 110,
-        render: amountCell
-      }
+      trialAmountColumn('借方', 'openingDebit', 110, true),
+      trialAmountColumn('贷方', 'openingCredit', 110, true)
     ]
   },
   {
     title: '本期发生额',
     children: [
-      {
-        title: '借方',
-        dataIndex: 'periodDebit',
-        align: 'right',
-        width: 110,
-        render: amountCell
-      },
-      {
-        title: '贷方',
-        dataIndex: 'periodCredit',
-        align: 'right',
-        width: 110,
-        render: amountCell
-      }
+      trialAmountColumn('借方', 'periodDebit', 110),
+      trialAmountColumn('贷方', 'periodCredit', 110)
     ]
   },
   {
     title: '本年累计发生额',
     children: [
-      {
-        title: '借方',
-        dataIndex: 'ytdDebit',
-        align: 'right',
-        width: 120,
-        render: amountCell
-      },
-      {
-        title: '贷方',
-        dataIndex: 'ytdCredit',
-        align: 'right',
-        width: 120,
-        render: amountCell
-      }
+      trialAmountColumn('借方', 'ytdDebit', 120),
+      trialAmountColumn('贷方', 'ytdCredit', 120)
     ]
   },
   {
     title: '期末余额',
     children: [
-      {
-        title: '借方',
-        dataIndex: 'endingDebit',
-        align: 'right',
-        width: 110,
-        render: amountCell
-      },
-      {
-        title: '贷方',
-        dataIndex: 'endingCredit',
-        align: 'right',
-        width: 110,
-        render: amountCell
-      }
+      trialAmountColumn('借方', 'endingDebit', 110, true),
+      trialAmountColumn('贷方', 'endingCredit', 110, true)
     ]
   }
 ];
+
+function trialSummaryCell(index: number, value: unknown) {
+  return (
+    <Table.Summary.Cell
+      index={index}
+      align="right"
+      className={isNegativeAmount(value) ? 'trial-balance-report__cell--negative' : undefined}
+    >
+      <strong>{trialBalanceAmountCell(value)}</strong>
+    </Table.Summary.Cell>
+  );
+}
 
 function TrialBalanceTab({ dateRange, refreshToken }) {
   const { message } = App.useApp();
@@ -175,30 +168,14 @@ function TrialBalanceTab({ dateRange, refreshToken }) {
                   <Table.Summary.Cell index={0} colSpan={3}>
                     <strong>合计</strong>
                   </Table.Summary.Cell>
-                  <Table.Summary.Cell index={3} align="right">
-                    <strong>{amountCell(data.totals.openingDebit)}</strong>
-                  </Table.Summary.Cell>
-                  <Table.Summary.Cell index={4} align="right">
-                    <strong>{amountCell(data.totals.openingCredit)}</strong>
-                  </Table.Summary.Cell>
-                  <Table.Summary.Cell index={5} align="right">
-                    <strong>{amountCell(data.totals.periodDebit)}</strong>
-                  </Table.Summary.Cell>
-                  <Table.Summary.Cell index={6} align="right">
-                    <strong>{amountCell(data.totals.periodCredit)}</strong>
-                  </Table.Summary.Cell>
-                  <Table.Summary.Cell index={7} align="right">
-                    <strong>{amountCell(data.totals.ytdDebit)}</strong>
-                  </Table.Summary.Cell>
-                  <Table.Summary.Cell index={8} align="right">
-                    <strong>{amountCell(data.totals.ytdCredit)}</strong>
-                  </Table.Summary.Cell>
-                  <Table.Summary.Cell index={9} align="right">
-                    <strong>{amountCell(data.totals.endingDebit)}</strong>
-                  </Table.Summary.Cell>
-                  <Table.Summary.Cell index={10} align="right">
-                    <strong>{amountCell(data.totals.endingCredit)}</strong>
-                  </Table.Summary.Cell>
+                  {trialSummaryCell(3, data.totals.openingDebit)}
+                  {trialSummaryCell(4, data.totals.openingCredit)}
+                  {trialSummaryCell(5, data.totals.periodDebit)}
+                  {trialSummaryCell(6, data.totals.periodCredit)}
+                  {trialSummaryCell(7, data.totals.ytdDebit)}
+                  {trialSummaryCell(8, data.totals.ytdCredit)}
+                  {trialSummaryCell(9, data.totals.endingDebit)}
+                  {trialSummaryCell(10, data.totals.endingCredit)}
                 </Table.Summary.Row>
               </Table.Summary>
             ) : null
@@ -332,7 +309,7 @@ function BalanceSheetTab({ dateRange, refreshToken }) {
 }
 
 export default function Reports() {
-  const [period, setPeriod] = useState(defaultReportPeriod);
+  const [period, setPeriod] = useState(defaultReportsPeriod);
   const [refreshToken, setRefreshToken] = useState(0);
   const dateRange = useMemo(() => reportPeriodToDateRange(period), [period]);
 

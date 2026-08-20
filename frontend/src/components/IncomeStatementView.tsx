@@ -24,10 +24,10 @@ export default function IncomeStatementView({ rows = [] }) {
           <tr>
             <th className="income-statement-view__th income-statement-view__th--label">项目</th>
             <th className="income-statement-view__th income-statement-view__th--index">行次</th>
+            <th className="income-statement-view__th income-statement-view__th--amount">本期金额</th>
             <th className="income-statement-view__th income-statement-view__th--amount">
               本年累计金额
             </th>
-            <th className="income-statement-view__th income-statement-view__th--amount">本期金额</th>
             <th className="income-statement-view__th income-statement-view__th--fill" />
           </tr>
         </thead>
@@ -65,7 +65,7 @@ export default function IncomeStatementView({ rows = [] }) {
                   .filter(Boolean)
                   .join(' ')}
               >
-                {formatReportAmount(row.ytdAmount)}
+                {formatReportAmount(row.periodAmount)}
               </td>
               <td
                 className={[
@@ -75,7 +75,7 @@ export default function IncomeStatementView({ rows = [] }) {
                   .filter(Boolean)
                   .join(' ')}
               >
-                {formatReportAmount(row.periodAmount)}
+                {formatReportAmount(row.ytdAmount)}
               </td>
               <td className="income-statement-view__fill" />
             </tr>

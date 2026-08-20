@@ -153,6 +153,294 @@ body,
   margin-bottom: 12px;
 }
 
+.voucher-list-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.voucher-list-toolbar__main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.voucher-list-toolbar__date {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.voucher-time-filter-group {
+  display: inline-flex;
+  align-items: stretch;
+  min-height: 32px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  background: #fff;
+  overflow: hidden;
+  cursor: default;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.voucher-time-filter-group:hover {
+  border-color: #4096ff;
+}
+
+.voucher-time-filter-group__mode {
+  min-width: 84px;
+  flex-shrink: 0;
+}
+
+.voucher-time-filter-group__mode.ant-select-borderless .ant-select-selector {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  height: 30px !important;
+  padding: 0 8px !important;
+}
+
+.voucher-time-filter-group__divider {
+  width: 1px;
+  background: #f0f0f0;
+  flex-shrink: 0;
+}
+
+.voucher-time-filter-group__value {
+  flex: 1;
+  min-width: 168px;
+  border: none;
+  background: transparent;
+  padding: 0 8px;
+  text-align: center;
+  font-size: 14px;
+  color: #374151;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.voucher-time-filter-group__value:hover,
+.voucher-time-filter-group__trigger:hover {
+  background: #fafafa;
+}
+
+.voucher-time-filter-group__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: transparent;
+  padding: 0 10px;
+  font-size: 14px;
+  color: #374151;
+  cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.voucher-time-filter-group__trigger-icon {
+  color: #1a56db;
+  font-size: 14px;
+}
+
+.voucher-time-filter-group__trigger--active {
+  color: #1a56db;
+  font-weight: 500;
+}
+
+.voucher-time-filter-popover-wrap .ant-popover-inner {
+  padding: 0;
+}
+
+.voucher-time-filter-popover {
+  padding: 12px 12px 10px;
+}
+
+.voucher-time-filter-popover__panels {
+  display: flex;
+  gap: 12px;
+}
+
+.voucher-time-filter__panel-title {
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: #374151;
+  font-weight: 500;
+}
+
+.voucher-time-filter__date-panel {
+  width: 280px;
+}
+
+.voucher-time-filter__date-panel .ant-picker-calendar {
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+}
+
+.voucher-time-filter__date-panel .ant-picker-calendar-header {
+  padding: 8px 8px 0;
+}
+
+.voucher-time-filter__date-panel .ant-picker-panel {
+  border-top: none;
+}
+
+.voucher-time-filter__period-panel {
+  width: 220px;
+}
+
+.voucher-time-filter__year-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  color: #374151;
+  font-weight: 500;
+}
+
+.voucher-time-filter__period-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.voucher-time-filter__period-item {
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  border-radius: 6px;
+  height: 34px;
+  cursor: pointer;
+  color: #374151;
+  transition: all 0.15s ease;
+}
+
+.voucher-time-filter__period-item:hover {
+  border-color: #1a56db;
+  color: #1a56db;
+}
+
+.voucher-time-filter__period-item--active {
+  background: #1a56db;
+  border-color: #1a56db;
+  color: #fff;
+}
+
+.voucher-time-filter-popover__shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.voucher-time-filter-popover__shortcut {
+  border: none;
+  background: none;
+  padding: 0;
+  color: #1a56db;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.voucher-time-filter-popover__shortcut:hover {
+  text-decoration: underline;
+}
+
+.voucher-time-filter-popover__preview {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.voucher-time-filter-popover__footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.voucher-list-toolbar__actions {
+  margin-left: auto;
+}
+
+.voucher-filter-popover .ant-popover-inner {
+  padding: 0;
+}
+
+.voucher-filter-panel {
+  width: 420px;
+  max-width: calc(100vw - 32px);
+  padding: 16px 16px 12px;
+}
+
+.voucher-filter-panel__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.voucher-filter-panel__label {
+  width: 56px;
+  flex-shrink: 0;
+  line-height: 32px;
+  color: #374151;
+  text-align: right;
+}
+
+.voucher-filter-panel__field {
+  flex: 1;
+  min-width: 0;
+}
+
+.voucher-filter-panel__field .ant-select,
+.voucher-filter-panel__field .ant-input,
+.voucher-filter-panel__field .ant-input-number {
+  width: 100%;
+}
+
+.voucher-filter-panel__hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #9ca3af;
+  line-height: 1.4;
+}
+
+.voucher-filter-panel__range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.voucher-filter-panel__range .ant-input-number {
+  flex: 1;
+}
+
+.voucher-filter-panel__range-sep {
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
+.voucher-filter-panel__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.voucher-filter-panel__expand {
+  padding-left: 0;
+}
+
 /* 统一表格滚动条 */
 .app-table-scroll,
 .page-table-body--scroll .ant-table-body,
@@ -1558,6 +1846,18 @@ body,
   background: var(--app-table-row-total) !important;
 }
 
+.trial-balance-report .ant-table-cell.trial-balance-report__cell--negative {
+  background: rgb(255, 238, 239) !important;
+}
+
+.trial-balance-report .ant-table-tbody > tr:hover > .trial-balance-report__cell--negative {
+  background: rgb(255, 228, 230) !important;
+}
+
+.trial-balance-report .ant-table-summary .ant-table-cell.trial-balance-report__cell--negative {
+  background: rgb(255, 238, 239) !important;
+}
+
 /* 弹窗 / 面板内嵌表格 */
 .app-table .ant-table-wrapper,
 .voucher-import-modal__table .ant-table-wrapper,
@@ -1597,6 +1897,41 @@ body,
 .tax-exemption-panel__tax-total {
   color: var(--app-table-amount);
   font-size: 15px;
+}
+
+.closing-prerequisites__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.closing-prerequisites__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 14px;
+  color: #374151;
+}
+
+.closing-prerequisites__icon {
+  margin-top: 3px;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.closing-prerequisites__icon--ok {
+  color: #52c41a;
+}
+
+.closing-prerequisites__icon--warn {
+  color: #faad14;
+}
+
+.closing-prerequisites__icon--error {
+  color: #ff4d4f;
 }
 
 .report-tab-panel .page-table-body .ant-table {

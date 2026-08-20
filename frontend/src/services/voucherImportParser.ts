@@ -1,5 +1,6 @@
 import { INVOICE_TYPE } from '../constants/invoice';
 import * as XLSX from 'xlsx';
+import { normalizeVoucherFinanceInterestEntries } from '../utils/financeExpenseEntry';
 
 /** 历史表格「一级科目」→ 系统科目编码 */
 const LEVEL1_ACCOUNT_CODES = {
@@ -332,14 +333,21 @@ function buildSummary(summary, counterparty) {
   return base ? `${base}（${party}）` : party;
 }
 
+function normalizeFinanceInterestEntries(voucher) {
+  const hints = (voucher._level2Hints || []).join(' ');
+  return normalizeVoucherFinanceInterestEntries(voucher, hints);
+}
+
 function inferVoucherMeta(voucher) {
   const level2Hints = voucher._level2Hints || [];
   const level2Text = level2Hints.join(' ');
   const codes = new Set(voucher.entries.map((e) => e.accountCode));
   const hasIncome = codes.has('5001');
-  const taxCreditEntry = voucher.entries.find(
-    (e) => e.accountCode === '2221' && parseFloat(e.credit) > 0
-  );
+  const taxCreditTotal = Math.round(
+    voucher.entries
+      .filter((e) => e.accountCode === '2221')
+      .reduce((sum, e) => sum + (parseFloat(String(e.credit)) || 0), 0) * 100
+  ) / 100;
 
   if (hasIncome) {
     voucher.businessType = '销售收入';
@@ -348,13 +356,13 @@ function inferVoucherMeta(voucher) {
       level2Hints.includes('应交专票增值税')
     ) {
       voucher.invoiceType = INVOICE_TYPE.SPECIAL;
-    } else if (taxCreditEntry) {
+    } else if (taxCreditTotal > 0) {
       voucher.invoiceType = INVOICE_TYPE.ORDINARY;
     } else {
       voucher.invoiceType = INVOICE_TYPE.NONE;
     }
-    if (taxCreditEntry) {
-      voucher.taxAmount = parseFloat(taxCreditEntry.credit) || 0;
+    if (taxCreditTotal > 0) {
+      voucher.taxAmount = taxCreditTotal;
     }
   } else if (codes.has('2211')) {
     voucher.businessType = '工资薪酬';
@@ -501,6 +509,7 @@ function rowsToVouchers(rows, accounts) {
       warnings.push(`${voucher.voucherNo} 分录不足 2 条，已跳过`);
       continue;
     }
+    normalizeFinanceInterestEntries(voucher);
     inferVoucherMeta(voucher);
     vouchers.push(voucher);
   }

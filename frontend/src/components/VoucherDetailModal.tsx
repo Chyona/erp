@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Modal, Button, Space, App, Popconfirm } from 'antd';
+import { Modal, Button, Space, App, Popconfirm, Alert } from 'antd';
 import { FilePdfOutlined } from '@ant-design/icons';
 import { Voucher } from '../services/voucher';
 import { ExportUtil, getCompanyInfo } from '../services/export';
 import { confirmWarning } from '../utils/confirmAction';
 import { useApp } from '../context/AppContext';
+import { isCarryForwardVoucher, CARRY_FORWARD_VOUCHER_READONLY_TIP } from '../utils/carryForwardVoucher';
 
 function isPdfAttachment(att) {
   return att.type === 'application/pdf' || /\.pdf$/i.test(att.name || '');
@@ -200,6 +201,8 @@ export default function VoucherDetailModal({
     }
   };
 
+  const carryForward = Boolean(voucher && isCarryForwardVoucher(voucher));
+
   return (
     <>
       <Modal
@@ -212,53 +215,54 @@ export default function VoucherDetailModal({
           <Button onClick={handlePrint} disabled={!voucher}>
             打印凭证
           </Button>
-          {voucher?.status === Voucher.STATUS.APPROVED && (
+          {!carryForward && voucher?.status === Voucher.STATUS.APPROVED && (
             <Button danger onClick={handleUnapprove} disabled={!voucher}>
               反审核
             </Button>
           )}
-          {voucher?.status === 'locked' ? (
-            <Popconfirm
-              title="确定强制删除已锁定凭证？"
-              description={
-                voucher
-                  ? `凭证 ${voucher.voucherNo} 及关联附件删除后不可恢复。`
-                  : undefined
-              }
-              okText="强制删除"
-              cancelText="取消"
-              okButtonProps={{ danger: true }}
-              onConfirm={handleForceDelete}
-              disabled={!voucher}
-            >
-              <Button danger disabled={!voucher}>
-                强制删除
-              </Button>
-            </Popconfirm>
-          ) : (
-            <>
+          {!carryForward &&
+            (voucher?.status === 'locked' ? (
               <Popconfirm
-                title="确定删除该凭证？"
+                title="确定强制删除已锁定凭证？"
                 description={
                   voucher
                     ? `凭证 ${voucher.voucherNo} 及关联附件删除后不可恢复。`
                     : undefined
                 }
-                okText="确定删除"
+                okText="强制删除"
                 cancelText="取消"
                 okButtonProps={{ danger: true }}
-                onConfirm={handleDelete}
+                onConfirm={handleForceDelete}
                 disabled={!voucher}
               >
                 <Button danger disabled={!voucher}>
-                  删除凭证
+                  强制删除
                 </Button>
               </Popconfirm>
-              <Button onClick={handleLock} disabled={!voucher}>
-                锁定凭证
-              </Button>
-            </>
-          )}
+            ) : (
+              <>
+                <Popconfirm
+                  title="确定删除该凭证？"
+                  description={
+                    voucher
+                      ? `凭证 ${voucher.voucherNo} 及关联附件删除后不可恢复。`
+                      : undefined
+                  }
+                  okText="确定删除"
+                  cancelText="取消"
+                  okButtonProps={{ danger: true }}
+                  onConfirm={handleDelete}
+                  disabled={!voucher}
+                >
+                  <Button danger disabled={!voucher}>
+                    删除凭证
+                  </Button>
+                </Popconfirm>
+                <Button onClick={handleLock} disabled={!voucher}>
+                  锁定凭证
+                </Button>
+              </>
+            ))}
           <Button type="primary" onClick={onClose}>
             关闭
           </Button>
@@ -266,6 +270,9 @@ export default function VoucherDetailModal({
         }
         loading={loading}
       >
+        {carryForward ? (
+          <Alert type="info" showIcon message={CARRY_FORWARD_VOUCHER_READONLY_TIP} style={{ marginBottom: 16 }} />
+        ) : null}
         {voucher && (
           <>
             <div

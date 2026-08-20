@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { Voucher } from '../services/voucher';
 import { confirmWarning } from '../utils/confirmAction';
 import { useApp } from '../context/AppContext';
+import { isCarryForwardVoucher } from '../utils/carryForwardVoucher';
 
 const { Text } = Typography;
 
@@ -19,6 +20,11 @@ export default function VoucherMoreActions({ voucher, onRefresh }) {
 
   const voucherType = voucher.voucherType || '记';
   const locked = voucher.status === Voucher.STATUS.LOCKED;
+  const carryForward = isCarryForwardVoucher(voucher);
+
+  if (carryForward) {
+    return null;
+  }
 
   const notifyDataChanged = () => {
     refresh();
