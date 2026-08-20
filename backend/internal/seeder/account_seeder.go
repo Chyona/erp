@@ -2,7 +2,7 @@ package seeder
 
 import (
 	"base/internal/model"
-	"base/pkg/utils"
+	"base/internal/pkg/utils"
 
 	"go.uber.org/zap"
 	"gorm.io/gorm"

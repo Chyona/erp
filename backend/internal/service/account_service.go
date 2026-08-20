@@ -7,7 +7,7 @@ import (
 
 	"base/internal/model"
 	"base/internal/repository"
-	"base/pkg/utils"
+	"base/internal/pkg/utils"
 	"gorm.io/gorm"
 )
 

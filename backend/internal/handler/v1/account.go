@@ -5,8 +5,8 @@ import (
 	"strconv"
 
 	"base/internal/service"
-	"base/pkg/response"
-	"base/pkg/utils"
+	"base/internal/pkg/response"
+	"base/internal/pkg/utils"
 	"github.com/gin-gonic/gin"
 )
 
