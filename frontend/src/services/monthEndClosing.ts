@@ -38,8 +38,9 @@ export async function getUnifiedSummary(period: ReportPeriod) {
 
   const profitLossPendingCount = profitLoss.accountLines.length;
 
-  const fullyClosed =
-    Boolean(profitLossVoucher) && taxPendingCount === 0 && profitLossPendingCount === 0;
+  const taxSettled = taxPendingCount === 0;
+  /** 已有损益结转凭证且普票已结清即视为完成（不要求科目余额为零，兼容历史导入） */
+  const fullyClosed = taxSettled && Boolean(profitLossVoucher);
   const staleAfterProfitLoss =
     Boolean(profitLossVoucher) && taxPendingCount > 0;
 
@@ -52,7 +53,9 @@ export async function getUnifiedSummary(period: ReportPeriod) {
     blockReason = `${periodLabel} 已完成月末结转`;
   } else if (staleAfterProfitLoss) {
     blockReason = `损益结转已完成，但仍有 ${taxPendingCount} 条普票税额待减免结转，请先反结转后重新操作`;
-  } else if (taxPendingCount === 0 && profitLossPendingCount === 0 && !profitLossVoucher) {
+  } else if (taxVoucher && !profitLossVoucher && profitLossPendingCount === 0) {
+    blockReason = `${periodLabel} 普票减免已结转，损益类科目无余额，无需再生成损益结转`;
+  } else if (taxSettled && profitLossPendingCount === 0 && !profitLossVoucher) {
     blockReason = '该期间无需月末结转（无待结转普票且损益类科目无余额）';
   } else {
     canClose = true;

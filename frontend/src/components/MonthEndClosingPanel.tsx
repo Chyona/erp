@@ -200,6 +200,10 @@ export default function MonthEndClosingPanel() {
   const taxReady = (summary?.taxPendingCount || 0) === 0;
   const profitLossDone = Boolean(summary?.profitLossVoucher);
   const fullyClosed = summary?.fullyClosed;
+  const generateDisabled =
+    !summary?.canClose ||
+    (profitLossDone && taxReady) ||
+    fullyClosed;
 
   return (
     <div className="tax-exemption-panel">
@@ -266,7 +270,12 @@ export default function MonthEndClosingPanel() {
           loading={loading}
           typeOptions={MONTH_TYPE_OPTIONS}
         />
-        <Button type="primary" onClick={handleCreate} loading={submitting} disabled={!summary?.canClose}>
+        <Button
+          type="primary"
+          onClick={handleCreate}
+          loading={submitting}
+          disabled={generateDisabled}
+        >
           生成月末结转凭证
         </Button>
         {(summary?.profitLossVoucher || summary?.taxVoucher) && (
@@ -288,8 +297,8 @@ export default function MonthEndClosingPanel() {
 
       <div className="tax-exemption-panel__stats">
         <Text>
-          待结转普票：<strong>{summary?.taxPendingCount || 0}</strong> 条
-          {(summary?.taxPendingCount || 0) > 0 ? (
+          待结转普票：<strong>{fullyClosed ? 0 : summary?.taxPendingCount || 0}</strong> 条
+          {!fullyClosed && (summary?.taxPendingCount || 0) > 0 ? (
             <>
               ，税额{' '}
               <span className="tax-exemption-panel__tax-total">
@@ -298,8 +307,8 @@ export default function MonthEndClosingPanel() {
             </>
           ) : null}
           {' · '}
-          待结转科目：<strong>{summary?.profitLossPendingCount || 0}</strong> 个
-          {(summary?.profitLossPendingCount || 0) > 0 ? (
+          待结转科目：<strong>{fullyClosed ? 0 : summary?.profitLossPendingCount || 0}</strong> 个
+          {!fullyClosed && (summary?.profitLossPendingCount || 0) > 0 ? (
             <>
               ，净利润{' '}
               <span className="tax-exemption-panel__tax-total">
@@ -317,6 +326,10 @@ export default function MonthEndClosingPanel() {
 
       {summary?.staleAfterProfitLoss ? (
         <Alert type="error" showIcon style={{ margin: '12px 0' }} message={summary.blockReason} />
+      ) : null}
+
+      {summary && fullyClosed ? (
+        <Alert type="success" showIcon style={{ margin: '12px 0' }} message={summary.blockReason} />
       ) : null}
 
       {summary && !summary.canClose && !fullyClosed && !summary.staleAfterProfitLoss ? (
