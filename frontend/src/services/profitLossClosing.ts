@@ -33,12 +33,33 @@ function isProfitLossAccount(account: Account) {
   return account.category === '损益' || account.category === '成本';
 }
 
-function matchesClosingVoucher(voucher: VoucherRecord, periodKey: string) {
+function matchesClosingVoucher(
+  voucher: VoucherRecord,
+  periodKey: string,
+  periodType: 'month' | 'quarter'
+) {
   return (
     voucher.isProfitLossClosing === true &&
     voucher.profitLossClosingPeriod === periodKey &&
-    (voucher.profitLossClosingPeriodType || 'month') === 'month'
+    (voucher.profitLossClosingPeriodType || 'month') === periodType
   );
+}
+
+/** 查找损益结转凭证：优先当季/当月；按季时若三个月均有按月结转则视为已完成 */
+function findClosingVoucher(vouchers: VoucherRecord[], period: ReportPeriod, periodKey: string) {
+  const exact = vouchers.find((v) => matchesClosingVoucher(v, periodKey, period.type));
+  if (exact) return exact;
+
+  if (period.type !== 'quarter' || !period.quarter) return null;
+
+  const startMonth = (period.quarter - 1) * 3 + 1;
+  const monthClosings: VoucherRecord[] = [];
+  for (let month = startMonth; month < startMonth + 3; month++) {
+    const monthKey = `${period.year}-${String(month).padStart(2, '0')}`;
+    const found = vouchers.find((v) => matchesClosingVoucher(v, monthKey, 'month'));
+    if (found) monthClosings.push(found);
+  }
+  return monthClosings.length === 3 ? monthClosings[monthClosings.length - 1] : null;
 }
 
 function buildAccountSums(
@@ -203,8 +224,7 @@ export type TaxExemptionPrerequisite = {
 };
 
 async function getTaxExemptionPrerequisite(period: ReportPeriod): Promise<TaxExemptionPrerequisite> {
-  const monthPeriod = { ...period, type: 'month' as const };
-  const taxSummary = await TaxExemption.getPeriodSummary(monthPeriod);
+  const taxSummary = await TaxExemption.getPeriodSummary(period);
   const pendingCount = taxSummary.ordinaryPending.length;
   const pendingTaxTotal = taxSummary.pendingTaxTotal;
   const withoutTaxCount = taxSummary.ordinaryWithoutTax.length;
@@ -238,18 +258,14 @@ async function getTaxExemptionPrerequisite(period: ReportPeriod): Promise<TaxExe
   };
 }
 
-/** 指定月份损益结转汇总（仅支持按月） */
+/** 指定期间损益结转汇总（支持按月 / 按季） */
 export async function getPeriodSummary(
   period: ReportPeriod,
   { projectPendingTaxExemption = false }: { projectPendingTaxExemption?: boolean } = {}
 ) {
-  if (period.type !== 'month') {
-    throw new Error('损益结转目前仅支持按月操作');
-  }
-
-  const periodKey = taxExemptionPeriodKey({ ...period, type: 'month' });
-  const periodLabel = formatReportPeriod({ ...period, type: 'month' });
-  const [start, end] = reportPeriodToDateRange({ ...period, type: 'month' });
+  const periodKey = taxExemptionPeriodKey(period);
+  const periodLabel = formatReportPeriod(period);
+  const [start, end] = reportPeriodToDateRange(period);
   const startDate = start.format('YYYY-MM-DD');
   const endDate = end.format('YYYY-MM-DD');
 
@@ -258,11 +274,10 @@ export async function getPeriodSummary(
   const vouchers = await getApprovedVouchersUpTo(endDate);
   const endingSums = buildAccountSums(vouchers, { toDate: endDate });
 
-  const closingVoucher =
-    vouchers.find((v) => matchesClosingVoucher(v, periodKey)) || null;
+  const closingVoucher = findClosingVoucher(vouchers, period, periodKey);
 
   const draftCount = (await Voucher.getAll()).filter(
-    (v) => voucherInReportPeriod(v.date, { ...period, type: 'month' }) && v.status === Voucher.STATUS.DRAFT
+    (v) => voucherInReportPeriod(v.date, period) && v.status === Voucher.STATUS.DRAFT
   ).length;
 
   const taxExemption = await getTaxExemptionPrerequisite(period);
@@ -299,7 +314,7 @@ export async function getPeriodSummary(
       : '';
 
   return {
-    period: { ...period, type: 'month' as const },
+    period,
     periodKey,
     periodLabel,
     startDate,
@@ -318,7 +333,7 @@ export async function getPeriodSummary(
   };
 }
 
-/** 生成指定月份结转损益凭证 */
+/** 生成指定期间结转损益凭证 */
 export async function createClosing(period: ReportPeriod, { approve = true } = {}) {
   const summary = await getPeriodSummary(period);
 
@@ -339,13 +354,13 @@ export async function createClosing(period: ReportPeriod, { approve = true } = {
 
   const voucherData = {
     voucherType: '记',
-    date: reportPeriodEndDate({ ...period, type: 'month' }),
+    date: reportPeriodEndDate(period),
     attachmentCount: 0,
     businessType: '其他',
     invoiceType: '',
     taxAmount: 0,
     isProfitLossClosing: true,
-    profitLossClosingPeriodType: 'month',
+    profitLossClosingPeriodType: period.type,
     profitLossClosingPeriod: summary.periodKey,
     invoiceNumbers: '',
     remark: `${summary.periodLabel}损益结转，共 ${summary.accountLines.length} 个科目`,
@@ -385,7 +400,7 @@ export async function reverseClosing(period: ReportPeriod, closingId?: string) {
     cf = summary.closingVoucher;
   }
 
-  const periodLabel = formatReportPeriod({ ...period, type: 'month' });
+  const periodLabel = formatReportPeriod(period);
   if (!cf) {
     throw new Error(`${periodLabel} 不存在损益结转凭证，无法反结转`);
   }
@@ -401,9 +416,9 @@ export async function reverseClosing(period: ReportPeriod, closingId?: string) {
   return { voucher: cf };
 }
 
-/** 普票结转前检查：对应月份是否已损益结转（已结转则后续普票会影响 5301） */
+/** 普票结转前检查：对应期间是否已损益结转 */
 export async function getProfitLossClosingConflictMessage(period: ReportPeriod): Promise<string> {
-  if (period.type === 'month') {
+  if (period.type === 'quarter') {
     const summary = await getPeriodSummary(period);
     if (summary.closingVoucher) {
       return `${summary.periodLabel} 已完成损益结转（${summary.closingVoucher.voucherNo}），本次普票结转将变动 5301，建议先反结转损益后再操作`;
@@ -411,16 +426,11 @@ export async function getProfitLossClosingConflictMessage(period: ReportPeriod):
     return '';
   }
 
-  const startMonth = (period.quarter! - 1) * 3 + 1;
-  const conflicts: string[] = [];
-  for (let month = startMonth; month < startMonth + 3; month++) {
-    const summary = await getPeriodSummary({ type: 'month', year: period.year, month });
-    if (summary.closingVoucher) {
-      conflicts.push(`${month}月（${summary.closingVoucher.voucherNo}）`);
-    }
+  const summary = await getPeriodSummary(period);
+  if (summary.closingVoucher) {
+    return `${summary.periodLabel} 已完成损益结转（${summary.closingVoucher.voucherNo}），本次普票结转将变动 5301，建议先反结转损益后再操作`;
   }
-  if (!conflicts.length) return '';
-  return `以下月份已完成损益结转：${conflicts.join('、')}。本次普票结转将变动 5301，建议先反结转对应月份损益后再操作`;
+  return '';
 }
 
 export const ProfitLossClosing = {

@@ -84,8 +84,24 @@ function periodAmount(debit, credit, direction) {
   return roundMoney(credit - debit);
 }
 
-/** 发生额分列展示借方、贷方合计（含结转凭证，不轧差） */
-function grossOccurrenceColumns(debit, credit) {
+function isProfitLossOrCostAccount(account) {
+  return account.category === '损益' || account.category === '成本';
+}
+
+/**
+ * 科目余额表发生额：
+ * - 损益/成本：不含损益结转，净额借贷两列同数（如 5603 借/贷均 148.46，与利润表一致）
+ * - 其余科目：借贷分列毛额
+ */
+function occurrenceColumns(debit, credit, direction, account) {
+  if (isProfitLossOrCostAccount(account)) {
+    const net = periodAmount(debit, credit, direction);
+    const n = blankMoney(net);
+    if (n == null) {
+      return { debit: null, credit: null };
+    }
+    return { debit: n, credit: n };
+  }
   return {
     debit: blankMoney(debit),
     credit: blankMoney(credit)
@@ -130,7 +146,17 @@ async function getTrialBalance(startDate, endDate) {
   const yearStart = `${endDate.slice(0, 4)}-01-01`;
   const openingSums = buildAccountSums(vouchers, { beforeDate: startDate });
   const periodSums = buildAccountSums(vouchers, { fromDate: startDate, toDate: endDate });
+  const periodOccurrenceSums = buildAccountSums(vouchers, {
+    fromDate: startDate,
+    toDate: endDate,
+    excludeProfitLossClosing: true
+  });
   const ytdSums = buildAccountSums(vouchers, { fromDate: yearStart, toDate: endDate });
+  const ytdOccurrenceSums = buildAccountSums(vouchers, {
+    fromDate: yearStart,
+    toDate: endDate,
+    excludeProfitLossClosing: true
+  });
   const endingSums = buildAccountSums(vouchers, { toDate: endDate });
 
   const rows = [];
@@ -148,15 +174,29 @@ async function getTrialBalance(startDate, endDate) {
   for (const account of accounts) {
     const opening = sumSums(openingSums, account.id);
     const period = sumSums(periodSums, account.id);
+    const periodOccurrence = sumSums(periodOccurrenceSums, account.id);
     const ytd = sumSums(ytdSums, account.id);
+    const ytdOccurrence = sumSums(ytdOccurrenceSums, account.id);
     const ending = sumSums(endingSums, account.id);
 
     const openingBal = accountBalance(opening.debit, opening.credit, account.direction);
     const endingBal = accountBalance(ending.debit, ending.credit, account.direction);
     const openingCols = toDebitCreditColumns(openingBal, account.direction);
     const endingCols = toDebitCreditColumns(endingBal, account.direction);
-    const periodCols = grossOccurrenceColumns(period.debit, period.credit);
-    const ytdCols = grossOccurrenceColumns(ytd.debit, ytd.credit);
+    const occurrenceSource = isProfitLossOrCostAccount(account) ? periodOccurrence : period;
+    const ytdOccurrenceSource = isProfitLossOrCostAccount(account) ? ytdOccurrence : ytd;
+    const periodCols = occurrenceColumns(
+      occurrenceSource.debit,
+      occurrenceSource.credit,
+      account.direction,
+      account
+    );
+    const ytdCols = occurrenceColumns(
+      ytdOccurrenceSource.debit,
+      ytdOccurrenceSource.credit,
+      account.direction,
+      account
+    );
 
     rows.push({
       key: account.id,

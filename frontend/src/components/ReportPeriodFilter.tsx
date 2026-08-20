@@ -51,7 +51,7 @@ function PeriodPickerPanel({ period, panelYear, onPanelYearChange, onSelect, onC
                   onClose();
                 }}
               >
-                {month}月
+                {month}期
               </button>
             );
           })}
@@ -105,12 +105,14 @@ export default function ReportPeriodFilter({
 
   return (
     <Space wrap className="report-period-filter" size={12}>
-      <Select
-        value={value.type}
-        options={typeOptions}
-        onChange={handleTypeChange}
-        className="report-period-filter__type"
-      />
+      {typeOptions.length > 1 ? (
+        <Select
+          value={value.type}
+          options={typeOptions}
+          onChange={handleTypeChange}
+          className="report-period-filter__type"
+        />
+      ) : null}
       <Popover
         trigger="click"
         open={open}

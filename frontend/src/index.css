@@ -1888,6 +1888,12 @@ body,
   font-variant-numeric: tabular-nums;
 }
 
+/* 待结转普票：前三列紧凑，摘要/备注无固定宽度、均分剩余空间 */
+.pending-tax-detail-table .ant-table table {
+  table-layout: fixed;
+  width: 100%;
+}
+
 .tax-exemption-panel__tax-value {
   color: var(--app-table-amount);
   font-size: 14px;

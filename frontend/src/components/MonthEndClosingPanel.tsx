@@ -15,12 +15,26 @@ import { defaultProfitLossClosingPeriod, taxExemptionPeriodKey } from '../utils/
 
 const { Text } = Typography;
 
-const MONTH_TYPE_OPTIONS = [{ value: 'month', label: '按月' }];
+const CLOSING_TYPE_OPTIONS = [{ value: 'quarter', label: '按季' }];
 
 function renderMoney(v: number | null | undefined) {
   if (v == null || Math.abs(v) < 0.005) return '—';
   return `¥${v.toFixed(2)}`;
 }
+
+const PENDING_TAX_DETAIL_COLUMNS: ColumnsType<any> = [
+  { title: '凭证号', dataIndex: 'voucherNo', width: 100, align: 'center' },
+  { title: '日期', dataIndex: 'date', width: 110 },
+  {
+    title: '税额',
+    dataIndex: 'taxAmount',
+    width: 110,
+    align: 'right',
+    render: renderMoney
+  },
+  { title: '摘要', dataIndex: 'entrySummary', ellipsis: true },
+  { title: '备注', dataIndex: 'remark', ellipsis: true }
+];
 
 const previewColumns: ColumnsType<any> = [
   { title: '科目编码', dataIndex: 'code', width: 96, align: 'center' },
@@ -93,6 +107,8 @@ export default function MonthEndClosingPanel() {
     }));
   }, [summary]);
 
+  const closingLabel = summary?.closingLabel || '季末结转';
+
   const handleCreate = async () => {
     if (!summary?.canClose) {
       message.warning(summary?.blockReason || '当前期间无法结转');
@@ -100,7 +116,7 @@ export default function MonthEndClosingPanel() {
     }
 
     const ok = await confirmDanger(modal, {
-      title: '生成月末结转凭证',
+      title: `生成${closingLabel}凭证`,
       content: (
         <div>
           <Alert
@@ -146,7 +162,7 @@ export default function MonthEndClosingPanel() {
           `损益 ${result.profitLossVoucher.voucherNo}（${result.accountCount} 科目，净利 ¥${result.netProfit.toFixed(2)}）`
         );
       }
-      message.success(`月末结转完成：${parts.join('；')}`);
+      message.success(`${closingLabel}完成：${parts.join('；')}`);
       refresh();
       loadSummary();
     } catch (err) {
@@ -158,7 +174,7 @@ export default function MonthEndClosingPanel() {
 
   const handleReverse = async () => {
     if (!summary?.profitLossVoucher && !summary?.taxVoucher) {
-      message.warning('该期间没有月末结转凭证');
+      message.warning(`该期间没有${closingLabel}凭证`);
       return;
     }
 
@@ -211,7 +227,7 @@ export default function MonthEndClosingPanel() {
         type="info"
         showIcon
         style={{ marginBottom: 16 }}
-        message="一键完成当月普票减免结转与损益结转。系统自动生成的结转凭证不可手动修改或删除，仅可在此反结转撤销。"
+        message="一键完成当季普票减免结转与损益结转。系统自动生成的结转凭证不可手动修改或删除，仅可在此反结转撤销。"
       />
 
       <div className="closing-prerequisites" style={{ marginBottom: 16 }}>
@@ -268,7 +284,7 @@ export default function MonthEndClosingPanel() {
           onChange={setPeriod}
           onRefresh={loadSummary}
           loading={loading}
-          typeOptions={MONTH_TYPE_OPTIONS}
+          typeOptions={CLOSING_TYPE_OPTIONS}
         />
         <Button
           type="primary"
@@ -276,7 +292,7 @@ export default function MonthEndClosingPanel() {
           loading={submitting}
           disabled={generateDisabled}
         >
-          生成月末结转凭证
+          生成{closingLabel}凭证
         </Button>
         {(summary?.profitLossVoucher || summary?.taxVoucher) && (
           <Button danger loading={reversing} onClick={handleReverse}>
@@ -317,7 +333,7 @@ export default function MonthEndClosingPanel() {
             </>
           ) : null}
         </Text>
-        <Text type="secondary">{fullyClosed ? '已完成月末结转' : '未完成月末结转'}</Text>
+        <Text type="secondary">{fullyClosed ? `已完成${closingLabel}` : `未完成${closingLabel}`}</Text>
       </div>
 
       {(summary?.taxExemptionWarnings || []).map((warning) => (
@@ -341,25 +357,14 @@ export default function MonthEndClosingPanel() {
           <Text strong style={{ display: 'block', margin: '12px 0 8px' }}>
             待结转普票明细
           </Text>
-          <div className="app-table" style={{ marginBottom: 16 }}>
+          <div className="app-table pending-tax-detail-table" style={{ marginBottom: 16 }}>
             <Table
               size="small"
               bordered
               loading={loading}
               rowKey="id"
-              columns={[
-                { title: '凭证号', dataIndex: 'voucherNo', width: 100 },
-                { title: '日期', dataIndex: 'date', width: 110 },
-                {
-                  title: '税额',
-                  dataIndex: 'taxAmount',
-                  width: 100,
-                  align: 'right',
-                  render: renderMoney
-                },
-                { title: '摘要', dataIndex: 'entrySummary', ellipsis: true },
-                { title: '备注', dataIndex: 'remark', ellipsis: true, width: 160 }
-              ]}
+              tableLayout="fixed"
+              columns={PENDING_TAX_DETAIL_COLUMNS}
               dataSource={summary?.tax.ordinaryPending || []}
               pagination={false}
             />
@@ -397,7 +402,7 @@ export default function MonthEndClosingPanel() {
 
       {!loading && fullyClosed && (
         <Text type="secondary" style={{ display: 'block', marginTop: 12 }}>
-          该期间月末结转已完成，如需调整请使用「反结转」。
+          该期间{closingLabel}已完成，如需调整请使用「反结转」。
         </Text>
       )}
 

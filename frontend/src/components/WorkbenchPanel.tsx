@@ -10,7 +10,7 @@ export default function WorkbenchPanel() {
         items={[
           {
             key: 'month-end-closing',
-            label: '月末结转',
+            label: '季末结转',
             children: <MonthEndClosingPanel />
           },
           {

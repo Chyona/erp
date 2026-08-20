@@ -39,32 +39,56 @@ const amountColumns: ColumnsType<any> = [
   {
     title: '价税合计',
     dataIndex: 'grossAmount',
-    width: 108,
+    width: 110,
     align: 'right',
     render: renderMoney
   },
   {
     title: '不含税金额',
     dataIndex: 'netAmount',
-    width: 108,
+    width: 110,
     align: 'right',
     render: renderMoney
   },
   {
     title: '税额',
     dataIndex: 'taxAmount',
-    width: 96,
+    width: 110,
     align: 'right',
     render: renderTaxAmount
   }
 ];
 
+const PENDING_TAX_FIXED_COLS = {
+  voucherNo: 68,
+  date: 88,
+  taxAmount: 72
+} as const;
+
 const summaryColumn = {
   title: '摘要',
   dataIndex: 'entrySummary',
-  ellipsis: true,
-  width: 320
+  ellipsis: true
 };
+
+const pendingTaxDetailColumns: ColumnsType<any> = [
+  {
+    title: '凭证号',
+    dataIndex: 'voucherNo',
+    width: PENDING_TAX_FIXED_COLS.voucherNo,
+    align: 'center'
+  },
+  { title: '日期', dataIndex: 'date', width: PENDING_TAX_FIXED_COLS.date },
+  {
+    title: '税额',
+    dataIndex: 'taxAmount',
+    width: PENDING_TAX_FIXED_COLS.taxAmount,
+    align: 'right',
+    render: renderTaxAmount
+  },
+  summaryColumn,
+  { title: '备注', dataIndex: 'remark', ellipsis: true }
+];
 
 export default function TaxExemptionPanel({
   onGoProfitLossClosing
@@ -208,19 +232,7 @@ export default function TaxExemptionPanel({
   const relatedCarryForwardVouchers = summary?.relatedCarryForwardVouchers || [];
   const hasExactCarryForward = Boolean(summary?.exactCarryForwardVoucher);
 
-  const pendingColumns: ColumnsType<any> = [
-    { title: '凭证号', dataIndex: 'voucherNo', width: 100 },
-    { title: '日期', dataIndex: 'date', width: 110 },
-    {
-      title: '税额',
-      dataIndex: 'taxAmount',
-      width: 96,
-      align: 'right',
-      render: renderTaxAmount
-    },
-    summaryColumn,
-    { title: '备注', dataIndex: 'remark', ellipsis: true, width: 160 }
-  ];
+  const pendingColumns = pendingTaxDetailColumns;
 
   const specialColumns: ColumnsType<any> = [
     { title: '凭证号', dataIndex: 'voucherNo', width: 100 },
@@ -298,8 +310,8 @@ export default function TaxExemptionPanel({
           已结转 {summary?.ordinaryDoneVoucherCount || 0} 张凭证 · 专票{' '}
           {summary?.specialInvoices.length || 0} 笔（不结转）
           {!summary?.ordinaryPending.length &&
-          summary?.exactCarryForwardVoucher &&
-          onGoProfitLossClosing ? (
+            summary?.exactCarryForwardVoucher &&
+            onGoProfitLossClosing ? (
             <>
               {' '}
               ·{' '}
@@ -348,11 +360,12 @@ export default function TaxExemptionPanel({
           <Text strong style={{ display: 'block', margin: '12px 0 8px' }}>
             待结转普票明细
           </Text>
-          <div className="app-table">
+          <div className="app-table pending-tax-detail-table">
             <Table
               size="small"
               bordered
               rowKey="id"
+              tableLayout="fixed"
               columns={pendingColumns}
               dataSource={summary.ordinaryPending}
               pagination={false}

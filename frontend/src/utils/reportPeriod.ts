@@ -16,9 +16,9 @@ export function defaultReportsPeriod() {
   return { ...defaultReportPeriod(), type: 'quarter' as const };
 }
 
-/** 普票减免结转默认与损益结转一致，按月 */
+/** 普票减免结转默认与损益结转一致，按季 */
 export function defaultTaxExemptionPeriod() {
-  return { ...defaultReportPeriod(), type: 'month' as 'month' | 'quarter' };
+  return { ...defaultReportPeriod(), type: 'quarter' as const };
 }
 
 export function reportPeriodToDateRange(period) {
@@ -36,9 +36,13 @@ export function reportPeriodToDateRange(period) {
   return [start, start.endOf('month')];
 }
 
+export function formatQuarterLabel(year: number, quarter: number) {
+  return `${year}年Q${quarter}`;
+}
+
 export function formatReportPeriod(period) {
   if (period.type === 'quarter') {
-    return `${period.year}年第${period.quarter}季度`;
+    return formatQuarterLabel(period.year, period.quarter);
   }
   return `${period.year}年${period.month}期`;
 }
@@ -72,7 +76,7 @@ export function reportPeriodEndDate(period) {
 
 export function formatTaxExemptionPeriod(period) {
   if (period.type === 'quarter') {
-    return `${period.year}年第${period.quarter}季度`;
+    return formatQuarterLabel(period.year, period.quarter);
   }
   return `${period.year}年${period.month}月`;
 }
@@ -101,9 +105,9 @@ export function formatStoredTaxExemptionPeriod(voucher) {
   return formatTaxExemptionPeriod(period);
 }
 
-/** 损益结转默认按当前月份 */
+/** 损益结转默认按当前季度 */
 export function defaultProfitLossClosingPeriod() {
-  return { ...defaultReportPeriod(), type: 'month' as const };
+  return { ...defaultReportPeriod(), type: 'quarter' as const };
 }
 
 export function formatStoredProfitLossClosingPeriod(voucher: {
@@ -115,7 +119,7 @@ export function formatStoredProfitLossClosingPeriod(voucher: {
     voucher.profitLossClosingPeriod,
     voucher.profitLossClosingPeriodType || 'month'
   );
-  return formatReportPeriod({ ...period, type: 'month' });
+  return formatReportPeriod({ ...period, type: period.type || 'month' });
 }
 
 export function expectedProfitLossClosingDate(voucher: {
@@ -127,7 +131,7 @@ export function expectedProfitLossClosingDate(voucher: {
     voucher.profitLossClosingPeriod,
     voucher.profitLossClosingPeriodType || 'month'
   );
-  return reportPeriodEndDate({ ...period, type: 'month' });
+  return reportPeriodEndDate({ ...period, type: period.type || 'month' });
 }
 
 /** 结转凭证应使用的日期：当前期间最后一天 */
