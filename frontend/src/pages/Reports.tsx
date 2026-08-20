@@ -133,6 +133,35 @@ function UnbalancedScaleIcon() {
   );
 }
 
+function TrialBalanceUnclosedTooltip({ period }) {
+  const periodLabel = formatReportPeriod(period);
+  const closingLabel = period.type === 'quarter' ? '季末结转' : '月末结转';
+
+  return (
+    <div className="report-trial-imbalance-tooltip__content">
+      <div className="report-trial-imbalance-tooltip__title">
+        {periodLabel} 尚未完成{closingLabel}
+      </div>
+      <p className="report-trial-imbalance-tooltip__reason">
+        该期间尚未生成损益结转凭证。损益类、成本类科目期末可能仍有余额，本期经营成果尚未转入「本年利润」，报表数据不完整。
+      </p>
+      <div className="report-trial-imbalance-tooltip__action">
+        <div className="report-trial-imbalance-tooltip__action-title">如何处理</div>
+        <ol className="report-trial-imbalance-tooltip__steps">
+          <li>
+            前往工作台 <strong>「{closingLabel}」</strong>，完成 <strong>{periodLabel}</strong>{' '}
+            损益结转
+          </li>
+          <li>
+            若季内已做过单独月末结转，请先 <strong>反结转</strong> 后，再统一做{closingLabel}
+          </li>
+          <li>结转后损益科目期末余额应为零，利润体现在 3103 本年利润</li>
+        </ol>
+      </div>
+    </div>
+  );
+}
+
 function TrialBalanceImbalanceTooltip({ data, period }) {
   const periodLabel = formatReportPeriod(period);
   const details = [];
@@ -165,26 +194,23 @@ function TrialBalanceImbalanceTooltip({ data, period }) {
         <ul className="report-trial-imbalance-tooltip__details">{details}</ul>
       ) : null}
       <p className="report-trial-imbalance-tooltip__reason">
-        常见于季内部分月份已单独月末结转，或该季度尚未完成季末结转。
+        按复式记账，科目余额表本期/本年累计借方合计应等于贷方合计。出现差额属于异常，并非未做结转所致。
       </p>
       <div className="report-trial-imbalance-tooltip__action">
         <div className="report-trial-imbalance-tooltip__action-title">如何处理</div>
         <ol className="report-trial-imbalance-tooltip__steps">
           <li>
-            前往工作台 <strong>「季末结转」</strong>，完成 <strong>{periodLabel}</strong>{' '}
-            损益结转
+            在<strong>凭证列表</strong>中检查是否有<strong>借贷不平衡</strong>的已审核凭证
           </li>
-          <li>
-            若季内已做过单独月末结转，请先 <strong>反结转</strong> 后，再统一做季末结转
-          </li>
-          <li>完成后刷新本表，发生额合计应借贷平衡</li>
+          <li>确认导入或手工录入的分录借方合计等于贷方合计</li>
+          <li>排除草稿后重新刷新；若仍存在差额，请核对备份恢复是否完整</li>
         </ol>
       </div>
     </div>
   );
 }
 
-function TrialBalanceTab({ period, dateRange, refreshToken, onOccurrenceImbalanceChange }) {
+function TrialBalanceTab({ period, dateRange, refreshToken, onHeaderAlertChange }) {
   const { message } = App.useApp();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -206,15 +232,21 @@ function TrialBalanceTab({ period, dateRange, refreshToken, onOccurrenceImbalanc
   }, [dateRange, refreshToken]);
 
   useEffect(() => {
-    const imbalance =
-      period.type === 'quarter' &&
-      data &&
-      (!data.periodOccurrenceBalanced || !data.ytdOccurrenceBalanced)
-        ? { data, period }
-        : null;
-    onOccurrenceImbalanceChange?.(imbalance);
-    return () => onOccurrenceImbalanceChange?.(null);
-  }, [data, period, onOccurrenceImbalanceChange]);
+    if (!data) {
+      onHeaderAlertChange?.(null);
+      return () => onHeaderAlertChange?.(null);
+    }
+
+    if (!data.periodOccurrenceBalanced || !data.ytdOccurrenceBalanced) {
+      onHeaderAlertChange?.({ kind: 'imbalance', data, period });
+    } else if (!data.periodProfitLossClosed) {
+      onHeaderAlertChange?.({ kind: 'unclosed', data, period });
+    } else {
+      onHeaderAlertChange?.(null);
+    }
+
+    return () => onHeaderAlertChange?.(null);
+  }, [data, period, onHeaderAlertChange]);
 
   const handleExport = () => {
     if (!data?.rows?.length) {
@@ -401,7 +433,7 @@ export default function Reports() {
   const [period, setPeriod] = useState(defaultReportsPeriod);
   const [refreshToken, setRefreshToken] = useState(0);
   const [activeTab, setActiveTab] = useState('trial');
-  const [trialImbalance, setTrialImbalance] = useState(null);
+  const [trialHeaderAlert, setTrialHeaderAlert] = useState(null);
   const dateRange = useMemo(() => reportPeriodToDateRange(period), [period]);
 
   const items = [
@@ -413,7 +445,7 @@ export default function Reports() {
           period={period}
           dateRange={dateRange}
           refreshToken={refreshToken}
-          onOccurrenceImbalanceChange={setTrialImbalance}
+          onHeaderAlertChange={setTrialHeaderAlert}
         />
       )
     },
@@ -439,9 +471,15 @@ export default function Reports() {
           <Text type="secondary">基于已审核、已锁定凭证汇总；草稿凭证不参与统计</Text>
         </div>
         <div className="report-page-header__actions">
-          {activeTab === 'trial' && trialImbalance ? (
+          {activeTab === 'trial' && trialHeaderAlert ? (
             <Tooltip
-              title={<TrialBalanceImbalanceTooltip {...trialImbalance} />}
+              title={
+                trialHeaderAlert.kind === 'imbalance' ? (
+                  <TrialBalanceImbalanceTooltip {...trialHeaderAlert} />
+                ) : (
+                  <TrialBalanceUnclosedTooltip period={trialHeaderAlert.period} />
+                )
+              }
               placement="bottomRight"
               color="#fff"
               overlayClassName="report-trial-imbalance-tooltip"
@@ -449,7 +487,11 @@ export default function Reports() {
               <span
                 className="report-trial-imbalance-icon"
                 role="img"
-                aria-label="发生额借贷不平衡"
+                aria-label={
+                  trialHeaderAlert.kind === 'imbalance'
+                    ? '发生额借贷不平衡'
+                    : '尚未完成损益结转'
+                }
               >
                 <UnbalancedScaleIcon />
               </span>
