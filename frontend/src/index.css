@@ -1645,6 +1645,120 @@ body,
   margin-top: 4px;
 }
 
+.report-page-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.report-trial-imbalance-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-left: 0;
+  border-radius: 8px;
+  font-size: 22px;
+  line-height: 1;
+  color: #d46b08;
+  background: #fff7e6;
+  border: 1px solid #ffd591;
+  cursor: help;
+  transition:
+    color 0.15s,
+    background-color 0.15s,
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+.report-trial-imbalance-icon:hover {
+  color: #ad4e00;
+  background: #ffe7ba;
+  border-color: #ffa940;
+  box-shadow: 0 0 0 2px rgba(250, 140, 22, 0.18);
+}
+
+.report-trial-imbalance-icon__svg {
+  display: block;
+}
+
+.report-trial-imbalance-tooltip .ant-tooltip-inner {
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 12px 14px;
+  text-align: left;
+  color: rgba(0, 0, 0, 0.88);
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  box-shadow:
+    0 6px 16px 0 rgba(0, 0, 0, 0.08),
+    0 3px 6px -4px rgba(0, 0, 0, 0.12),
+    0 9px 28px 8px rgba(0, 0, 0, 0.05);
+}
+
+.report-trial-imbalance-tooltip__content {
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.report-trial-imbalance-tooltip__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #d46b08;
+  margin-bottom: 8px;
+}
+
+.report-trial-imbalance-tooltip__details {
+  margin: 0 0 8px;
+  padding-left: 18px;
+  color: #475569;
+}
+
+.report-trial-imbalance-tooltip__details strong {
+  color: #d46b08;
+  font-weight: 600;
+}
+
+.report-trial-imbalance-tooltip__reason {
+  margin: 0 0 10px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.report-trial-imbalance-tooltip__action {
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: #fff7e6;
+  border: 1px solid #ffd591;
+}
+
+.report-trial-imbalance-tooltip__action-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #ad4e00;
+  margin-bottom: 6px;
+}
+
+.report-trial-imbalance-tooltip__steps {
+  margin: 0;
+  padding-left: 18px;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.report-trial-imbalance-tooltip__steps li + li {
+  margin-top: 4px;
+}
+
+.report-trial-imbalance-tooltip__steps strong {
+  color: #ad4e00;
+  font-weight: 600;
+}
+
+.report-trial-imbalance-tooltip .ant-tooltip-arrow::before {
+  background: #fff;
+}
+
 .report-period-filter__type {
   width: 96px;
 }

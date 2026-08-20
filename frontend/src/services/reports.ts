@@ -1,5 +1,6 @@
 import { Voucher } from './voucher';
 import { Accounts } from './accounts';
+import { hasProfitLossClosing } from './profitLossClosing';
 import type { Account, Voucher as VoucherRecord } from '../types';
 import {
   BALANCE_SHEET_ASSETS,
@@ -88,13 +89,81 @@ function isProfitLossOrCostAccount(account) {
   return account.category === '损益' || account.category === '成本';
 }
 
+function buildProfitLossAccountIds(accounts: Account[]) {
+  return new Set(accounts.filter(isProfitLossOrCostAccount).map((a) => a.id));
+}
+
+/** 期间内是否有损益/成本类业务凭证（不含损益结转） */
+function hasProfitLossBusinessInRange(
+  vouchers: VoucherRecord[],
+  profitLossAccountIds: Set<string>,
+  fromDate: string,
+  toDate: string
+) {
+  for (const v of vouchers) {
+    if (v.isProfitLossClosing) continue;
+    const d = v.date;
+    if (d < fromDate || d > toDate) continue;
+    for (const e of v.entries || []) {
+      if (e.accountId && profitLossAccountIds.has(e.accountId)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 /**
- * 科目余额表发生额：
- * - 损益/成本：不含损益结转，净额借贷两列同数（如 5603 借/贷均 148.46，与利润表一致）
- * - 其余科目：借贷分列毛额
+ * 本年累计损益发生额展示：当前季/月无新业务时，沿用上一已结转期间的净额对称展示
+ * （如 Q3 无凭证时，5603 仍显示 Q2 时的 148.46 / 148.46）
  */
-function occurrenceColumns(debit, credit, direction, account) {
-  if (isProfitLossOrCostAccount(account)) {
+function ytdProfitLossDisplayClosed(
+  vouchers: VoucherRecord[],
+  reportPeriod: { type: string; year: number; quarter?: number; month?: number } | null,
+  startDate: string,
+  endDate: string,
+  periodProfitLossClosed: boolean,
+  profitLossAccountIds: Set<string>
+) {
+  if (periodProfitLossClosed) return true;
+  if (!reportPeriod) return false;
+
+  if (hasProfitLossBusinessInRange(vouchers, profitLossAccountIds, startDate, endDate)) {
+    return false;
+  }
+
+  if (reportPeriod.type === 'quarter' && reportPeriod.quarter && reportPeriod.quarter > 1) {
+    return hasProfitLossClosing(vouchers, {
+      type: 'quarter',
+      year: reportPeriod.year,
+      quarter: reportPeriod.quarter - 1
+    });
+  }
+
+  if (reportPeriod.type === 'month' && reportPeriod.month && reportPeriod.month > 1) {
+    return hasProfitLossClosing(vouchers, {
+      type: 'month',
+      year: reportPeriod.year,
+      month: reportPeriod.month - 1
+    });
+  }
+
+  return false;
+}
+
+function totalsBalanced(debit, credit) {
+  const d = parseFloat(String(debit)) || 0;
+  const c = parseFloat(String(credit)) || 0;
+  return Math.abs(d - c) < 0.005;
+}
+
+/**
+ * 科目余额表发生额（损益/成本不含损益结转凭证）：
+ * - 未结转：借贷分列毛额（收入只在贷方、费用只在借方）
+ * - 已结转：净额借贷两列同数（与利润表一致，如 5603 为 148.46）
+ */
+function occurrenceColumns(debit, credit, direction, account, profitLossClosed) {
+  if (profitLossClosed && isProfitLossOrCostAccount(account)) {
     const net = periodAmount(debit, credit, direction);
     const n = blankMoney(net);
     if (n == null) {
@@ -140,9 +209,20 @@ function resolveAccountCategoryLabel(account) {
   }
 }
 
-async function getTrialBalance(startDate, endDate) {
+async function getTrialBalance(startDate, endDate, reportPeriod = null) {
   const accounts = await Accounts.getAll();
   const vouchers = await getApprovedVouchersUpTo(endDate);
+  const periodProfitLossClosed =
+    reportPeriod != null && hasProfitLossClosing(vouchers, reportPeriod);
+  const profitLossAccountIds = buildProfitLossAccountIds(accounts);
+  const ytdDisplayClosed = ytdProfitLossDisplayClosed(
+    vouchers,
+    reportPeriod,
+    startDate,
+    endDate,
+    periodProfitLossClosed,
+    profitLossAccountIds
+  );
   const yearStart = `${endDate.slice(0, 4)}-01-01`;
   const openingSums = buildAccountSums(vouchers, { beforeDate: startDate });
   const periodSums = buildAccountSums(vouchers, { fromDate: startDate, toDate: endDate });
@@ -189,13 +269,15 @@ async function getTrialBalance(startDate, endDate) {
       occurrenceSource.debit,
       occurrenceSource.credit,
       account.direction,
-      account
+      account,
+      periodProfitLossClosed
     );
     const ytdCols = occurrenceColumns(
       ytdOccurrenceSource.debit,
       ytdOccurrenceSource.credit,
       account.direction,
-      account
+      account,
+      ytdDisplayClosed
     );
 
     rows.push({
@@ -228,6 +310,12 @@ async function getTrialBalance(startDate, endDate) {
     endDate,
     yearStart,
     rows,
+    periodOccurrenceBalanced: totalsBalanced(totals.periodDebit, totals.periodCredit),
+    ytdOccurrenceBalanced: totalsBalanced(totals.ytdDebit, totals.ytdCredit),
+    periodOccurrenceDiff: roundMoney(totals.periodDebit - totals.periodCredit),
+    ytdOccurrenceDiff: roundMoney(totals.ytdDebit - totals.ytdCredit),
+    periodProfitLossClosed,
+    ytdProfitLossDisplayClosed: ytdDisplayClosed,
     totals: {
       openingDebit: blankMoney(totals.openingDebit),
       openingCredit: blankMoney(totals.openingCredit),

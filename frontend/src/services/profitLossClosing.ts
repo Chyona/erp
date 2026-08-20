@@ -62,6 +62,12 @@ function findClosingVoucher(vouchers: VoucherRecord[], period: ReportPeriod, per
   return monthClosings.length === 3 ? monthClosings[monthClosings.length - 1] : null;
 }
 
+/** 报告期是否已完成损益结转（含按季时三个月均有按月结转） */
+export function hasProfitLossClosing(vouchers: VoucherRecord[], period: ReportPeriod) {
+  const periodKey = taxExemptionPeriodKey(period);
+  return Boolean(findClosingVoucher(vouchers, period, periodKey));
+}
+
 function buildAccountSums(
   vouchers: VoucherRecord[],
   { fromDate, toDate }: { fromDate?: string; toDate?: string } = {}
@@ -437,5 +443,6 @@ export const ProfitLossClosing = {
   getPeriodSummary,
   createClosing,
   reverseClosing,
-  getProfitLossClosingConflictMessage
+  getProfitLossClosingConflictMessage,
+  hasProfitLossClosing
 };

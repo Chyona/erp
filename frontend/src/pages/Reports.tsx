@@ -7,7 +7,8 @@ import {
   Table,
   Typography,
   App,
-  Alert
+  Alert,
+  Tooltip
 } from 'antd';
 import { DownloadOutlined } from '@ant-design/icons';
 import { Reports as ReportsService } from '../services/reports';
@@ -18,6 +19,7 @@ import IncomeStatementView from '../components/IncomeStatementView';
 import ReportPeriodFilter from '../components/ReportPeriodFilter';
 import {
   defaultReportsPeriod,
+  formatReportPeriod,
   reportPeriodToDateRange
 } from '../utils/reportPeriod';
 import { mergeBalanceSheetRows } from '../utils/balanceSheetRows';
@@ -106,7 +108,83 @@ function trialSummaryCell(index: number, value: unknown) {
   );
 }
 
-function TrialBalanceTab({ dateRange, refreshToken }) {
+function UnbalancedScaleIcon() {
+  return (
+    <svg
+      className="report-trial-imbalance-icon__svg"
+      viewBox="0 0 24 24"
+      width="1em"
+      height="1em"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M12 4v16" />
+      <path d="M8 20h8" />
+      <path d="M4 10l16-3" />
+      <path d="M5 10v3.5" />
+      <path d="M2.5 13.5h5l-1.2 2.5H3.7Z" fill="currentColor" stroke="none" />
+      <path d="M19 7v2.5" />
+      <path d="M16.5 9.5h5l-1.2 2.5h-2.6Z" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function TrialBalanceImbalanceTooltip({ data, period }) {
+  const periodLabel = formatReportPeriod(period);
+  const details = [];
+
+  if (!data.periodOccurrenceBalanced) {
+    details.push(
+      <li key="period">
+        本期发生额：借方 {trialBalanceAmountCell(data.totals.periodDebit) || '0.00'}，贷方{' '}
+        {trialBalanceAmountCell(data.totals.periodCredit) || '0.00'}，差额{' '}
+        <strong>{Math.abs(data.periodOccurrenceDiff).toFixed(2)}</strong>
+      </li>
+    );
+  }
+  if (!data.ytdOccurrenceBalanced) {
+    details.push(
+      <li key="ytd">
+        本年累计：借方 {trialBalanceAmountCell(data.totals.ytdDebit) || '0.00'}，贷方{' '}
+        {trialBalanceAmountCell(data.totals.ytdCredit) || '0.00'}，差额{' '}
+        <strong>{Math.abs(data.ytdOccurrenceDiff).toFixed(2)}</strong>
+      </li>
+    );
+  }
+
+  return (
+    <div className="report-trial-imbalance-tooltip__content">
+      <div className="report-trial-imbalance-tooltip__title">
+        {periodLabel} 发生额借贷不平衡
+      </div>
+      {details.length ? (
+        <ul className="report-trial-imbalance-tooltip__details">{details}</ul>
+      ) : null}
+      <p className="report-trial-imbalance-tooltip__reason">
+        常见于季内部分月份已单独月末结转，或该季度尚未完成季末结转。
+      </p>
+      <div className="report-trial-imbalance-tooltip__action">
+        <div className="report-trial-imbalance-tooltip__action-title">如何处理</div>
+        <ol className="report-trial-imbalance-tooltip__steps">
+          <li>
+            前往工作台 <strong>「季末结转」</strong>，完成 <strong>{periodLabel}</strong>{' '}
+            损益结转
+          </li>
+          <li>
+            若季内已做过单独月末结转，请先 <strong>反结转</strong> 后，再统一做季末结转
+          </li>
+          <li>完成后刷新本表，发生额合计应借贷平衡</li>
+        </ol>
+      </div>
+    </div>
+  );
+}
+
+function TrialBalanceTab({ period, dateRange, refreshToken, onOccurrenceImbalanceChange }) {
   const { message } = App.useApp();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -116,7 +194,7 @@ function TrialBalanceTab({ dateRange, refreshToken }) {
     try {
       const start = dateRange[0].format('YYYY-MM-DD');
       const end = dateRange[1].format('YYYY-MM-DD');
-      const result = await ReportsService.getTrialBalance(start, end);
+      const result = await ReportsService.getTrialBalance(start, end, period);
       setData(result);
     } finally {
       setLoading(false);
@@ -126,6 +204,17 @@ function TrialBalanceTab({ dateRange, refreshToken }) {
   useEffect(() => {
     handleQuery();
   }, [dateRange, refreshToken]);
+
+  useEffect(() => {
+    const imbalance =
+      period.type === 'quarter' &&
+      data &&
+      (!data.periodOccurrenceBalanced || !data.ytdOccurrenceBalanced)
+        ? { data, period }
+        : null;
+    onOccurrenceImbalanceChange?.(imbalance);
+    return () => onOccurrenceImbalanceChange?.(null);
+  }, [data, period, onOccurrenceImbalanceChange]);
 
   const handleExport = () => {
     if (!data?.rows?.length) {
@@ -311,13 +400,22 @@ function BalanceSheetTab({ dateRange, refreshToken }) {
 export default function Reports() {
   const [period, setPeriod] = useState(defaultReportsPeriod);
   const [refreshToken, setRefreshToken] = useState(0);
+  const [activeTab, setActiveTab] = useState('trial');
+  const [trialImbalance, setTrialImbalance] = useState(null);
   const dateRange = useMemo(() => reportPeriodToDateRange(period), [period]);
 
   const items = [
     {
       key: 'trial',
       label: '科目余额表',
-      children: <TrialBalanceTab dateRange={dateRange} refreshToken={refreshToken} />
+      children: (
+        <TrialBalanceTab
+          period={period}
+          dateRange={dateRange}
+          refreshToken={refreshToken}
+          onOccurrenceImbalanceChange={setTrialImbalance}
+        />
+      )
     },
     {
       key: 'income',
@@ -340,13 +438,37 @@ export default function Reports() {
           </Title>
           <Text type="secondary">基于已审核、已锁定凭证汇总；草稿凭证不参与统计</Text>
         </div>
-        <ReportPeriodFilter
-          value={period}
-          onChange={setPeriod}
-          onRefresh={() => setRefreshToken((token) => token + 1)}
-        />
+        <div className="report-page-header__actions">
+          {activeTab === 'trial' && trialImbalance ? (
+            <Tooltip
+              title={<TrialBalanceImbalanceTooltip {...trialImbalance} />}
+              placement="bottomRight"
+              color="#fff"
+              overlayClassName="report-trial-imbalance-tooltip"
+            >
+              <span
+                className="report-trial-imbalance-icon"
+                role="img"
+                aria-label="发生额借贷不平衡"
+              >
+                <UnbalancedScaleIcon />
+              </span>
+            </Tooltip>
+          ) : null}
+          <ReportPeriodFilter
+            value={period}
+            onChange={setPeriod}
+            onRefresh={() => setRefreshToken((token) => token + 1)}
+          />
+        </div>
       </div>
-      <Tabs className="report-tabs" destroyInactiveTabPane items={items} />
+      <Tabs
+        className="report-tabs"
+        destroyInactiveTabPane
+        activeKey={activeTab}
+        onChange={setActiveTab}
+        items={items}
+      />
     </div>
   );
 }
