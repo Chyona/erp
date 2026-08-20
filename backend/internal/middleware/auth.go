@@ -3,26 +3,15 @@ package middleware
 import (
 	"strings"
 
-	jwtpkg "live-mixer/pkg/jwt"
-	"live-mixer/pkg/response"
-
+	"base/pkg/response"
 	"github.com/gin-gonic/gin"
 )
 
 const authHeaderKey = "Authorization"
-const authUserContextKey = "auth_user"
+const authContextKey = "account"
 
-// AuthUser 已认证用户信息，从 JWT Claims 解析得到。
-type AuthUser struct {
-	ID       uint
-	Username string
-	Nickname string
-	Avatar   string
-	Roles    []string
-}
-
-// JWTAuth JWT 鉴权中间件，校验 Bearer Token 并将用户信息写入上下文。
-func JWTAuth(secret string) gin.HandlerFunc {
+// Auth 简单 Bearer Token 鉴权中间件（示例实现）。
+func Auth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader(authHeaderKey)
 		if header == "" {
@@ -45,31 +34,24 @@ func JWTAuth(secret string) gin.HandlerFunc {
 			return
 		}
 
-		// 解析 JWT，提取内嵌的用户信息
-		claims, err := jwtpkg.ParseToken(secret, token)
-		if err != nil {
-			response.Unauthorized(c, "Token 无效或已过期")
+		// 示例：固定 token 校验，生产环境应替换为 JWT 等方案
+		if token != "demo-token" {
+			response.Unauthorized(c, "Token 无效")
 			c.Abort()
 			return
 		}
 
-		c.Set(authUserContextKey, AuthUser{
-			ID:       claims.UserID,
-			Username: claims.Username,
-			Nickname: claims.Nickname,
-			Avatar:   claims.Avatar,
-			Roles:    claims.Roles,
-		})
+		c.Set(authContextKey, "demo")
 		c.Next()
 	}
 }
 
-// GetAuthUser 从上下文获取已认证用户信息。
-func GetAuthUser(c *gin.Context) (AuthUser, bool) {
-	if v, ok := c.Get(authUserContextKey); ok {
-		if user, ok := v.(AuthUser); ok {
-			return user, true
+// GetAuthAccount 从上下文获取已认证账号名。
+func GetAuthAccount(c *gin.Context) string {
+	if v, ok := c.Get(authContextKey); ok {
+		if s, ok := v.(string); ok {
+			return s
 		}
 	}
-	return AuthUser{}, false
+	return ""
 }

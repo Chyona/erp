@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"live-mixer/internal/config"
+	"base/internal/config"
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -15,12 +15,7 @@ import (
 func InitDatabase(cfg config.DatabaseConfig, logger *zap.Logger) (*gorm.DB, error) {
 	gormLog := gormlogger.Default.LogMode(gormlogger.Info)
 
-	// PreferSimpleProtocol 关闭隐式预处理语句缓存，避免表结构变更后出现
-	// "cached plan must not change result type (SQLSTATE 0A000)"。
-	db, err := gorm.Open(postgres.New(postgres.Config{
-		DSN:                  cfg.DSN(),
-		PreferSimpleProtocol: true,
-	}), &gorm.Config{
+	db, err := gorm.Open(postgres.Open(cfg.DSN()), &gorm.Config{
 		Logger: gormLog,
 	})
 	if err != nil {

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"live-mixer/internal/config"
+	"base/internal/config"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"

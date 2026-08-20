@@ -4,9 +4,9 @@ package v1
 import (
 	"strconv"
 
-	"live-mixer/internal/service"
-	"live-mixer/pkg/response"
-	"live-mixer/pkg/utils"
+	"base/internal/service"
+	"base/pkg/response"
+	"base/pkg/utils"
 	"github.com/gin-gonic/gin"
 )
 
@@ -26,16 +26,12 @@ type CreateAccountRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,min=6"`
 	Nickname string `json:"nickname"`
-	Avatar   string `json:"avatar"` // 用户头像 URL
-	Roles    string `json:"roles"`  // 用户角色，多个角色用逗号分隔
 }
 
 // UpdateAccountRequest 更新账号请求体。
 type UpdateAccountRequest struct {
-	Nickname string  `json:"nickname"`
-	Avatar   *string `json:"avatar"` // 可选，用户头像 URL
-	Roles    *string `json:"roles"`  // 可选，用户角色，多个角色用逗号分隔
-	IsActive *int8   `json:"is_active"`
+	Nickname string `json:"nickname"`
+	Status   *int8  `json:"status"`
 }
 
 // CreateAccount 创建账号
@@ -47,7 +43,6 @@ type UpdateAccountRequest struct {
 // @Param        body  body      CreateAccountRequest  true  "账号信息"
 // @Success      200   {object}  response.Body
 // @Failure      400   {object}  response.Body
-// @Security     BearerAuth
 // @Router       /v1/accounts [post]
 func (h *AccountHandler) CreateAccount(c *gin.Context) {
 	var req CreateAccountRequest
@@ -56,7 +51,7 @@ func (h *AccountHandler) CreateAccount(c *gin.Context) {
 		return
 	}
 
-	account, err := h.accountService.CreateAccount(c.Request.Context(), req.Username, req.Email, req.Password, req.Nickname, req.Avatar, req.Roles)
+	account, err := h.accountService.CreateAccount(c.Request.Context(), req.Username, req.Email, req.Password, req.Nickname)
 	if err != nil {
 		response.BadRequest(c, err.Error())
 		return
@@ -72,7 +67,6 @@ func (h *AccountHandler) CreateAccount(c *gin.Context) {
 // @Param        id   path      int  true  "账号 ID"
 // @Success      200  {object}  response.Body
 // @Failure      404  {object}  response.Body
-// @Security     BearerAuth
 // @Router       /v1/accounts/{id} [get]
 func (h *AccountHandler) GetAccount(c *gin.Context) {
 	id, err := parseUintParam(c, "id")
@@ -97,7 +91,6 @@ func (h *AccountHandler) GetAccount(c *gin.Context) {
 // @Param        page       query     int  false  "页码"
 // @Param        page_size  query     int  false  "每页数量"
 // @Success      200        {object}  response.Body
-// @Security     BearerAuth
 // @Router       /v1/accounts [get]
 func (h *AccountHandler) ListAccounts(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -119,14 +112,13 @@ func (h *AccountHandler) ListAccounts(c *gin.Context) {
 
 // UpdateAccount 更新账号
 // @Summary      更新账号
-// @Description  更新账号昵称、头像、角色或状态
+// @Description  更新账号昵称或状态
 // @Tags         账号
 // @Accept       json
 // @Produce      json
 // @Param        id    path      int                   true  "账号 ID"
 // @Param        body  body      UpdateAccountRequest  true  "更新内容"
 // @Success      200   {object}  response.Body
-// @Security     BearerAuth
 // @Router       /v1/accounts/{id} [put]
 func (h *AccountHandler) UpdateAccount(c *gin.Context) {
 	id, err := parseUintParam(c, "id")
@@ -141,7 +133,7 @@ func (h *AccountHandler) UpdateAccount(c *gin.Context) {
 		return
 	}
 
-	account, err := h.accountService.UpdateAccount(c.Request.Context(), id, req.Nickname, req.Avatar, req.Roles, req.IsActive)
+	account, err := h.accountService.UpdateAccount(c.Request.Context(), id, req.Nickname, req.Status)
 	if err != nil {
 		response.NotFound(c, err.Error())
 		return
@@ -156,7 +148,6 @@ func (h *AccountHandler) UpdateAccount(c *gin.Context) {
 // @Produce      json
 // @Param        id   path      int  true  "账号 ID"
 // @Success      200  {object}  response.Body
-// @Security     BearerAuth
 // @Router       /v1/accounts/{id} [delete]
 func (h *AccountHandler) DeleteAccount(c *gin.Context) {
 	id, err := parseUintParam(c, "id")

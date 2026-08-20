@@ -5,18 +5,18 @@ import (
 	"context"
 	"errors"
 
-	"live-mixer/internal/model"
-	"live-mixer/internal/repository"
-	"live-mixer/pkg/utils"
+	"base/internal/model"
+	"base/internal/repository"
+	"base/pkg/utils"
 	"gorm.io/gorm"
 )
 
 // AccountService 账号业务接口。
 type AccountService interface {
-	CreateAccount(ctx context.Context, username, email, password, nickname, avatar, roles string) (*model.Account, error)
+	CreateAccount(ctx context.Context, username, email, password, nickname string) (*model.Account, error)
 	GetAccount(ctx context.Context, id uint) (*model.Account, error)
 	ListAccounts(ctx context.Context, page, pageSize int) ([]model.Account, int64, error)
-	UpdateAccount(ctx context.Context, id uint, nickname string, avatar, roles *string, isActive *int8) (*model.Account, error)
+	UpdateAccount(ctx context.Context, id uint, nickname string, status *int8) (*model.Account, error)
 	DeleteAccount(ctx context.Context, id uint) error
 }
 
@@ -29,7 +29,7 @@ func NewAccountService(accountRepo repository.AccountRepository) AccountService 
 	return &accountService{accountRepo: accountRepo}
 }
 
-func (s *accountService) CreateAccount(ctx context.Context, username, email, password, nickname, avatar, roles string) (*model.Account, error) {
+func (s *accountService) CreateAccount(ctx context.Context, username, email, password, nickname string) (*model.Account, error) {
 	// 检查账号名是否已存在
 	if _, err := s.accountRepo.GetByUsername(ctx, username); err == nil {
 		return nil, errors.New("账号名已存在")
@@ -47,9 +47,7 @@ func (s *accountService) CreateAccount(ctx context.Context, username, email, pas
 		Email:    email,
 		Password: hashed,
 		Nickname: nickname,
-		Avatar:   avatar,
-		Roles:    roles,
-		IsActive: 1,
+		Status:   1,
 	}
 	if err := s.accountRepo.Create(ctx, account); err != nil {
 		return nil, err
@@ -73,7 +71,7 @@ func (s *accountService) ListAccounts(ctx context.Context, page, pageSize int) (
 	return s.accountRepo.List(ctx, offset, pageSize)
 }
 
-func (s *accountService) UpdateAccount(ctx context.Context, id uint, nickname string, avatar, roles *string, isActive *int8) (*model.Account, error) {
+func (s *accountService) UpdateAccount(ctx context.Context, id uint, nickname string, status *int8) (*model.Account, error) {
 	account, err := s.accountRepo.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -84,15 +82,8 @@ func (s *accountService) UpdateAccount(ctx context.Context, id uint, nickname st
 	if nickname != "" {
 		account.Nickname = nickname
 	}
-	// 头像与角色使用指针，区分「未传参」与「传空值清空」
-	if avatar != nil {
-		account.Avatar = *avatar
-	}
-	if roles != nil {
-		account.Roles = *roles
-	}
-	if isActive != nil {
-		account.IsActive = *isActive
+	if status != nil {
+		account.Status = *status
 	}
 	if err := s.accountRepo.Update(ctx, account); err != nil {
 		return nil, err

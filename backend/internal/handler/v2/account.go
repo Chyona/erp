@@ -4,8 +4,8 @@ package v2
 import (
 	"strconv"
 
-	"live-mixer/internal/service"
-	"live-mixer/pkg/response"
+	"base/internal/service"
+	"base/pkg/response"
 	"github.com/gin-gonic/gin"
 )
 
@@ -40,12 +40,10 @@ func (h *AccountHandler) GetAccountProfile(c *gin.Context) {
 		return
 	}
 
-	// v2 仅返回概要字段（含头像与角色）
+	// v2 仅返回概要字段
 	response.Success(c, gin.H{
 		"id":       account.ID,
 		"username": account.Username,
 		"nickname": account.Nickname,
-		"avatar":   account.Avatar,
-		"roles":    account.Roles,
 	})
 }
