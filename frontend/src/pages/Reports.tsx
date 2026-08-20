@@ -281,7 +281,7 @@ function TrialBalanceTab({ period, dateRange, refreshToken, onHeaderAlertChange 
           size="small"
           tableLayout="fixed"
           scroll={{ x: TRIAL_BALANCE_SCROLL_X }}
-          locale={{ emptyText: '请选择期间并查询（仅统计已审核/已锁定凭证）' }}
+          locale={{ emptyText: '请选择期间并查询（仅统计已审核/已结项凭证）' }}
           summary={() =>
             data?.rows?.length ? (
               <Table.Summary fixed>
@@ -468,7 +468,7 @@ export default function Reports() {
           <Title level={2} style={{ margin: 0 }}>
             财务报表
           </Title>
-          <Text type="secondary">基于已审核、已锁定凭证汇总；草稿凭证不参与统计</Text>
+          <Text type="secondary">基于已审核、已结项凭证汇总；草稿凭证不参与统计</Text>
         </div>
         <div className="report-page-header__actions">
           {activeTab === 'trial' && trialHeaderAlert ? (

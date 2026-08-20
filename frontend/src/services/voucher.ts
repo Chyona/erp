@@ -13,6 +13,12 @@ import {
   isCarryForwardVoucher
 } from '../utils/carryForwardVoucher';
 import { normalizeVoucherFinanceInterestEntries } from '../utils/financeExpenseEntry';
+import { TaxDeclaration } from './taxDeclaration';
+import {
+  formatQuarterLabel,
+  reportPeriodToDateRange,
+  taxExemptionPeriodKey
+} from '../utils/reportPeriod';
 import type {
   Attachment,
   LedgerResult,
@@ -25,7 +31,7 @@ import type {
 } from '../types';
 
 const STATUS = { DRAFT: 'draft', APPROVED: 'approved', LOCKED: 'locked' } as const;
-const STATUS_LABEL: Record<VoucherStatus, string> = { draft: '草稿', approved: '已审核', locked: '已锁定' };
+const STATUS_LABEL: Record<VoucherStatus, string> = { draft: '草稿', approved: '已审核', locked: '已结项' };
 const ATTACHMENT_READONLY_TIP = '已结账或已审核的凭证不支持上传、删除、修改附件';
 
 function canModifyAttachments(status: VoucherStatus) {
@@ -48,6 +54,10 @@ function assertCarryForwardMutable(
   if (isCarryForwardVoucher(voucher)) {
     throw new Error(CARRY_FORWARD_VOUCHER_READONLY_TIP);
   }
+}
+
+async function assertVoucherDateMutable(dateStr: string) {
+  await TaxDeclaration.assertDateNotInDeclaredQuarter(dateStr);
 }
 
 function isRedLetterVoucher(voucher: Pick<VoucherRecord, 'reversedFromId' | 'reversedFromNo' | 'remark' | 'entries'> | null | undefined) {
@@ -117,7 +127,7 @@ async function persistVoucherNumbers(vouchers, pad) {
 function assertVouchersUnlocked(vouchers) {
   const locked = vouchers.filter((v) => v.status === STATUS.LOCKED);
   if (locked.length) {
-    throw new Error(`凭证 ${locked.map((v) => v.voucherNo).join('、')} 已锁定，无法调整`);
+    throw new Error(`凭证 ${locked.map((v) => v.voucherNo).join('、')} 已结项，无法调整`);
   }
 }
 
@@ -180,6 +190,8 @@ async function save(voucherData: VoucherInput, approve = false): Promise<Voucher
     if (!e.summary) throw new Error('请填写摘要');
   }
 
+  await assertVoucherDateMutable(normalized.date);
+
   const isNew = !normalized.id;
   if (isNew) {
     normalized.id = DB.generateId();
@@ -199,8 +211,11 @@ async function save(voucherData: VoucherInput, approve = false): Promise<Voucher
   } else {
     const existing = await DB.get('vouchers', normalized.id);
     assertCarryForwardMutable(existing);
+    if (existing?.date && existing.date !== normalized.date) {
+      await assertVoucherDateMutable(existing.date);
+    }
     if (existing && existing.status === STATUS.LOCKED) {
-      throw new Error('凭证已锁定，不可修改');
+      throw new Error('凭证已结项，不可修改');
     }
     if (existing && existing.status === STATUS.APPROVED) {
       throw new Error('凭证已审核，不可修改');
@@ -229,12 +244,85 @@ async function save(voucherData: VoucherInput, approve = false): Promise<Voucher
 async function lock(id) {
   const voucher = await DB.get('vouchers', id);
   if (!voucher) throw new Error('凭证不存在');
-  if (voucher.status === STATUS.DRAFT) throw new Error('草稿凭证需先审核才能锁定');
+  if (voucher.status === STATUS.DRAFT) throw new Error('草稿凭证需先审核才能结项');
   voucher.status = STATUS.LOCKED;
   voucher.lockedAt = new Date().toISOString();
   await DB.put('vouchers', voucher);
-  await DB.addAuditLog('锁定', '凭证', voucher.voucherNo);
+  await DB.addAuditLog('结项', '凭证', voucher.voucherNo);
   return voucher;
+}
+
+/** 季度结项：将该季所有已审核凭证标记为已结项 */
+async function lockManyInQuarter(period: { type: 'quarter'; year: number; quarter: number }) {
+  const [start, end] = reportPeriodToDateRange(period);
+  const startDate = start.format('YYYY-MM-DD');
+  const endDate = end.format('YYYY-MM-DD');
+  const periodKey = taxExemptionPeriodKey(period);
+  const vouchers = await DB.getAll('vouchers');
+  const inQuarter = vouchers.filter((v) => v.date >= startDate && v.date <= endDate);
+
+  const drafts = inQuarter.filter((v) => v.status === STATUS.DRAFT);
+  if (drafts.length) {
+    throw new Error(`该季度还有 ${drafts.length} 张草稿凭证，请先审核后再结项`);
+  }
+
+  let locked = 0;
+  for (const voucher of inQuarter) {
+    if (voucher.status === STATUS.LOCKED) {
+      if (!voucher.quarterDeclaredKey) {
+        voucher.quarterDeclaredKey = periodKey;
+        await DB.put('vouchers', voucher);
+      }
+      continue;
+    }
+    if (voucher.status !== STATUS.APPROVED) continue;
+    voucher.status = STATUS.LOCKED;
+    voucher.lockedAt = new Date().toISOString();
+    voucher.quarterDeclaredKey = periodKey;
+    await DB.put('vouchers', voucher);
+    locked++;
+  }
+
+  if (locked > 0) {
+    await DB.addAuditLog(
+      '批量结项',
+      '凭证',
+      `${formatQuarterLabel(period.year, period.quarter)} ${locked} 张`
+    );
+  }
+
+  return { locked, total: inQuarter.length };
+}
+
+/** 取消季度结项：恢复该季因结项标记而结项的凭证为已审核 */
+async function unlockManyInQuarter(period: { type: 'quarter'; year: number; quarter: number }) {
+  const [start, end] = reportPeriodToDateRange(period);
+  const startDate = start.format('YYYY-MM-DD');
+  const endDate = end.format('YYYY-MM-DD');
+  const periodKey = taxExemptionPeriodKey(period);
+  const vouchers = await DB.getAll('vouchers');
+  const inQuarter = vouchers.filter((v) => v.date >= startDate && v.date <= endDate);
+
+  let unlocked = 0;
+  for (const voucher of inQuarter) {
+    if (voucher.status !== STATUS.LOCKED) continue;
+    if (voucher.quarterDeclaredKey !== periodKey) continue;
+    voucher.status = STATUS.APPROVED;
+    voucher.lockedAt = undefined;
+    voucher.quarterDeclaredKey = undefined;
+    await DB.put('vouchers', voucher);
+    unlocked++;
+  }
+
+  if (unlocked > 0) {
+    await DB.addAuditLog(
+      '取消结项',
+      '凭证',
+      `${formatQuarterLabel(period.year, period.quarter)} ${unlocked} 张恢复为已审核`
+    );
+  }
+
+  return { unlocked };
 }
 
 /** 批量审核草稿凭证 */
@@ -253,6 +341,7 @@ async function approveMany(ids: string[]) {
       continue;
     }
     try {
+      await assertVoucherDateMutable(voucher.date);
       await save(voucher, true);
       result.approved++;
     } catch (err) {
@@ -270,7 +359,7 @@ async function approveMany(ids: string[]) {
   return result;
 }
 
-/** 批量反审核：已审核 → 草稿（已锁定不可反审核） */
+/** 批量反审核：已审核 → 草稿（已结项不可反审核） */
 async function unapproveMany(ids: string[]) {
   const uniqueIds = [...new Set(ids)];
   const result = { unapproved: 0, skipped: 0, failed: [] };
@@ -285,7 +374,7 @@ async function unapproveMany(ids: string[]) {
       result.failed.push({
         id,
         voucherNo: voucher.voucherNo,
-        message: '已锁定，不可反审核'
+        message: '已结项，不可反审核'
       });
       continue;
     }
@@ -302,6 +391,7 @@ async function unapproveMany(ids: string[]) {
       continue;
     }
     try {
+      await assertVoucherDateMutable(voucher.date);
       voucher.status = STATUS.DRAFT;
       voucher.approvedAt = undefined;
       voucher.updatedAt = new Date().toISOString();
@@ -327,8 +417,9 @@ async function unapprove(id) {
   const voucher = await DB.get('vouchers', id);
   if (!voucher) throw new Error('凭证不存在');
   assertCarryForwardMutable(voucher);
+  await assertVoucherDateMutable(voucher.date);
   if (voucher.status === STATUS.LOCKED) {
-    throw new Error('已锁定的凭证不可反审核');
+    throw new Error('已结项的凭证不可反审核');
   }
   if (voucher.status !== STATUS.APPROVED) {
     throw new Error('仅已审核凭证可反审核');
@@ -368,8 +459,9 @@ async function remove(id, options: VoucherMutationOptions = {}) {
   const voucher = await DB.get('vouchers', id);
   if (!voucher) return;
   assertCarryForwardMutable(voucher, options);
+  await assertVoucherDateMutable(voucher.date);
   if (voucher.status === STATUS.LOCKED) {
-    throw new Error('已锁定的凭证不可删除');
+    throw new Error('已结项的凭证不可删除');
   }
   await removeVoucherData(voucher);
   await DB.addAuditLog('删除', '凭证', voucher.voucherNo);
@@ -379,6 +471,7 @@ async function forceRemove(id, options: VoucherMutationOptions = {}) {
   const voucher = await DB.get('vouchers', id);
   if (!voucher) return;
   assertCarryForwardMutable(voucher, options);
+  await assertVoucherDateMutable(voucher.date);
   await removeVoucherData(voucher);
   await DB.addAuditLog('强制删除', '凭证', voucher.voucherNo);
 }
@@ -392,7 +485,7 @@ async function removeByVoucherNo(voucherNo) {
   await forceRemove(voucher.id);
 }
 
-/** 批量删除未锁定凭证（草稿、已审核） */
+/** 批量删除未结项凭证（草稿、已审核） */
 async function removeMany(ids: string[]) {
   const uniqueIds = [...new Set(ids)];
   const result = { deleted: 0, skipped: 0, failed: [] };
@@ -407,7 +500,7 @@ async function removeMany(ids: string[]) {
       result.failed.push({
         id,
         voucherNo: voucher.voucherNo,
-        message: '已锁定，不可删除'
+        message: '已结项，不可删除'
       });
       continue;
     }
@@ -420,6 +513,7 @@ async function removeMany(ids: string[]) {
       continue;
     }
     try {
+      await assertVoucherDateMutable(voucher.date);
       await removeVoucherData(voucher);
       result.deleted++;
     } catch (err) {
@@ -437,22 +531,35 @@ async function removeMany(ids: string[]) {
   return result;
 }
 
-/** 批量删除所有未锁定凭证（草稿、已审核） */
+/** 批量删除所有未结项凭证（草稿、已审核） */
 async function removeAllUnlocked() {
   const vouchers = await DB.getAll('vouchers');
-  const targets = vouchers.filter((v) => v.status !== STATUS.LOCKED);
-  const lockedCount = vouchers.length - targets.length;
+  const targets = [];
+  let lockedCount = 0;
+  let declaredCount = 0;
+
+  for (const voucher of vouchers) {
+    if (voucher.status === STATUS.LOCKED) {
+      lockedCount++;
+      continue;
+    }
+    if (await TaxDeclaration.isDateInDeclaredQuarter(voucher.date)) {
+      declaredCount++;
+      continue;
+    }
+    targets.push(voucher);
+  }
 
   if (!targets.length) {
-    return { deleted: 0, locked: lockedCount };
+    return { deleted: 0, locked: lockedCount, declared: declaredCount };
   }
 
   for (const voucher of targets) {
     await removeVoucherData(voucher);
   }
 
-  await DB.addAuditLog('批量删除', '凭证', `删除 ${targets.length} 张未锁定凭证`);
-  return { deleted: targets.length, locked: lockedCount };
+  await DB.addAuditLog('批量删除', '凭证', `删除 ${targets.length} 张未结项凭证`);
+  return { deleted: targets.length, locked: lockedCount, declared: declaredCount };
 }
 
 async function getAll(filters: VoucherFilters = {}) {
@@ -602,6 +709,7 @@ async function addAttachmentToVoucher(voucherId, file) {
   if (!canModifyAttachments(voucher.status)) {
     throw new Error(ATTACHMENT_READONLY_TIP);
   }
+  await assertVoucherDateMutable(voucher.date);
   if (file.size > 5 * 1024 * 1024) {
     throw new Error(`${file.name} 超过 5MB 限制`);
   }
@@ -630,8 +738,9 @@ async function reverse(id) {
   const source = await DB.get('vouchers', id);
   if (!source) throw new Error('凭证不存在');
   assertCarryForwardMutable(source);
+  await assertVoucherDateMutable(source.date);
   if (source.status === STATUS.LOCKED) {
-    throw new Error('已锁定的凭证不可冲销');
+    throw new Error('已结项的凭证不可冲销');
   }
 
   const entries = (source.entries || []).map((entry) => ({
@@ -675,8 +784,9 @@ async function reorder(voucherId, beforeNumber) {
   const source = await DB.get('vouchers', voucherId);
   if (!source) throw new Error('凭证不存在');
   assertCarryForwardMutable(source);
+  await assertVoucherDateMutable(source.date);
   if (source.status === STATUS.LOCKED) {
-    throw new Error('已锁定的凭证不可调整顺序');
+    throw new Error('已结项的凭证不可调整顺序');
   }
 
   const targetNum = parseVoucherNum(beforeNumber);
@@ -720,6 +830,8 @@ async function reorder(voucherId, beforeNumber) {
 async function prepareInsertSlot(voucherType, date, beforeNumber) {
   const targetNum = parseVoucherNum(beforeNumber);
   if (!targetNum) throw new Error('请输入有效的凭证号');
+
+  await assertVoucherDateMutable(date);
 
   const yearMonth = getYearMonth(date);
   const periodVouchers = await getPeriodVouchers(voucherType, yearMonth);
@@ -809,11 +921,14 @@ export const Voucher = {
   STATUS_LABEL,
   ATTACHMENT_READONLY_TIP,
   CARRY_FORWARD_VOUCHER_READONLY_TIP,
+  DECLARED_QUARTER_READONLY_TIP: TaxDeclaration.DECLARED_QUARTER_READONLY_TIP,
   canModifyAttachments,
   canEditVoucher,
   isRedLetterVoucher,
   save,
   lock,
+  lockManyInQuarter,
+  unlockManyInQuarter,
   approveMany,
   unapprove,
   unapproveMany,

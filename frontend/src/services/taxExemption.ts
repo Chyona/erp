@@ -1,6 +1,7 @@
 import { DB } from './db';
 import { Accounts } from './accounts';
 import { Voucher } from './voucher';
+import { TaxDeclaration } from './taxDeclaration';
 import { INVOICE_TYPE } from '../constants/invoice';
 import type { TaxExemptionTaxLine, Voucher as VoucherRecord } from '../types';
 import {
@@ -366,6 +367,20 @@ export async function createCarryForward(period, { approve = true } = {}) {
 
 /** 反结转：删除减免结转凭证，并恢复来源销售凭证的待结转状态 */
 export async function reverseCarryForward(period, carryForwardId) {
+  if (period.type === 'quarter' && period.quarter) {
+    if (
+      await TaxDeclaration.isQuarterDeclared({
+        type: 'quarter',
+        year: period.year,
+        quarter: period.quarter
+      })
+    ) {
+      throw new Error(
+        `${formatTaxExemptionPeriod(period)} 已结项，不可反结转。${TaxDeclaration.DECLARED_QUARTER_READONLY_TIP}`
+      );
+    }
+  }
+
   let cf;
   if (carryForwardId) {
     cf = await Voucher.getById(carryForwardId);

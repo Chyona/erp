@@ -3,6 +3,7 @@ import { Spin } from 'antd';
 import { DB } from '../services/db';
 import { Accounts } from '../services/accounts';
 import { repairFinanceInterestEntries } from '../services/financeExpenseRepair';
+import { TaxDeclaration } from '../services/taxDeclaration';
 import { useApp } from '../context/AppContext';
 
 export default function AppInit({ children }: { children: ReactNode }) {
@@ -15,13 +16,14 @@ export default function AppInit({ children }: { children: ReactNode }) {
       await DB.open();
       await Accounts.init();
       const repaired = await repairFinanceInterestEntries();
+      const syncedLocks = await TaxDeclaration.syncDeclaredQuarterVoucherLocks();
       const name = await DB.getSetting('companyName');
       const accs = await Accounts.getAll();
       if (!cancelled) {
         setCompanyName(typeof name === 'string' ? name : '');
         setAccounts(accs);
         setReady(true);
-        if (repaired > 0) {
+        if (repaired > 0 || syncedLocks > 0) {
           refresh();
         }
       }

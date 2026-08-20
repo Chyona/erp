@@ -168,14 +168,14 @@ export default function VoucherDetailModal({
   const handleLock = async () => {
     if (!voucher) return;
     const ok = await confirmWarning(modal, {
-      title: '确定锁定凭证？',
-      content: `凭证 ${voucher.voucherNo} 锁定后将不可修改和删除，仅可查看和打印。`,
-      okText: '确定锁定'
+      title: '确定结项？',
+      content: `凭证 ${voucher.voucherNo} 结项后将不可修改和删除，仅可查看和打印。`,
+      okText: '确定结项'
     });
     if (!ok) return;
     try {
       await Voucher.lock(voucher.id);
-      message.success('凭证已锁定');
+      message.success('凭证已结项');
       onLocked?.();
       onClose();
     } catch (err) {
@@ -210,6 +210,8 @@ export default function VoucherDetailModal({
         open={open}
         onCancel={onClose}
         width={800}
+        className="voucher-detail-modal"
+        wrapClassName="voucher-detail-modal-wrap"
         footer={
         <Space>
           <Button onClick={handlePrint} disabled={!voucher}>
@@ -223,7 +225,7 @@ export default function VoucherDetailModal({
           {!carryForward &&
             (voucher?.status === 'locked' ? (
               <Popconfirm
-                title="确定强制删除已锁定凭证？"
+                title="确定强制删除已结项凭证？"
                 description={
                   voucher
                     ? `凭证 ${voucher.voucherNo} 及关联附件删除后不可恢复。`
@@ -259,7 +261,7 @@ export default function VoucherDetailModal({
                   </Button>
                 </Popconfirm>
                 <Button onClick={handleLock} disabled={!voucher}>
-                  锁定凭证
+                  凭证结项
                 </Button>
               </>
             ))}

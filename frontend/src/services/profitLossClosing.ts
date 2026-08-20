@@ -2,6 +2,7 @@ import { DB } from './db';
 import { Accounts } from './accounts';
 import { Voucher } from './voucher';
 import { TaxExemption } from './taxExemption';
+import { TaxDeclaration } from './taxDeclaration';
 import type { Account, Voucher as VoucherRecord, VoucherEntry } from '../types';
 import {
   formatReportPeriod,
@@ -395,6 +396,20 @@ export async function createClosing(period: ReportPeriod, { approve = true } = {
 
 /** 反结转：删除指定月份的损益结转凭证 */
 export async function reverseClosing(period: ReportPeriod, closingId?: string) {
+  if (period.type === 'quarter' && period.quarter) {
+    if (
+      await TaxDeclaration.isQuarterDeclared({
+        type: 'quarter',
+        year: period.year,
+        quarter: period.quarter
+      })
+    ) {
+      throw new Error(
+        `${formatReportPeriod(period)} 已结项，不可反结转。${TaxDeclaration.DECLARED_QUARTER_READONLY_TIP}`
+      );
+    }
+  }
+
   let cf: VoucherRecord | null = null;
   if (closingId) {
     cf = await Voucher.getById(closingId);

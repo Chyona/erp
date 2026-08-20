@@ -1,6 +1,7 @@
 import { TaxExemption } from './taxExemption';
 import { ProfitLossClosing } from './profitLossClosing';
 import { DB } from './db';
+import { TaxDeclaration } from './taxDeclaration';
 import { formatReportPeriod } from '../utils/reportPeriod';
 import type { Voucher } from '../types';
 
@@ -13,6 +14,15 @@ type ReportPeriod = {
 
 function closingPeriodLabel(period: ReportPeriod) {
   return period.type === 'quarter' ? '季末结转' : '月末结转';
+}
+
+async function assertPeriodNotDeclared(period: ReportPeriod) {
+  if (period.type !== 'quarter' || !period.quarter) return;
+  if (await TaxDeclaration.isQuarterDeclared({ type: 'quarter', year: period.year, quarter: period.quarter })) {
+    throw new Error(
+      `${formatReportPeriod(period)} 已结项，不可变更结转数据。${TaxDeclaration.DECLARED_QUARTER_READONLY_TIP}`
+    );
+  }
 }
 
 /** 季末/月末结转汇总：普票减免 + 损益结转 */
@@ -41,6 +51,14 @@ export async function getUnifiedSummary(period: ReportPeriod) {
   const taxSettled = taxPendingCount === 0;
   /** 已有损益结转凭证且普票已结清即视为完成（不要求科目余额为零，兼容历史导入） */
   const fullyClosed = taxSettled && Boolean(profitLossVoucher);
+  const declared =
+    period.type === 'quarter' && period.quarter
+      ? await TaxDeclaration.isQuarterDeclared({
+          type: 'quarter',
+          year: period.year,
+          quarter: period.quarter
+        })
+      : false;
   const staleAfterProfitLoss =
     Boolean(profitLossVoucher) && taxPendingCount > 0;
 
@@ -49,6 +67,8 @@ export async function getUnifiedSummary(period: ReportPeriod) {
 
   if (profitLoss.draftCount > 0) {
     blockReason = `该期间还有 ${profitLoss.draftCount} 张草稿凭证未审核，请先审核后再结转`;
+  } else if (declared) {
+    blockReason = `${periodLabel} 已结项`;
   } else if (fullyClosed) {
     blockReason = `${periodLabel} 已完成${closingLabel}`;
   } else if (staleAfterProfitLoss) {
@@ -74,6 +94,7 @@ export async function getUnifiedSummary(period: ReportPeriod) {
     profitLossPendingCount,
     netProfit: profitLoss.netProfit,
     fullyClosed,
+    declared,
     staleAfterProfitLoss,
     canClose,
     blockReason,
@@ -83,6 +104,7 @@ export async function getUnifiedSummary(period: ReportPeriod) {
 
 /** 一键结转：先普票减免（如有），再损益结转（如有） */
 export async function createUnifiedClosing(period: ReportPeriod, { approve = true } = {}) {
+  await assertPeriodNotDeclared(period);
   const summary = await getUnifiedSummary(period);
   if (!summary.canClose) {
     throw new Error(summary.blockReason || '当前期间无法结转');
@@ -136,6 +158,7 @@ export async function createUnifiedClosing(period: ReportPeriod, { approve = tru
 
 /** 反结转：先撤销损益结转，再撤销普票减免结转 */
 export async function reverseUnifiedClosing(period: ReportPeriod) {
+  await assertPeriodNotDeclared(period);
   const summary = await getUnifiedSummary(period);
 
   if (!summary.profitLossVoucher && !summary.taxVoucher) {

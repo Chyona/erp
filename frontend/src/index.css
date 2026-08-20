@@ -1317,6 +1317,34 @@ body,
 }
 
 /* Print voucher styles in modal */
+.voucher-detail-modal-wrap {
+  overflow: hidden;
+}
+
+.voucher-detail-modal-wrap .ant-modal {
+  top: 24px;
+  padding-bottom: 24px;
+  max-width: calc(100vw - 32px);
+}
+
+.voucher-detail-modal .ant-modal-content {
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+}
+
+.voucher-detail-modal .ant-modal-header,
+.voucher-detail-modal .ant-modal-footer {
+  flex-shrink: 0;
+}
+
+.voucher-detail-modal .ant-modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .print-voucher {
   font-family: SimSun, serif;
   padding: 20px;

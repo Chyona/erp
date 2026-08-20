@@ -61,6 +61,8 @@ export interface Voucher {
   updatedAt?: string;
   approvedAt?: string;
   lockedAt?: string;
+  /** 因季度结项标记而结项的期间键，如 2026-Q2 */
+  quarterDeclaredKey?: string;
   importedAt?: string;
   importSource?: string;
 }

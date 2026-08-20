@@ -179,7 +179,7 @@ export default function VoucherTable({
       {!isCarryForwardVoucher(voucher) &&
         (voucher.status === 'locked' ? (
           <Popconfirm
-            title="确定强制删除已锁定凭证？"
+            title="确定强制删除已结项凭证？"
             description={`凭证 ${voucher.voucherNo} 及关联附件删除后不可恢复。`}
             okText="强制删除"
             cancelText="取消"

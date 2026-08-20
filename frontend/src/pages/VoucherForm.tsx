@@ -221,7 +221,7 @@ export default function VoucherForm() {
   const openVoucher = (voucher) => {
     if (!voucher) return;
     if (voucher.status === Voucher.STATUS.LOCKED) {
-      message.info('已锁定凭证请在凭证列表中查看');
+      message.info('已结项凭证请在凭证列表中查看');
       return;
     }
     navigate(`/vouchers/${voucher.id}/edit`);
