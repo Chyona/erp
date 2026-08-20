@@ -43,7 +43,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/base_pkg_response.Body"
+                            "$ref": "#/definitions/erp_internal_pkg_response.Body"
                         }
                     }
                 }
@@ -75,13 +75,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/base_pkg_response.Body"
+                            "$ref": "#/definitions/erp_internal_pkg_response.Body"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/base_pkg_response.Body"
+                            "$ref": "#/definitions/erp_internal_pkg_response.Body"
                         }
                     }
                 }
@@ -110,13 +110,13 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/base_pkg_response.Body"
+                            "$ref": "#/definitions/erp_internal_pkg_response.Body"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/base_pkg_response.Body"
+                            "$ref": "#/definitions/erp_internal_pkg_response.Body"
                         }
                     }
                 }
@@ -155,7 +155,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/base_pkg_response.Body"
+                            "$ref": "#/definitions/erp_internal_pkg_response.Body"
                         }
                     }
                 }
@@ -182,7 +182,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/base_pkg_response.Body"
+                            "$ref": "#/definitions/erp_internal_pkg_response.Body"
                         }
                     }
                 }
@@ -211,7 +211,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/base_pkg_response.Body"
+                            "$ref": "#/definitions/erp_internal_pkg_response.Body"
                         }
                     }
                 }
@@ -219,7 +219,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "base_pkg_response.Body": {
+        "erp_internal_pkg_response.Body": {
             "type": "object",
             "properties": {
                 "code": {

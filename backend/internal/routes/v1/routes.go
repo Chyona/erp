@@ -2,8 +2,8 @@
 package v1
 
 import (
-	v1handler "base/internal/handler/v1"
-	"base/internal/middleware"
+	v1handler "erp/internal/handler/v1"
+	"erp/internal/middleware"
 	"github.com/gin-gonic/gin"
 )
 

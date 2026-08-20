@@ -5,9 +5,9 @@ import (
 	"context"
 	"errors"
 
-	"base/internal/model"
-	"base/internal/repository"
-	"base/internal/pkg/utils"
+	"erp/internal/model"
+	"erp/internal/repository"
+	"erp/internal/pkg/utils"
 	"gorm.io/gorm"
 )
 

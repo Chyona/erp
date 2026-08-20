@@ -1,4 +1,4 @@
-module base
+module erp
 
 go 1.25
 

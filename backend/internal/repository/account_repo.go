@@ -4,7 +4,7 @@ package repository
 import (
 	"context"
 
-	"base/internal/model"
+	"erp/internal/model"
 	"gorm.io/gorm"
 )
 

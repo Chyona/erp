@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"base/internal/config"
+	"erp/internal/config"
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"

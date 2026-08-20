@@ -4,8 +4,8 @@ package v2
 import (
 	"strconv"
 
-	"base/internal/service"
-	"base/internal/pkg/response"
+	"erp/internal/service"
+	"erp/internal/pkg/response"
 	"github.com/gin-gonic/gin"
 )
 

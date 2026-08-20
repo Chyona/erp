@@ -4,7 +4,7 @@ package migrator
 import (
 	"fmt"
 
-	"base/internal/model"
+	"erp/internal/model"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )

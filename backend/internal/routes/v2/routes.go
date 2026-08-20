@@ -2,7 +2,7 @@
 package v2
 
 import (
-	v2handler "base/internal/handler/v2"
+	v2handler "erp/internal/handler/v2"
 	"github.com/gin-gonic/gin"
 )
 

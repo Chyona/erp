@@ -3,7 +3,7 @@ package middleware
 import (
 	"strings"
 
-	"base/internal/pkg/response"
+	"erp/internal/pkg/response"
 	"github.com/gin-gonic/gin"
 )
 

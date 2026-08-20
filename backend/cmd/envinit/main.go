@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"os"
 
-	"base/internal/bootstrap"
-	"base/internal/config"
-	"base/internal/migrator"
-	"base/internal/seeder"
+	"erp/internal/bootstrap"
+	"erp/internal/config"
+	"erp/internal/migrator"
+	"erp/internal/seeder"
 
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"

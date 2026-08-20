@@ -4,9 +4,9 @@ package v1
 import (
 	"strconv"
 
-	"base/internal/service"
-	"base/internal/pkg/response"
-	"base/internal/pkg/utils"
+	"erp/internal/service"
+	"erp/internal/pkg/response"
+	"erp/internal/pkg/utils"
 	"github.com/gin-gonic/gin"
 )
 
