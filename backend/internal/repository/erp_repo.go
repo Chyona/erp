@@ -270,7 +270,7 @@ func (r *erpRepository) ClearSettings(ctx context.Context) error {
 	return r.db.WithContext(ctx).Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&model.Setting{}).Error
 }
 
-// ImportAll 在事务内清空五张表后全量写入，对应前端 DB.importAll。
+// ImportAll 在事务内清空五张表后全量写入，对应前端 ErpApi.importAll。
 func (r *erpRepository) ImportAll(ctx context.Context, data *model.ExportData) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		repo := &erpRepository{db: tx}

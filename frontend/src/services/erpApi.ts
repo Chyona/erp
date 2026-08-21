@@ -1,10 +1,12 @@
 /**
- * 数据存储层 — 全部走后端 API（/openapi/erp/v1）
+ * ERP 后端 API 客户端（浏览器不落库）。
+ * - 业务数据：HTTP → /openapi/erp/v1
+ * - 附件文件：POST /attachments/upload → COS，库内仅存未签名 url
  *
  * 统一批量入口（单条 = 数组长度 1）：
  *   POST /vouchers/batch     { action: upsert|approve|unapprove|delete, items?|ids? }
  *   POST /accounts/batch     { action: upsert|delete, items?|ids? }
- *   POST /attachments/batch  { action: upsert|delete, items?|ids? }
+ *   POST /attachments/batch  { action: upsert|delete, items?|ids? }  // 仅元数据
  *   PUT  /settings/batch     { items: [{ key, value }] }
  */
 import type {
@@ -35,6 +37,23 @@ const STORE_PATHS: Record<StoreName, string> = {
   auditLogs: '/audit-logs',
   settings: '/settings'
 };
+
+/** 附件只允许元数据 + 未签名 URL，禁止夹带文件内容字段。 */
+function sanitizeAttachment(item: Attachment): Attachment {
+  const raw = item as Attachment & { data?: unknown };
+  return {
+    id: raw.id,
+    name: raw.name,
+    type: raw.type,
+    size: raw.size,
+    url: raw.url || '',
+    uploadedAt: raw.uploadedAt
+  };
+}
+
+function sanitizeAttachments(items: Attachment[]): Attachment[] {
+  return items.map(sanitizeAttachment);
+}
 
 export type VoucherBatchFailItem = {
   id: string;
@@ -111,8 +130,12 @@ async function put<K extends StoreName>(
     });
     return setting.key;
   }
-  const record = data as { id: string };
-  await apiRequest('PUT', `${STORE_PATHS[storeName]}/${encodeURIComponent(record.id)}`, data);
+  const payload =
+    storeName === 'attachments'
+      ? sanitizeAttachment(data as Attachment)
+      : data;
+  const record = payload as { id: string };
+  await apiRequest('PUT', `${STORE_PATHS[storeName]}/${encodeURIComponent(record.id)}`, payload);
   return record.id;
 }
 
@@ -158,7 +181,7 @@ async function vouchersBatch(input: {
   };
 }
 
-/** 批量 upsert（accounts / vouchers / attachments）。 */
+/** 批量 upsert（accounts / vouchers / attachments 元数据）。 */
 async function putMany<K extends BatchStore>(
   storeName: K,
   items: StoreRecordMap[K] | StoreRecordMap[K][]
@@ -170,9 +193,11 @@ async function putMany<K extends BatchStore>(
     await vouchersBatch({ action: 'upsert', items: list as Voucher[] });
     return;
   }
+  const payload =
+    storeName === 'attachments' ? sanitizeAttachments(list as Attachment[]) : list;
   await apiRequest('POST', `${STORE_PATHS[storeName]}/batch`, {
     action: 'upsert',
-    items: list
+    items: payload
   });
 }
 
@@ -272,11 +297,11 @@ async function importAll(data: Partial<ExportData>): Promise<void> {
     accounts: data.accounts ?? [],
     auditLogs: data.auditLogs ?? [],
     settings: data.settings ?? [],
-    attachments: data.attachments ?? []
+    attachments: sanitizeAttachments(data.attachments ?? [])
   });
 }
 
-export const DB = {
+export const ErpApi = {
   open,
   getAll,
   get,

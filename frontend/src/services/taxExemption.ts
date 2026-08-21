@@ -1,4 +1,4 @@
-import { DB } from './db';
+import { ErpApi } from './erpApi';
 import { Accounts } from './accounts';
 import { Voucher } from './voucher';
 import { TaxDeclaration } from './taxDeclaration';
@@ -195,7 +195,7 @@ async function repairOrphanTaxExemptionLinks(vouchers) {
     toSave.push(voucher);
   }
 
-  await DB.putMany('vouchers', toSave);
+  await ErpApi.putMany('vouchers', toSave);
   return toSave.length;
 }
 
@@ -301,7 +301,7 @@ export async function createCarryForward(period, { approve = true } = {}) {
     throw new Error('缺少 2221 应交税费 或 5301 营业外收入 科目');
   }
 
-  const signatory = String((await DB.getSetting('defaultSignatory')) ?? '');
+  const signatory = String((await ErpApi.getSetting('defaultSignatory')) ?? '');
   const scopeLabel = period.type === 'quarter' ? '季度' : '月度';
 
   const voucherData = {
@@ -351,9 +351,9 @@ export async function createCarryForward(period, { approve = true } = {}) {
     source.taxExemptionVoucherId = saved.id;
     linked.push(source);
   }
-  await DB.putMany('vouchers', linked);
+  await ErpApi.putMany('vouchers', linked);
 
-  await DB.addAuditLog(
+  await ErpApi.addAuditLog(
     approve ? '新建并审核' : '新建草稿',
     '普票减免结转',
     `${saved.voucherNo} ${totalTax.toFixed(2)} 元，${summary.ordinaryPending.length} 条税额 / ${pendingVoucherIds.length} 张凭证（${periodLabel}）`
@@ -407,7 +407,7 @@ export async function reverseCarryForward(period, carryForwardId) {
     v.taxExemptionDone = false;
     v.taxExemptionVoucherId = '';
   }
-  await DB.putMany('vouchers', linked);
+  await ErpApi.putMany('vouchers', linked);
 
   if (cf.status === Voucher.STATUS.LOCKED) {
     await Voucher.forceRemove(cf.id, { allowCarryForwardBypass: true });
@@ -415,7 +415,7 @@ export async function reverseCarryForward(period, carryForwardId) {
     await Voucher.remove(cf.id, { allowCarryForwardBypass: true });
   }
 
-  await DB.addAuditLog(
+  await ErpApi.addAuditLog(
     '反结转',
     '普票减免结转',
     `删除 ${cf.voucherNo}，恢复 ${linked.length} 笔销售凭证待结转状态（${periodLabel}）`

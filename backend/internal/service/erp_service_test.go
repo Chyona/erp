@@ -11,7 +11,7 @@ import (
 
 // TestErpService_ChartAccounts 覆盖科目增删改查与清空。
 func TestErpService_ChartAccounts(t *testing.T) {
-	svc := NewErpService(newMemoryErpRepo())
+	svc := NewErpService(newMemoryErpRepo(), nil)
 	ctx := context.Background()
 
 	_, err := svc.GetChartAccount(ctx, "missing")
@@ -57,7 +57,7 @@ func TestErpService_ChartAccounts(t *testing.T) {
 
 // TestErpService_Vouchers 覆盖凭证保存、空分录默认与删除。
 func TestErpService_Vouchers(t *testing.T) {
-	svc := NewErpService(newMemoryErpRepo())
+	svc := NewErpService(newMemoryErpRepo(), nil)
 	ctx := context.Background()
 
 	_, err := svc.GetVoucher(ctx, "missing")
@@ -100,7 +100,7 @@ func TestErpService_Vouchers(t *testing.T) {
 
 // TestErpService_VoucherBatch 覆盖批量 upsert / 审核 / 反审核。
 func TestErpService_VoucherBatch(t *testing.T) {
-	svc := NewErpService(newMemoryErpRepo())
+	svc := NewErpService(newMemoryErpRepo(), nil)
 	ctx := context.Background()
 
 	carry := true
@@ -153,7 +153,7 @@ func TestErpService_VoucherBatch(t *testing.T) {
 
 // TestErpService_Attachments 覆盖附件 CRUD。
 func TestErpService_Attachments(t *testing.T) {
-	svc := NewErpService(newMemoryErpRepo())
+	svc := NewErpService(newMemoryErpRepo(), nil)
 	ctx := context.Background()
 
 	_, err := svc.GetAttachment(ctx, "missing")
@@ -166,7 +166,7 @@ func TestErpService_Attachments(t *testing.T) {
 	}
 
 	saved, err := svc.SaveAttachment(ctx, &model.Attachment{
-		ID: "att1", Name: "a.pdf", Type: "application/pdf", Size: 12, Data: "data:...", UploadedAt: "2026-01-01T00:00:00Z",
+		ID: "att1", Name: "a.pdf", Type: "application/pdf", Size: 12, URL: "https://example.com/a.pdf", UploadedAt: "2026-01-01T00:00:00Z",
 	})
 	if err != nil || saved.Name != "a.pdf" {
 		t.Fatalf("SaveAttachment() = %+v, %v", saved, err)
@@ -190,7 +190,7 @@ func TestErpService_Attachments(t *testing.T) {
 
 // TestErpService_AuditLogs 覆盖追加审计日志、截断 UA、查询与清空。
 func TestErpService_AuditLogs(t *testing.T) {
-	svc := NewErpService(newMemoryErpRepo())
+	svc := NewErpService(newMemoryErpRepo(), nil)
 	ctx := context.Background()
 
 	_, err := svc.GetAuditLog(ctx, "missing")
@@ -228,7 +228,7 @@ func TestErpService_AuditLogs(t *testing.T) {
 
 // TestErpService_Settings 覆盖设置读写删除与缺失返回 nil。
 func TestErpService_Settings(t *testing.T) {
-	svc := NewErpService(newMemoryErpRepo())
+	svc := NewErpService(newMemoryErpRepo(), nil)
 	ctx := context.Background()
 
 	val, err := svc.GetSetting(ctx, "companyName")
@@ -270,7 +270,7 @@ func TestErpService_Settings(t *testing.T) {
 // TestErpService_ExportImport 覆盖全量导出与导入替换。
 func TestErpService_ExportImport(t *testing.T) {
 	repo := newMemoryErpRepo()
-	svc := NewErpService(repo)
+	svc := NewErpService(repo, nil)
 	ctx := context.Background()
 
 	_, _ = svc.SaveChartAccount(ctx, &model.ChartAccount{ID: "a1", Code: "1002", Name: "银行存款", Category: "资产", Direction: "debit"})

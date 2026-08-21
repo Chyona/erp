@@ -1,4 +1,4 @@
-import { DB } from './db';
+import { ErpApi } from './erpApi';
 import { Voucher } from './voucher';
 import { normalizeVoucherFinanceInterestEntries } from '../utils/financeExpenseEntry';
 import type { Voucher as VoucherRecord } from '../types';
@@ -12,7 +12,7 @@ function recalcTotals(voucher: VoucherRecord) {
 
 /** 修复已入库凭证中 5603 利息误记借方的问题 */
 export async function repairFinanceInterestEntries() {
-  const vouchers = await DB.getAll('vouchers');
+  const vouchers = await ErpApi.getAll('vouchers');
   const toSave: VoucherRecord[] = [];
 
   for (const voucher of vouchers) {
@@ -27,11 +27,11 @@ export async function repairFinanceInterestEntries() {
     toSave.push(normalized);
   }
 
-  await DB.putMany('vouchers', toSave);
+  await ErpApi.putMany('vouchers', toSave);
   const repaired = toSave.length;
 
   if (repaired > 0) {
-    await DB.addAuditLog('修复', '财务费用利息分录', `已纠正 ${repaired} 张凭证`);
+    await ErpApi.addAuditLog('修复', '财务费用利息分录', `已纠正 ${repaired} 张凭证`);
   }
 
   return repaired;

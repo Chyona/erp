@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button, Form, Input, Select, Typography, App, Card, Popconfirm, Space, Table } from 'antd';
-import { DB } from '../services/db';
+import { ErpApi } from '../services/erpApi';
 import { Voucher } from '../services/voucher';
 import { TaxDeclaration } from '../services/taxDeclaration';
 import { formatQuarterLabel } from '../utils/reportPeriod';
@@ -35,7 +35,7 @@ export default function Settings() {
 
   useEffect(() => {
     (async () => {
-      const all = await DB.getAll('settings');
+      const all = await ErpApi.getAll('settings');
       const map = new Map(all.map((s) => [s.key, s.value]));
       const values: Record<string, string> = {};
       for (const f of FIELDS) {
@@ -58,8 +58,8 @@ export default function Settings() {
       { key: 'defaultPreparedBy', value: signatory },
       { key: 'defaultReviewedBy', value: signatory }
     ];
-    await DB.setSettingsBatch(items);
-    await DB.addAuditLog('修改', '系统设置', '企业信息更新');
+    await ErpApi.setSettingsBatch(items);
+    await ErpApi.addAuditLog('修改', '系统设置', '企业信息更新');
     setCompanyName(values.companyName || '');
     message.success('设置已保存');
     refresh();

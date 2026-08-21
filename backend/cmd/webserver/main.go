@@ -14,6 +14,7 @@ import (
 	v2handler "erp/internal/handler/v2"
 	"erp/internal/middleware"
 	"erp/internal/pkg/llm"
+	"erp/internal/pkg/storage"
 	"erp/internal/repository"
 	"erp/internal/service"
 	routesv1 "erp/internal/routes/v1"
@@ -57,7 +58,14 @@ func main() {
 	v2AccountHandler := v2handler.NewAccountHandler(accountService)
 
 	erpRepo := repository.NewErpRepository(db)
-	erpService := service.NewErpService(erpRepo)
+	var storeClient *storage.Client
+	if sc, err := storage.NewClientFromAppConfig(cfg.Storage); err != nil {
+		logger.Warn("对象存储未就绪，附件上传不可用", zap.Error(err))
+	} else {
+		storeClient = sc
+		logger.Info("对象存储已启用", zap.String("provider", string(sc.ProviderType())), zap.String("basePath", sc.BasePath()))
+	}
+	erpService := service.NewErpService(erpRepo, storeClient)
 	erpHandler := v1handler.NewErpHandler(erpService)
 	appService := service.NewAppService(erpRepo)
 	appHandler := v1handler.NewAppHandler(appService)

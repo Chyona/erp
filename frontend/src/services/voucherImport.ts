@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { DB } from './db';
+import { ErpApi } from './erpApi';
 import { Voucher } from './voucher';
 import type { Voucher as VoucherRecord } from '../types';
 import { VoucherImportParser } from './voucherImportParser';
@@ -264,7 +264,7 @@ async function importVouchers(vouchers, { skipDuplicates = false, approve = fals
       }
 
       const voucher: VoucherRecord = {
-        id: DB.generateId(),
+        id: ErpApi.generateId(),
         voucherType: raw.voucherType || '记',
         voucherNumber: raw.voucherNumber || raw.voucherNo,
         voucherNo: raw.voucherNo,
@@ -315,10 +315,10 @@ async function importVouchers(vouchers, { skipDuplicates = false, approve = fals
     }
   }
 
-  await DB.putMany('vouchers', toSave);
+  await ErpApi.putMany('vouchers', toSave);
 
   if (result.imported > 0 || result.skipped > 0 || result.failed > 0) {
-    await DB.addAuditLog(
+    await ErpApi.addAuditLog(
       '导入',
       '凭证',
       `文件共 ${result.total} 张，成功 ${result.imported} 张，跳过 ${result.skipped} 张，失败 ${result.failed} 张`

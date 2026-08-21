@@ -12,7 +12,7 @@ func (Setting) TableName() string {
 	return "settings"
 }
 
-// ExportData 全量备份结构，对应前端 DB.exportAll / importAll。
+// ExportData 全量备份结构，对应前端 ErpApi.exportAll / importAll。
 type ExportData struct {
 	Version    int             `json:"version"`
 	ExportedAt string          `json:"exportedAt"`

@@ -54,6 +54,25 @@ export async function apiRequest<T>(
   return json.data;
 }
 
+/** multipart 上传（不要手动设 Content-Type，由浏览器带 boundary） */
+export async function apiUploadForm<T>(path: string, form: FormData): Promise<T> {
+  const url = `${getApiBase()}${path.startsWith('/') ? path : `/${path}`}`;
+  const res = await fetch(url, { method: 'POST', body: form });
+
+  let json: ApiBody<T>;
+  try {
+    json = (await res.json()) as ApiBody<T>;
+  } catch {
+    throw new ApiError(res.ok ? '响应解析失败' : `HTTP ${res.status}: ${res.statusText}`);
+  }
+
+  if (!res.ok || json.code !== 0) {
+    throw new ApiError(json.message || `HTTP ${res.status}`, json.code ?? res.status);
+  }
+
+  return json.data;
+}
+
 export async function pingBackend(): Promise<void> {
   const origin = getServerOrigin();
   const healthUrl = origin ? `${origin}/health` : '/health';

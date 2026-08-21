@@ -24,6 +24,10 @@ type storageProvider interface {
 	UploadFile(ctx context.Context, localPath, objectKey string) (string, error)
 	// UploadReader 将数据流上传到对象存储，适用于内存或管道数据源。
 	UploadReader(ctx context.Context, r io.Reader, objectKey string, size int64) (string, error)
+	// ObjectURL 返回对象的公开访问地址（未签名、不含 query）。
+	ObjectURL(objectKey string) string
+	// DeleteObject 删除对象；对象不存在时应视为成功。
+	DeleteObject(ctx context.Context, objectKey string) error
 	// Type 返回当前后端类型。
 	Type() ProviderType
 }

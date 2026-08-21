@@ -1,18 +1,23 @@
 package storage
 
-import "strings"
+import (
+	"net/url"
+	"strings"
+)
 
 const (
-	// DefaultBasePath 对象键默认前缀，上传文件保存在桶内该目录下。
-	DefaultBasePath = "video_editing"
+	// DefaultBasePath 对象键默认前缀；空表示直接落在桶根下（如 attachments/...）。
+	DefaultBasePath = ""
 
 	// SubDirTemp 临时文件目录（相对 base_path），如 ASR 前上传获取公网 URL。
 	SubDirTemp = "temp"
 	// SubDirTest cmd/test 进程产生的测试上传目录（相对 base_path）；单元测试不受此约定约束。
 	SubDirTest = "test"
+	// SubDirAttachments 凭证附件目录（相对 base_path）。
+	SubDirAttachments = "attachments"
 )
 
-// ResolveBasePath 规范化保存路径；空值时返回 DefaultBasePath。
+// ResolveBasePath 规范化保存路径；空值时返回 DefaultBasePath（当前为空，即无额外前缀）。
 func ResolveBasePath(path string) string {
 	path = strings.Trim(path, "/")
 	if path == "" {
@@ -32,4 +37,46 @@ func JoinObjectKey(basePath, objectKey string) string {
 		return basePath
 	}
 	return basePath + "/" + objectKey
+}
+
+// AttachmentObjectKey 按凭证所属年/月生成附件对象键：attachments/YYYY/MM/{fileName}（不加 ID 前缀）。
+func AttachmentObjectKey(year, month, id, fileName string) string {
+	year = strings.TrimSpace(year)
+	month = strings.TrimSpace(month)
+	fileName = strings.TrimLeft(strings.TrimSpace(fileName), "/")
+	if year == "" {
+		year = "unknown"
+	}
+	if month == "" {
+		month = "00"
+	}
+	if len(month) == 1 {
+		month = "0" + month
+	}
+	if fileName == "" {
+		fileName = strings.TrimSpace(id)
+	}
+	if fileName == "" {
+		fileName = "file"
+	}
+	return JoinObjectKey(SubDirAttachments, year+"/"+month+"/"+fileName)
+}
+
+// ObjectKeyFromPublicURL 从公开访问 URL 解析桶内对象键；非 http(s) 或 data: 返回空。
+func ObjectKeyFromPublicURL(publicURL string) string {
+	raw := strings.TrimSpace(publicURL)
+	if raw == "" || strings.HasPrefix(strings.ToLower(raw), "data:") {
+		return ""
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" {
+		return ""
+	}
+	key := strings.TrimPrefix(u.Path, "/")
+	if key == "" && u.RawPath != "" {
+		if decoded, err := url.PathUnescape(strings.TrimPrefix(u.RawPath, "/")); err == nil {
+			key = decoded
+		}
+	}
+	return key
 }

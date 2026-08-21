@@ -4,16 +4,22 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
+	"net/url"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"erp/internal/model"
+	"erp/internal/pkg/storage"
 	"erp/internal/repository"
 	"github.com/google/uuid"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
-// ErpService ERP 存储业务层，对应前端 services/db.ts。
+// ErpService ERP 业务层，对应前端 ErpApi（services/erpApi.ts）。
 type ErpService interface {
 	ListChartAccounts(ctx context.Context) ([]model.ChartAccount, error)
 	GetChartAccount(ctx context.Context, id string) (*model.ChartAccount, error)
@@ -35,6 +41,7 @@ type ErpService interface {
 
 	ListAttachments(ctx context.Context) ([]model.Attachment, error)
 	GetAttachment(ctx context.Context, id string) (*model.Attachment, error)
+	UploadAttachment(ctx context.Context, id, name, contentType, voucherDate string, r io.Reader, size int64) (*model.Attachment, error)
 	SaveAttachment(ctx context.Context, attachment *model.Attachment) (*model.Attachment, error)
 	SaveAttachmentsBatch(ctx context.Context, items []model.Attachment) ([]model.Attachment, error)
 	DeleteAttachment(ctx context.Context, id string) error
@@ -81,11 +88,12 @@ type SettingKV struct {
 }
 
 type erpService struct {
-	repo repository.ErpRepository
+	repo  repository.ErpRepository
+	store *storage.Client
 }
 
-func NewErpService(repo repository.ErpRepository) ErpService {
-	return &erpService{repo: repo}
+func NewErpService(repo repository.ErpRepository, store *storage.Client) ErpService {
+	return &erpService{repo: repo, store: store}
 }
 
 // generateID 生成业务主键（UUID v4）。
@@ -370,7 +378,7 @@ func (s *erpService) DeleteVouchersBatch(ctx context.Context, ids []string) (*Vo
 	}
 
 	if len(attachmentIDs) > 0 {
-		if err := s.repo.DeleteAttachmentsByIDs(ctx, uniqueIDs(attachmentIDs)); err != nil {
+		if err := s.DeleteAttachmentsBatch(ctx, uniqueIDs(attachmentIDs)); err != nil {
 			return nil, err
 		}
 	}
@@ -406,9 +414,118 @@ func (s *erpService) GetAttachment(ctx context.Context, id string) (*model.Attac
 	return item, nil
 }
 
+func normalizeAttachmentURL(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return raw
+	}
+	u.RawQuery = ""
+	u.Fragment = ""
+	return u.String()
+}
+
+func sanitizeAttachmentFileName(name string) string {
+	name = filepath.Base(strings.TrimSpace(name))
+	name = strings.ReplaceAll(name, "\\", "_")
+	if name == "" || name == "." || name == ".." {
+		return "file"
+	}
+	return name
+}
+
+// parseVoucherYearMonth 从凭证日期解析年、月；无效时回退到当前 UTC 日期。
+func parseVoucherYearMonth(voucherDate string) (year, month string) {
+	raw := strings.TrimSpace(voucherDate)
+	raw = strings.ReplaceAll(raw, "/", "-")
+	if len(raw) >= 10 {
+		raw = raw[:10]
+	}
+	if t, err := time.Parse("2006-01-02", raw); err == nil {
+		return t.Format("2006"), t.Format("01")
+	}
+	if t, err := time.Parse("2006-1-2", raw); err == nil {
+		return t.Format("2006"), t.Format("01")
+	}
+	now := time.Now().UTC()
+	return now.Format("2006"), now.Format("01")
+}
+
+// UploadAttachment 将文件上传到对象存储，并仅将未签名 URL 写入附件表。
+// 对象键按凭证日期落在 attachments/YYYY/MM/ 下。
+func (s *erpService) UploadAttachment(
+	ctx context.Context,
+	id, name, contentType, voucherDate string,
+	r io.Reader,
+	size int64,
+) (*model.Attachment, error) {
+	if s.store == nil {
+		return nil, errors.New("未配置对象存储，无法上传附件")
+	}
+	if r == nil {
+		return nil, errors.New("上传内容为空")
+	}
+	id = strings.TrimSpace(id)
+	if id == "" {
+		id = generateID()
+	}
+	name = strings.TrimSpace(name)
+	if name == "" {
+		name = "file"
+	}
+	safeName := sanitizeAttachmentFileName(name)
+	year, month := parseVoucherYearMonth(voucherDate)
+	objectKey := storage.AttachmentObjectKey(year, month, id, safeName)
+	publicURL, err := s.store.UploadPublic(ctx, r, objectKey, size)
+	if err != nil {
+		return nil, fmt.Errorf("上传附件到对象存储失败: %w", err)
+	}
+	publicURL = normalizeAttachmentURL(publicURL)
+	if publicURL == "" {
+		return nil, errors.New("对象存储未返回有效 URL")
+	}
+	att := &model.Attachment{
+		ID:         id,
+		Name:       name,
+		Type:       contentType,
+		Size:       size,
+		URL:        publicURL,
+		UploadedAt: time.Now().UTC().Format(time.RFC3339),
+	}
+	if err := s.repo.SaveAttachment(ctx, att); err != nil {
+		return nil, err
+	}
+	return att, nil
+}
+
 func (s *erpService) SaveAttachment(ctx context.Context, attachment *model.Attachment) (*model.Attachment, error) {
 	if attachment.ID == "" {
 		return nil, errors.New("附件 ID 不能为空")
+	}
+	attachment.URL = normalizeAttachmentURL(attachment.URL)
+	if attachment.URL == "" {
+		existing, err := s.repo.GetAttachment(ctx, attachment.ID)
+		if err == nil && existing != nil {
+			attachment.URL = normalizeAttachmentURL(existing.URL)
+			if attachment.Size == 0 {
+				attachment.Size = existing.Size
+			}
+			if attachment.Type == "" {
+				attachment.Type = existing.Type
+			}
+			if attachment.UploadedAt == "" {
+				attachment.UploadedAt = existing.UploadedAt
+			}
+		}
+	}
+	if attachment.URL == "" {
+		return nil, errors.New("附件 URL 不能为空，请先上传文件")
+	}
+	if strings.HasPrefix(strings.ToLower(attachment.URL), "data:") {
+		return nil, errors.New("不支持将文件内容写入数据库，请通过上传接口存到对象存储")
 	}
 	if err := s.repo.SaveAttachment(ctx, attachment); err != nil {
 		return nil, err
@@ -416,7 +533,7 @@ func (s *erpService) SaveAttachment(ctx context.Context, attachment *model.Attac
 	return attachment, nil
 }
 
-// SaveAttachmentsBatch 批量 upsert 附件（单事务）。
+// SaveAttachmentsBatch 批量 upsert 附件元数据（单事务；不含文件上传）。
 func (s *erpService) SaveAttachmentsBatch(ctx context.Context, items []model.Attachment) ([]model.Attachment, error) {
 	if len(items) == 0 {
 		return []model.Attachment{}, nil
@@ -425,6 +542,13 @@ func (s *erpService) SaveAttachmentsBatch(ctx context.Context, items []model.Att
 		if items[i].ID == "" {
 			return nil, errors.New("附件 ID 不能为空")
 		}
+		items[i].URL = normalizeAttachmentURL(items[i].URL)
+		if items[i].URL == "" {
+			return nil, fmt.Errorf("附件 %s URL 不能为空", items[i].ID)
+		}
+		if strings.HasPrefix(strings.ToLower(items[i].URL), "data:") {
+			return nil, errors.New("不支持将文件内容写入数据库，请通过上传接口存到对象存储")
+		}
 	}
 	if err := s.repo.SaveAttachmentsBatch(ctx, items); err != nil {
 		return nil, err
@@ -432,16 +556,68 @@ func (s *erpService) SaveAttachmentsBatch(ctx context.Context, items []model.Att
 	return items, nil
 }
 
+func (s *erpService) deleteAttachmentObject(ctx context.Context, publicURL string) error {
+	if s.store == nil {
+		return nil
+	}
+	if err := s.store.DeleteByPublicURL(ctx, publicURL); err != nil {
+		return fmt.Errorf("删除对象存储文件失败: %w", err)
+	}
+	return nil
+}
+
+func (s *erpService) deleteAttachmentObjects(ctx context.Context, items []model.Attachment) error {
+	for i := range items {
+		if err := s.deleteAttachmentObject(ctx, items[i].URL); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *erpService) DeleteAttachment(ctx context.Context, id string) error {
+	item, err := s.repo.GetAttachment(ctx, id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+		return err
+	}
+	if err := s.deleteAttachmentObject(ctx, item.URL); err != nil {
+		return err
+	}
 	return s.repo.DeleteAttachment(ctx, id)
 }
 
-// DeleteAttachmentsBatch 批量删除附件。
+// DeleteAttachmentsBatch 批量删除附件（含对象存储文件）。
 func (s *erpService) DeleteAttachmentsBatch(ctx context.Context, ids []string) error {
-	return s.repo.DeleteAttachmentsByIDs(ctx, uniqueIDs(ids))
+	ids = uniqueIDs(ids)
+	if len(ids) == 0 {
+		return nil
+	}
+	for _, id := range ids {
+		item, err := s.repo.GetAttachment(ctx, id)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				continue
+			}
+			return err
+		}
+		if err := s.deleteAttachmentObject(ctx, item.URL); err != nil {
+			return err
+		}
+	}
+	return s.repo.DeleteAttachmentsByIDs(ctx, ids)
 }
 
 func (s *erpService) ClearAttachments(ctx context.Context) error {
+	items, err := s.repo.ListAttachments(ctx)
+	if err != nil {
+		return err
+	}
+	if err := s.deleteAttachmentObjects(ctx, items); err != nil {
+		return err
+	}
 	return s.repo.ClearAttachments(ctx)
 }
 

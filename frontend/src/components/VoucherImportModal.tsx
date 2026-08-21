@@ -470,8 +470,7 @@ export default function VoucherImportModal({ open, accounts, onClose, onSuccess 
     setImporting(true);
     try {
       const result = await VoucherImport.importVouchers(preview.vouchers, {
-        skipDuplicates,
-        approve: true
+        skipDuplicates
       });
 
       const cfSkipped = preview.filteredCarryForwardCount || 0;
@@ -538,8 +537,8 @@ export default function VoucherImportModal({ open, accounts, onClose, onSuccess 
     >
       <Paragraph type="secondary" style={{ marginBottom: 6 }}>
         表头需含：凭证号、凭证日期、摘要、一级科目、借方金额、贷方金额。导入后默认为
-        <strong>已审核</strong>
-        （预览中可先人工校对）。多工作表 Excel 仅导入第 1 个工作表。
+        <strong>草稿</strong>
+        （便于补传附件后再审核）。多工作表 Excel 仅导入第 1 个工作表。
       </Paragraph>
       <Paragraph className="voucher-import-modal__skip-tip" style={{ marginBottom: 12 }}>
         <Text strong className="voucher-import-modal__skip-tip-label">
@@ -667,7 +666,7 @@ export default function VoucherImportModal({ open, accounts, onClose, onSuccess 
           style={{ marginTop: 16 }}
           type="info"
           showIcon
-          message={parseProgress || '正在解析分录表，请稍候…'}
+          message={parseProgress || '正在解析文件的分录表，请稍候…'}
         />
       )}
 

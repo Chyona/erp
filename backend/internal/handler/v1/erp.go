@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"erp/internal/model"
 	"erp/internal/pkg/response"
@@ -11,7 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// ErpHandler ERP 存储 HTTP 处理器，对应前端 services/db.ts 五个 store。
+// ErpHandler ERP HTTP 处理器，对应前端 ErpApi（services/erpApi.ts）。
 type ErpHandler struct {
 	erpService service.ErpService
 }
@@ -405,7 +406,51 @@ func (h *ErpHandler) GetAttachment(c *gin.Context) {
 	response.Success(c, item)
 }
 
-// SaveAttachment PUT /attachments/:id — 新增或更新附件。
+// UploadAttachment POST /attachments/upload — multipart 上传文件到对象存储，库内仅存未签名 URL。
+func (h *ErpHandler) UploadAttachment(c *gin.Context) {
+	fileHeader, err := c.FormFile("file")
+	if err != nil {
+		response.BadRequest(c, "请上传 file 字段")
+		return
+	}
+	f, err := fileHeader.Open()
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	defer f.Close()
+
+	id := strings.TrimSpace(c.PostForm("id"))
+	name := strings.TrimSpace(c.PostForm("name"))
+	voucherDate := strings.TrimSpace(c.PostForm("voucherDate"))
+	if voucherDate == "" {
+		voucherDate = strings.TrimSpace(c.PostForm("date"))
+	}
+	if name == "" {
+		name = fileHeader.Filename
+	}
+	contentType := fileHeader.Header.Get("Content-Type")
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+
+	saved, err := h.erpService.UploadAttachment(
+		c.Request.Context(),
+		id,
+		name,
+		contentType,
+		voucherDate,
+		f,
+		fileHeader.Size,
+	)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	response.Success(c, saved)
+}
+
+// SaveAttachment PUT /attachments/:id — 更新附件元数据（不含文件内容）。
 func (h *ErpHandler) SaveAttachment(c *gin.Context) {
 	var item model.Attachment
 	if err := c.ShouldBindJSON(&item); err != nil {

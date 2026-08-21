@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -121,6 +122,21 @@ func (s *stubErpService) SaveAttachment(ctx context.Context, attachment *model.A
 		return nil, s.err
 	}
 	return attachment, nil
+}
+func (s *stubErpService) UploadAttachment(ctx context.Context, id, name, contentType, voucherDate string, r io.Reader, size int64) (*model.Attachment, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	if s.attachment != nil {
+		return s.attachment, nil
+	}
+	return &model.Attachment{
+		ID:   id,
+		Name: name,
+		Type: contentType,
+		Size: size,
+		URL:  "https://example.com/" + id,
+	}, nil
 }
 func (s *stubErpService) SaveAttachmentsBatch(ctx context.Context, items []model.Attachment) ([]model.Attachment, error) {
 	if s.err != nil {
@@ -321,7 +337,7 @@ func TestErpHandler_Attachments(t *testing.T) {
 	}{
 		{http.MethodGet, "/attachments", nil},
 		{http.MethodGet, "/attachments/att1", nil},
-		{http.MethodPut, "/attachments/att1", []byte(`{"name":"a.pdf","type":"application/pdf","size":1,"data":"x","uploadedAt":"2026-01-01T00:00:00Z"}`)},
+		{http.MethodPut, "/attachments/att1", []byte(`{"name":"a.pdf","type":"application/pdf","size":1,"url":"https://example.com/a.pdf","uploadedAt":"2026-01-01T00:00:00Z"}`)},
 		{http.MethodDelete, "/attachments/att1", nil},
 		{http.MethodDelete, "/attachments", nil},
 	} {

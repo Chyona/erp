@@ -1,4 +1,4 @@
-import { DB } from './db';
+import { ErpApi } from './erpApi';
 import { Accounts } from './accounts';
 import { Voucher } from './voucher';
 import { TaxExemption } from './taxExemption';
@@ -358,7 +358,7 @@ export async function createClosing(period: ReportPeriod, { approve = true } = {
     throw new Error(summary.blockReason || '该期间没有可结转的损益发生额');
   }
 
-  const signatory = String((await DB.getSetting('defaultSignatory')) ?? '');
+  const signatory = String((await ErpApi.getSetting('defaultSignatory')) ?? '');
 
   const voucherData = {
     voucherType: '记',
@@ -382,7 +382,7 @@ export async function createClosing(period: ReportPeriod, { approve = true } = {
 
   const saved = await Voucher.save(voucherData as import('../types').VoucherInput, approve);
 
-  await DB.addAuditLog(
+  await ErpApi.addAuditLog(
     approve ? '新建并审核' : '新建草稿',
     '损益结转',
     `${saved.voucherNo} ${summary.periodLabel}，${summary.accountLines.length} 个科目，净利 ${summary.netProfit.toFixed(2)}`
@@ -433,7 +433,7 @@ export async function reverseClosing(period: ReportPeriod, closingId?: string) {
     await Voucher.remove(cf.id, { allowCarryForwardBypass: true });
   }
 
-  await DB.addAuditLog('反结转', '损益结转', `删除 ${cf.voucherNo}（${periodLabel}）`);
+  await ErpApi.addAuditLog('反结转', '损益结转', `删除 ${cf.voucherNo}（${periodLabel}）`);
 
   return { voucher: cf };
 }

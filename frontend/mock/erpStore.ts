@@ -20,7 +20,7 @@ export type MockAttachment = {
   name: string;
   type: string;
   size: number;
-  data: string;
+  url: string;
   uploadedAt: string;
 };
 
@@ -67,7 +67,7 @@ function nowISO(): string {
   return new Date().toISOString();
 }
 
-/** 生成业务主键（UUID v4），与后端 / 前端 DB.generateId 一致。 */
+/** 生成业务主键（UUID v4），与后端 / 前端 ErpApi.generateId 一致。 */
 export function mockId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();

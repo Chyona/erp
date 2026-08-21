@@ -1,4 +1,5 @@
-import { DB } from './db';
+import { ErpApi } from './erpApi';
+import { apiUploadForm } from './apiClient';
 import { Accounts } from './accounts';
 import { buildAttachmentFileName } from '../utils/attachmentName';
 import {
@@ -117,7 +118,7 @@ function getNumberPad(vouchers) {
 }
 
 async function getPeriodVouchers(voucherType, yearMonth) {
-  const all = await DB.getAll('vouchers');
+  const all = await ErpApi.getAll('vouchers');
   return all
     .filter((v) => v.voucherType === voucherType && v.date.startsWith(yearMonth))
     .sort((a, b) => parseVoucherNum(a.voucherNumber) - parseVoucherNum(b.voucherNumber));
@@ -139,7 +140,7 @@ async function persistVoucherNumbers(vouchers, pad) {
     voucher.checksum = generateChecksum(voucher);
     return voucher;
   });
-  await DB.putMany('vouchers', items);
+  await ErpApi.putMany('vouchers', items);
 }
 
 function assertVouchersUnlocked(vouchers) {
@@ -150,7 +151,7 @@ function assertVouchersUnlocked(vouchers) {
 }
 
 async function getNextNumber(type, date) {
-  const vouchers = await DB.getAll('vouchers');
+  const vouchers = await ErpApi.getAll('vouchers');
   const yearMonth = date.slice(0, 7);
   const sameMonth = vouchers.filter(
     (v) => v.voucherType === type && v.date.startsWith(yearMonth)
@@ -212,7 +213,7 @@ async function save(voucherData: VoucherInput, approve = false): Promise<Voucher
 
   const isNew = !normalized.id;
   if (isNew) {
-    normalized.id = DB.generateId();
+    normalized.id = ErpApi.generateId();
     normalized.createdAt = new Date().toISOString();
     if (!normalized.voucherNumber) {
       normalized.voucherNumber = await getNextNumber(normalized.voucherType, normalized.date);
@@ -227,7 +228,7 @@ async function save(voucherData: VoucherInput, approve = false): Promise<Voucher
       }
     }
   } else {
-    const existing = await DB.get('vouchers', normalized.id);
+    const existing = await ErpApi.get('vouchers', normalized.id);
     assertCarryForwardMutable(existing);
     if (existing?.date && existing.date !== normalized.date) {
       await assertVoucherDateMutable(existing.date);
@@ -248,9 +249,9 @@ async function save(voucherData: VoucherInput, approve = false): Promise<Voucher
   if (approve) normalized.approvedAt = new Date().toISOString();
   normalized.checksum = generateChecksum(normalized);
 
-  await DB.put('vouchers', normalized as VoucherRecord);
+  await ErpApi.put('vouchers', normalized as VoucherRecord);
 
-  await DB.addAuditLog(
+  await ErpApi.addAuditLog(
     isNew ? (approve ? '新建并审核' : '新建草稿') : approve ? '修改并审核' : '修改草稿',
     '凭证',
     `${normalized.voucherNo} 金额 ${totals.debit.toFixed(2)}`
@@ -260,13 +261,13 @@ async function save(voucherData: VoucherInput, approve = false): Promise<Voucher
 }
 
 async function lock(id) {
-  const voucher = await DB.get('vouchers', id);
+  const voucher = await ErpApi.get('vouchers', id);
   if (!voucher) throw new Error('凭证不存在');
   if (voucher.status === STATUS.DRAFT) throw new Error('草稿凭证需先审核才能结项');
   voucher.status = STATUS.LOCKED;
   voucher.lockedAt = new Date().toISOString();
-  await DB.put('vouchers', voucher);
-  await DB.addAuditLog('结项', '凭证', voucher.voucherNo);
+  await ErpApi.put('vouchers', voucher);
+  await ErpApi.addAuditLog('结项', '凭证', voucher.voucherNo);
   return voucher;
 }
 
@@ -276,7 +277,7 @@ async function lockManyInQuarter(period: { type: 'quarter'; year: number; quarte
   const startDate = start.format('YYYY-MM-DD');
   const endDate = end.format('YYYY-MM-DD');
   const periodKey = taxExemptionPeriodKey(period);
-  const vouchers = await DB.getAll('vouchers');
+  const vouchers = await ErpApi.getAll('vouchers');
   const inQuarter = vouchers.filter((v) => v.date >= startDate && v.date <= endDate);
 
   const drafts = inQuarter.filter((v) => v.status === STATUS.DRAFT);
@@ -303,10 +304,10 @@ async function lockManyInQuarter(period: { type: 'quarter'; year: number; quarte
     locked++;
   }
 
-  await DB.putMany('vouchers', toSave);
+  await ErpApi.putMany('vouchers', toSave);
 
   if (locked > 0) {
-    await DB.addAuditLog(
+    await ErpApi.addAuditLog(
       '批量结项',
       '凭证',
       `${formatQuarterLabel(period.year, period.quarter)} ${locked} 张`
@@ -322,7 +323,7 @@ async function unlockManyInQuarter(period: { type: 'quarter'; year: number; quar
   const startDate = start.format('YYYY-MM-DD');
   const endDate = end.format('YYYY-MM-DD');
   const periodKey = taxExemptionPeriodKey(period);
-  const vouchers = await DB.getAll('vouchers');
+  const vouchers = await ErpApi.getAll('vouchers');
   const inQuarter = vouchers.filter((v) => v.date >= startDate && v.date <= endDate);
 
   const toSave: VoucherRecord[] = [];
@@ -337,10 +338,10 @@ async function unlockManyInQuarter(period: { type: 'quarter'; year: number; quar
     unlocked++;
   }
 
-  await DB.putMany('vouchers', toSave);
+  await ErpApi.putMany('vouchers', toSave);
 
   if (unlocked > 0) {
-    await DB.addAuditLog(
+    await ErpApi.addAuditLog(
       '取消结项',
       '凭证',
       `${formatQuarterLabel(period.year, period.quarter)} ${unlocked} 张恢复为已审核`
@@ -357,7 +358,7 @@ async function approveMany(ids: string[]) {
 
   if (!uniqueIds.length) return result;
 
-  const all = await DB.getAll('vouchers');
+  const all = await ErpApi.getAll('vouchers');
   const byId = new Map(all.map((v) => [v.id, v]));
   const declared = await TaxDeclaration.getDeclaredQuarters();
   const eligible: string[] = [];
@@ -385,14 +386,14 @@ async function approveMany(ids: string[]) {
   }
 
   if (eligible.length) {
-    const batch = await DB.vouchersBatch({ action: 'approve', ids: eligible });
+    const batch = await ErpApi.vouchersBatch({ action: 'approve', ids: eligible });
     result.approved += batch.approved ?? 0;
     result.skipped += batch.skipped;
     result.failed.push(...batch.failed);
   }
 
   if (result.approved > 0) {
-    await DB.addAuditLog('批量审核', '凭证', `成功审核 ${result.approved} 张凭证`);
+    await ErpApi.addAuditLog('批量审核', '凭证', `成功审核 ${result.approved} 张凭证`);
   }
   return result;
 }
@@ -408,7 +409,7 @@ async function unapproveMany(ids: string[]) {
 
   if (!uniqueIds.length) return result;
 
-  const all = await DB.getAll('vouchers');
+  const all = await ErpApi.getAll('vouchers');
   const byId = new Map(all.map((v) => [v.id, v]));
   const declared = await TaxDeclaration.getDeclaredQuarters();
   const eligible: string[] = [];
@@ -452,21 +453,21 @@ async function unapproveMany(ids: string[]) {
   }
 
   if (eligible.length) {
-    const batch = await DB.vouchersBatch({ action: 'unapprove', ids: eligible });
+    const batch = await ErpApi.vouchersBatch({ action: 'unapprove', ids: eligible });
     result.unapproved += batch.unapproved ?? 0;
     result.skipped += batch.skipped;
     result.failed.push(...batch.failed);
   }
 
   if (result.unapproved > 0) {
-    await DB.addAuditLog('批量反审核', '凭证', `成功反审核 ${result.unapproved} 张凭证`);
+    await ErpApi.addAuditLog('批量反审核', '凭证', `成功反审核 ${result.unapproved} 张凭证`);
   }
   return result;
 }
 
 /** 单张反审核：已审核 → 草稿 */
 async function unapprove(id) {
-  const voucher = await DB.get('vouchers', id);
+  const voucher = await ErpApi.get('vouchers', id);
   if (!voucher) throw new Error('凭证不存在');
   assertCarryForwardMutable(voucher);
   await assertVoucherDateMutable(voucher.date);
@@ -480,13 +481,13 @@ async function unapprove(id) {
   voucher.status = STATUS.DRAFT;
   voucher.approvedAt = undefined;
   voucher.updatedAt = new Date().toISOString();
-  await DB.put('vouchers', voucher);
-  await DB.addAuditLog('反审核', '凭证', voucher.voucherNo);
+  await ErpApi.put('vouchers', voucher);
+  await ErpApi.addAuditLog('反审核', '凭证', voucher.voucherNo);
   return voucher;
 }
 
 async function clearTaxExemptionLinksForCarryForward(carryForwardId) {
-  const vouchers = await DB.getAll('vouchers');
+  const vouchers = await ErpApi.getAll('vouchers');
   const toSave = vouchers
     .filter((voucher) => voucher.taxExemptionVoucherId === carryForwardId)
     .map((voucher) => {
@@ -494,7 +495,7 @@ async function clearTaxExemptionLinksForCarryForward(carryForwardId) {
       voucher.taxExemptionVoucherId = '';
       return voucher;
     });
-  await DB.putMany('vouchers', toSave);
+  await ErpApi.putMany('vouchers', toSave);
 }
 
 async function removeVoucherData(voucher) {
@@ -502,13 +503,13 @@ async function removeVoucherData(voucher) {
     await clearTaxExemptionLinksForCarryForward(voucher.id);
   }
   if (voucher.attachmentIds?.length) {
-    await DB.removeMany('attachments', voucher.attachmentIds);
+    await ErpApi.removeMany('attachments', voucher.attachmentIds);
   }
-  await DB.remove('vouchers', voucher.id);
+  await ErpApi.remove('vouchers', voucher.id);
 }
 
 async function remove(id, options: VoucherMutationOptions = {}) {
-  const voucher = await DB.get('vouchers', id);
+  const voucher = await ErpApi.get('vouchers', id);
   if (!voucher) return;
   assertCarryForwardMutable(voucher, options);
   await assertVoucherDateMutable(voucher.date);
@@ -516,20 +517,20 @@ async function remove(id, options: VoucherMutationOptions = {}) {
     throw new Error('已结项的凭证不可删除');
   }
   await removeVoucherData(voucher);
-  await DB.addAuditLog('删除', '凭证', voucher.voucherNo);
+  await ErpApi.addAuditLog('删除', '凭证', voucher.voucherNo);
 }
 
 async function forceRemove(id, options: VoucherMutationOptions = {}) {
-  const voucher = await DB.get('vouchers', id);
+  const voucher = await ErpApi.get('vouchers', id);
   if (!voucher) return;
   assertCarryForwardMutable(voucher, options);
   await assertVoucherDateMutable(voucher.date);
   await removeVoucherData(voucher);
-  await DB.addAuditLog('强制删除', '凭证', voucher.voucherNo);
+  await ErpApi.addAuditLog('强制删除', '凭证', voucher.voucherNo);
 }
 
 async function removeByVoucherNo(voucherNo) {
-  const vouchers = await DB.getAll('vouchers');
+  const vouchers = await ErpApi.getAll('vouchers');
   const voucher = vouchers.find((v) => v.voucherNo === voucherNo);
   if (!voucher) {
     throw new Error(`未找到凭证 ${voucherNo}`);
@@ -548,7 +549,7 @@ async function removeMany(ids: string[]) {
 
   if (!uniqueIds.length) return result;
 
-  const all = await DB.getAll('vouchers');
+  const all = await ErpApi.getAll('vouchers');
   const byId = new Map(all.map((v) => [v.id, v]));
   const declared = await TaxDeclaration.getDeclaredQuarters();
   const eligible: string[] = [];
@@ -588,7 +589,7 @@ async function removeMany(ids: string[]) {
   }
 
   if (eligible.length) {
-    const batch = (await DB.removeMany('vouchers', eligible)) as {
+    const batch = (await ErpApi.removeMany('vouchers', eligible)) as {
       deleted?: number;
       skipped?: number;
       failed?: Array<{ id: string; voucherNo?: string; message: string }>;
@@ -599,14 +600,14 @@ async function removeMany(ids: string[]) {
   }
 
   if (result.deleted > 0) {
-    await DB.addAuditLog('批量删除', '凭证', `成功删除 ${result.deleted} 张凭证`);
+    await ErpApi.addAuditLog('批量删除', '凭证', `成功删除 ${result.deleted} 张凭证`);
   }
   return result;
 }
 
 /** 批量删除所有未结项凭证（草稿、已审核） */
 async function removeAllUnlocked() {
-  const vouchers = await DB.getAll('vouchers');
+  const vouchers = await ErpApi.getAll('vouchers');
   const declared = await TaxDeclaration.getDeclaredQuarters();
   const targets: string[] = [];
   let lockedCount = 0;
@@ -632,15 +633,15 @@ async function removeAllUnlocked() {
     return { deleted: 0, locked: lockedCount, declared: declaredCount };
   }
 
-  const batch = (await DB.removeMany('vouchers', targets)) as { deleted?: number };
+  const batch = (await ErpApi.removeMany('vouchers', targets)) as { deleted?: number };
   const deleted = batch.deleted ?? targets.length;
 
-  await DB.addAuditLog('批量删除', '凭证', `删除 ${deleted} 张未结项凭证`);
+  await ErpApi.addAuditLog('批量删除', '凭证', `删除 ${deleted} 张未结项凭证`);
   return { deleted, locked: lockedCount, declared: declaredCount };
 }
 
 async function getAll(filters: VoucherFilters = {}) {
-  let vouchers = await DB.getAll('vouchers');
+  let vouchers = await ErpApi.getAll('vouchers');
   vouchers.sort(compareVouchersDesc);
 
   if (filters.startDate) vouchers = vouchers.filter((v) => v.date >= filters.startDate!);
@@ -706,12 +707,12 @@ async function getAll(filters: VoucherFilters = {}) {
 }
 
 async function getById(id) {
-  return DB.get('vouchers', id);
+  return ErpApi.get('vouchers', id);
 }
 
 /** 按列表顺序（日期新→旧）取相邻凭证；direction: older | newer */
 async function getAdjacentVoucher(currentId, direction) {
-  const vouchers = await DB.getAll('vouchers');
+  const vouchers = await ErpApi.getAll('vouchers');
   vouchers.sort(compareVouchersDesc);
   const index = vouchers.findIndex((v) => v.id === currentId);
   if (index < 0) return null;
@@ -727,7 +728,7 @@ async function findByVoucherNo(
   const text = String(raw || '').trim();
   if (!text) return null;
 
-  let vouchers = await DB.getAll('vouchers');
+  let vouchers = await ErpApi.getAll('vouchers');
   if (yearMonth) {
     vouchers = vouchers.filter((v) => v.date.startsWith(yearMonth));
   }
@@ -751,37 +752,30 @@ async function findByVoucherNo(
   );
 }
 
-async function saveAttachment(file: File, customName?: string): Promise<Attachment> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const attachment: Attachment = {
-        id: DB.generateId(),
-        name: customName || file.name,
-        type: file.type,
-        size: file.size,
-        data: reader.result as string,
-        uploadedAt: new Date().toISOString()
-      };
-      await DB.put('attachments', attachment);
-      resolve(attachment);
-    };
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
+async function saveAttachment(file: File, customName?: string, voucherDate?: string): Promise<Attachment> {
+  const id = ErpApi.generateId();
+  const form = new FormData();
+  form.append('file', file);
+  form.append('id', id);
+  form.append('name', customName || file.name);
+  const date = String(voucherDate || '').trim();
+  if (date) {
+    form.append('voucherDate', date.slice(0, 10));
+  }
+  return apiUploadForm<Attachment>('/attachments/upload', form);
 }
 
 async function updateAttachment(attachment) {
-  await DB.put('attachments', attachment);
+  await ErpApi.put('attachments', attachment);
   return attachment;
 }
 
 async function getAttachment(id) {
-  return DB.get('attachments', id);
+  return ErpApi.get('attachments', id);
 }
 
 async function addAttachmentToVoucher(voucherId, file) {
-  const voucher = await DB.get('vouchers', voucherId);
+  const voucher = await ErpApi.get('vouchers', voucherId);
   if (!voucher) throw new Error('凭证不存在');
   if (!canModifyAttachments(voucher.status)) {
     throw new Error(ATTACHMENT_READONLY_TIP);
@@ -801,18 +795,54 @@ async function addAttachmentToVoucher(voucherId, file) {
     index
   });
 
-  const att = await saveAttachment(file, fileName);
+  const att = await saveAttachment(file, fileName, voucher.date);
   voucher.attachmentIds = [...(voucher.attachmentIds || []), att.id];
   voucher.attachmentCount = voucher.attachmentIds.length;
   voucher.updatedAt = new Date().toISOString();
-  await DB.put('vouchers', voucher);
-  await DB.addAuditLog('上传附件', '凭证', `${voucher.voucherNo} ${fileName}`);
+  await ErpApi.put('vouchers', voucher);
+  await ErpApi.addAuditLog('上传附件', '凭证', `${voucher.voucherNo} ${fileName}`);
+  return voucher;
+}
+
+async function removeAttachmentFromVoucher(voucherId, attachmentId) {
+  return removeAttachmentsFromVoucher(voucherId, [attachmentId]);
+}
+
+async function removeAttachmentsFromVoucher(voucherId, attachmentIds: string[]) {
+  const ids = [...new Set((attachmentIds || []).map((id) => String(id || '').trim()).filter(Boolean))];
+  if (!ids.length) {
+    const voucher = await ErpApi.get('vouchers', voucherId);
+    if (!voucher) throw new Error('凭证不存在');
+    return voucher;
+  }
+
+  const voucher = await ErpApi.get('vouchers', voucherId);
+  if (!voucher) throw new Error('凭证不存在');
+  if (!canModifyAttachments(voucher.status)) {
+    throw new Error(ATTACHMENT_READONLY_TIP);
+  }
+  await assertVoucherDateMutable(voucher.date);
+
+  // 先删附件（含 COS），再更新凭证引用
+  await ErpApi.removeMany('attachments', ids);
+
+  const removeSet = new Set(ids);
+  const nextIds = (voucher.attachmentIds || []).filter((id) => !removeSet.has(id));
+  voucher.attachmentIds = nextIds;
+  voucher.attachmentCount = nextIds.length;
+  voucher.updatedAt = new Date().toISOString();
+  await ErpApi.put('vouchers', voucher);
+  await ErpApi.addAuditLog(
+    '删除附件',
+    '凭证',
+    `${voucher.voucherNo} ${ids.length > 1 ? `批量 ${ids.length} 个` : ids[0]}`
+  );
   return voucher;
 }
 
 /** 冲销：生成借贷相反的新草稿凭证 */
 async function reverse(id) {
-  const source = await DB.get('vouchers', id);
+  const source = await ErpApi.get('vouchers', id);
   if (!source) throw new Error('凭证不存在');
   assertCarryForwardMutable(source);
   await assertVoucherDateMutable(source.date);
@@ -852,13 +882,13 @@ async function reverse(id) {
   };
 
   const saved = await save(voucherData, false);
-  await DB.addAuditLog('冲销', '凭证', `${source.voucherNo} → ${saved.voucherNo}`);
+  await ErpApi.addAuditLog('冲销', '凭证', `${source.voucherNo} → ${saved.voucherNo}`);
   return saved;
 }
 
 /** 调整顺序：将凭证移动到指定字号之前，同期凭证重新编号 */
 async function reorder(voucherId, beforeNumber) {
-  const source = await DB.get('vouchers', voucherId);
+  const source = await ErpApi.get('vouchers', voucherId);
   if (!source) throw new Error('凭证不存在');
   assertCarryForwardMutable(source);
   await assertVoucherDateMutable(source.date);
@@ -895,7 +925,7 @@ async function reorder(voucherId, beforeNumber) {
 
   await persistVoucherNumbers(reordered, pad);
   const updated = reordered.find((v) => v.id === voucherId);
-  await DB.addAuditLog(
+  await ErpApi.addAuditLog(
     '调整顺序',
     '凭证',
     `${source.voucherType}-${formatVoucherNum(sourceNum, pad)} → ${updated.voucherNo} 前移至 ${targetNum} 号`
@@ -941,10 +971,10 @@ async function prepareInsertSlot(voucherType, date, beforeNumber) {
     voucher.updatedAt = new Date().toISOString();
     voucher.checksum = generateChecksum(voucher);
   }
-  await DB.putMany('vouchers', toShift);
+  await ErpApi.putMany('vouchers', toShift);
 
   const reservedNumber = formatVoucherNum(targetNum, pad);
-  await DB.addAuditLog(
+  await ErpApi.addAuditLog(
     '插入凭证',
     '凭证',
     `${voucherType}-${reservedNumber} 前插入空位（${yearMonth}）`
@@ -953,7 +983,7 @@ async function prepareInsertSlot(voucherType, date, beforeNumber) {
 }
 
 async function getStats() {
-  const vouchers = await DB.getAll('vouchers');
+  const vouchers = await ErpApi.getAll('vouchers');
   const now = new Date();
   const yearMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const monthVouchers = vouchers.filter((v) => v.date.startsWith(yearMonth));
@@ -1039,6 +1069,8 @@ export const Voucher = {
   findByVoucherNo,
   saveAttachment,
   addAttachmentToVoucher,
+  removeAttachmentFromVoucher,
+  removeAttachmentsFromVoucher,
   reverse,
   reorder,
   prepareInsertSlot,

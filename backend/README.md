@@ -39,7 +39,7 @@ base/
 
 ## ERP 前端对接
 
-前端通过 `frontend/src/services/db.ts` 访问 **`/openapi/erp/v1`**（科目/凭证/附件/审计/设置、`/app/init`、备份导入）。接口说明见 `docs/ERP_API.md`。
+前端通过 `frontend/src/services/erpApi.ts`（`ErpApi`）访问 **`/openapi/erp/v1`**（科目/凭证/附件元数据/审计/设置、`/app/init`、备份导入；附件文件走 COS）。接口说明见 `docs/ERP_API.md`。
 
 健康检查：`GET /health`（无 `/openapi` 前缀）。
 

@@ -30,6 +30,7 @@ export default function VoucherEntrySheet({
   onRemoveEntry,
   onUpload,
   onRemoveAttachment,
+  onRemoveAttachments,
   attachmentPanelOpen,
   onAttachmentPanelClose,
   onAttachmentPanelToggle,
@@ -254,6 +255,7 @@ export default function VoucherEntrySheet({
           open={attachmentPanelOpen}
           onClose={onAttachmentPanelClose}
           onRemove={onRemoveAttachment}
+          onRemoveMany={onRemoveAttachments}
           onUpload={onUpload}
           canModify={canModifyAttachments}
         />

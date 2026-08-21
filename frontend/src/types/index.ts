@@ -106,7 +106,8 @@ export interface Attachment {
   name: string;
   type: string;
   size: number;
-  data: string | ArrayBuffer | null;
+  /** 对象存储公开 URL（无签名） */
+  url: string;
   uploadedAt: string;
 }
 

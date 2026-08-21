@@ -1,6 +1,6 @@
 # ERP 数据存储 API
 
-对应前端 `frontend/src/services/db.ts` 的五个数据 store，持久化到 PostgreSQL。
+对应前端 `frontend/src/services/erpApi.ts`（`ErpApi`），业务持久化到 PostgreSQL；附件文件存对象存储。
 
 **Base URL:** `/openapi/erp/v1`
 
@@ -67,14 +67,19 @@ upsert 返回：`{ "action": "upsert", "count": N, "items": [...] }`。
 
 ## 附件 attachments
 
+文件存对象存储（COS 等）；库表仅保存**未签名**公开 URL。
+
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/attachments` | 列出全部 |
-| POST | `/attachments/batch` | 统一批量：`{ action: "upsert"\|"delete", items?\|ids? }` |
+| POST | `/attachments/upload` | multipart 上传：`file` + 可选 `id`/`name`/`voucherDate`（凭证日期，用于 `attachments/YYYY/MM/`），返回附件元数据（含 `url`） |
+| POST | `/attachments/batch` | 统一批量：`{ action: "upsert"\|"delete", items?\|ids? }`（upsert 仅元数据） |
 | GET | `/attachments/:id` | 按 ID 查询 |
-| PUT | `/attachments/:id` | 新增/更新（`data` 为 base64 字符串） |
+| PUT | `/attachments/:id` | 更新元数据（如重命名；不可写文件内容） |
 | DELETE | `/attachments/:id` | 删除 |
 | DELETE | `/attachments` | 清空 |
+
+附件字段：`id`、`name`、`type`、`size`、`url`、`uploadedAt`。`url` 为对象存储公开地址，不含签名参数。
 
 ## 审计日志 audit-logs
 
@@ -114,8 +119,8 @@ upsert 返回：`{ "action": "upsert", "count": N, "items": [...] }`。
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/data/export` | 导出全库（对应 `DB.exportAll()`） |
-| POST | `/data/import` | 导入全库（清空后写入，对应 `DB.importAll()`） |
+| GET | `/data/export` | 导出全库（对应 `ErpApi.exportAll()`） |
+| POST | `/data/import` | 导入全库（清空后写入，对应 `ErpApi.importAll()`） |
 
 ---
 
@@ -129,7 +134,7 @@ VITE_API_BASE_URL=/openapi/erp/v1
 
 `vite.config.ts` 已将 `/openapi`、`/health` 代理到 `http://127.0.0.1:30000`。
 
-所有业务数据仅存 PostgreSQL，前端通过 `db.ts` + `apiClient.ts` 访问本 API（不再使用 IndexedDB）。
+所有业务数据仅存 PostgreSQL，附件文件存 COS；前端通过 `erpApi.ts` + `apiClient.ts` 访问本 API（浏览器不落库）。
 
 业务逻辑（凭证审核、报表、税务结转等）在前端 services 中执行，通过本存储层读写服务端数据。
 

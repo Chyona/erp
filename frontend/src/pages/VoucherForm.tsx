@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Button,
   Card,
@@ -15,7 +15,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { Voucher } from '../services/voucher';
 import type { Attachment, VoucherStatus } from '../types';
-import { DB } from '../services/db';
+import { ErpApi } from '../services/erpApi';
 import { useApp } from '../context/AppContext';
 import { confirmDanger, confirmWarning } from '../utils/confirmAction';
 import BusinessTypeHint from '../components/BusinessTypeHint';
@@ -87,6 +87,10 @@ export default function VoucherForm() {
   const [entries, setEntries] = useState<FormEntry[]>([emptyEntry(), emptyEntry()]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [attachmentPanelOpen, setAttachmentPanelOpen] = useState(false);
+  const attachmentsRef = useRef<Attachment[]>([]);
+  const uploadQueueRef = useRef(Promise.resolve());
+  const uploadToastRef = useRef({ count: 0, timer: 0 as ReturnType<typeof setTimeout> | 0 });
+  attachmentsRef.current = attachments;
   const [voucherNumber, setVoucherNumber] = useState('');
   const [voucherStatus, setVoucherStatus] = useState<VoucherStatus>(Voucher.STATUS.DRAFT);
   const [reviewedBy, setReviewedBy] = useState('');
@@ -269,9 +273,9 @@ export default function VoucherForm() {
   };
 
   const loadDefaultSignatory = async () =>
-    (await DB.getSetting('defaultSignatory')) ||
-    (await DB.getSetting('defaultPreparedBy')) ||
-    (await DB.getSetting('defaultReviewedBy')) ||
+    (await ErpApi.getSetting('defaultSignatory')) ||
+    (await ErpApi.getSetting('defaultPreparedBy')) ||
+    (await ErpApi.getSetting('defaultReviewedBy')) ||
     '';
 
   const clearForm = async () => {
@@ -298,7 +302,7 @@ export default function VoucherForm() {
     }
 
     if (attachments.length) {
-      await DB.removeMany(
+      await ErpApi.removeMany(
         'attachments',
         attachments.map((att) => att.id)
       );
@@ -395,6 +399,20 @@ export default function VoucherForm() {
     });
   };
 
+  const removeAttachmentsFromPanel = (indices: number[]) => {
+    if (!Voucher.canModifyAttachments(voucherStatus)) {
+      message.warning(Voucher.ATTACHMENT_READONLY_TIP);
+      return;
+    }
+    const removeSet = new Set(indices || []);
+    setAttachments((prev) => {
+      const next = prev.filter((_, idx) => !removeSet.has(idx));
+      if (next.length === 0) setAttachmentPanelOpen(false);
+      form.setFieldValue('attachmentCount', next.length);
+      return next;
+    });
+  };
+
   const toggleAttachmentPanel = () => {
     if (attachments.length === 0) return;
     setAttachmentPanelOpen((open) => !open);
@@ -406,7 +424,7 @@ export default function VoucherForm() {
     totals
   });
 
-  const handleUpload = async ({ file, onSuccess, onError }) => {
+  const handleUpload = ({ file, onSuccess, onError }) => {
     if (!Voucher.canModifyAttachments(voucherStatus)) {
       message.warning(Voucher.ATTACHMENT_READONLY_TIP);
       onError(new Error(Voucher.ATTACHMENT_READONLY_TIP));
@@ -417,21 +435,43 @@ export default function VoucherForm() {
       onError(new Error('文件过大'));
       return;
     }
-    try {
-      const fileName = buildAttachmentFileName({
-        ...getAttachmentNameContext(),
-        originalName: file.name,
-        index: attachments.length
+
+    const noteSuccess = () => {
+      uploadToastRef.current.count += 1;
+      if (uploadToastRef.current.timer) clearTimeout(uploadToastRef.current.timer);
+      uploadToastRef.current.timer = setTimeout(() => {
+        const n = uploadToastRef.current.count;
+        uploadToastRef.current.count = 0;
+        uploadToastRef.current.timer = 0;
+        if (n > 0) message.success(n > 1 ? `已上传 ${n} 个附件` : '附件上传成功');
+      }, 280);
+    };
+
+    uploadQueueRef.current = uploadQueueRef.current
+      .catch(() => undefined)
+      .then(async () => {
+        const fileName = buildAttachmentFileName({
+          ...getAttachmentNameContext(),
+          originalName: file.name,
+          index: attachmentsRef.current.length
+        });
+        const att = await Voucher.saveAttachment(
+          file,
+          fileName,
+          voucherDate ? voucherDate.format('YYYY-MM-DD') : undefined
+        );
+        const next = [...attachmentsRef.current, att];
+        attachmentsRef.current = next;
+        setAttachments(next);
+        form.setFieldValue('attachmentCount', next.length);
+        setAttachmentPanelOpen(true);
+        noteSuccess();
+        onSuccess();
+      })
+      .catch((err) => {
+        message.error(err?.message || '附件上传失败');
+        onError(err);
       });
-      const att = await Voucher.saveAttachment(file, fileName);
-      setAttachments((prev) => [...prev, att]);
-      form.setFieldValue('attachmentCount', attachments.length + 1);
-      setAttachmentPanelOpen(true);
-      onSuccess();
-    } catch (err) {
-      message.error(err.message || '附件上传失败');
-      onError(err);
-    }
   };
 
   const resetForNewVoucher = async () => {
@@ -715,6 +755,7 @@ export default function VoucherForm() {
               onRemoveEntry={removeEntry}
               onUpload={handleUpload}
               onRemoveAttachment={removeAttachmentFromPanel}
+              onRemoveAttachments={removeAttachmentsFromPanel}
               canModifyAttachments={Voucher.canModifyAttachments(voucherStatus)}
               readOnly={readOnly}
               redLetter={isRedLetter}

@@ -79,13 +79,13 @@ CREATE INDEX IF NOT EXISTS idx_vouchers_voucher_no ON vouchers (voucher_no);
 CREATE INDEX IF NOT EXISTS idx_vouchers_date ON vouchers (date);
 CREATE INDEX IF NOT EXISTS idx_vouchers_status ON vouchers (status);
 
--- 凭证附件（前端 attachments store，data 为 base64）
+-- 凭证附件（文件存 COS 等对象存储，库内仅保存未签名 URL；前端经 ErpApi 读写元数据）
 CREATE TABLE IF NOT EXISTS attachments (
     id          VARCHAR(64)  PRIMARY KEY,
     name        VARCHAR(256) NOT NULL,
     type        VARCHAR(128),
     size        BIGINT       NOT NULL DEFAULT 0,
-    data        TEXT,
+    url         VARCHAR(1024) NOT NULL DEFAULT '',
     uploaded_at VARCHAR(32)
 );
 

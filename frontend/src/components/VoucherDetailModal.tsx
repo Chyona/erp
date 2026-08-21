@@ -7,10 +7,7 @@ import { confirmWarning } from '../utils/confirmAction';
 import { useApp } from '../context/AppContext';
 import { isCarryForwardVoucher, CARRY_FORWARD_VOUCHER_READONLY_TIP } from '../utils/carryForwardVoucher';
 import { CarryForwardBadge } from './StatusBadge';
-
-function isPdfAttachment(att) {
-  return att.type === 'application/pdf' || /\.pdf$/i.test(att.name || '');
-}
+import AttachmentPreviewModal, { isPdfAttachment } from './AttachmentPreviewModal';
 
 function AttachmentThumbnail({ attachment, onClick }) {
   const isPdf = isPdfAttachment(attachment);
@@ -26,57 +23,11 @@ function AttachmentThumbnail({ attachment, onClick }) {
         {isPdf ? (
           <FilePdfOutlined className="attachment-thumb__pdf-icon" />
         ) : (
-          <img src={attachment.data} alt="" className="attachment-thumb__img" />
+          <img src={attachment.url} alt="" className="attachment-thumb__img" />
         )}
       </div>
       <span className="attachment-thumb__name">{attachment.name}</span>
     </button>
-  );
-}
-
-function AttachmentPreviewModal({ attachment, open, onClose }) {
-  if (!attachment) return null;
-
-  const isPdf = isPdfAttachment(attachment);
-
-  return (
-    <Modal
-      title={attachment.name}
-      open={open}
-      onCancel={onClose}
-      footer={
-        <Space>
-          <Button href={attachment.data} download={attachment.name}>
-            下载
-          </Button>
-          <Button type="primary" onClick={onClose}>
-            关闭
-          </Button>
-        </Space>
-      }
-      width={920}
-      destroyOnHidden
-      className="attachment-preview-modal"
-    >
-      {isPdf ? (
-        <>
-          <iframe
-            title={attachment.name}
-            src={`${attachment.data}#toolbar=1&navpanes=0`}
-            className="attachment-preview-modal__pdf-frame"
-          />
-          <p className="attachment-preview-modal__hint">
-            若无法预览，请点击「下载」后本地查看
-          </p>
-        </>
-      ) : (
-        <img
-          src={attachment.data}
-          alt={attachment.name}
-          className="attachment-preview-modal__image"
-        />
-      )}
-    </Modal>
   );
 }
 

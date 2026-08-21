@@ -36,7 +36,7 @@ type Config struct {
 	COS                 COSConfig
 	OSS                 OSSConfig
 	TOS                 TOSConfig
-	BasePath            string // 对象键保存路径前缀，空值时使用 DefaultBasePath
+	BasePath            string // 对象键保存路径前缀，空表示无额外前缀（直接 attachments/...）
 	SignedURLExpireDays int    // 上传后返回的签名链接有效期（天），0 表示 DefaultSignedURLExpireDays
 }
 
@@ -67,7 +67,7 @@ type Config struct {
 //   - TOS_ENDPOINT（可选）
 //
 // 通用：
-//   - STORAGE_BASE_PATH（可选，默认 video_editing）
+//   - STORAGE_BASE_PATH（可选，默认空，即无额外目录前缀）
 //   - STORAGE_SIGNED_URL_EXPIRE_DAYS（可选，默认 30）
 func LoadConfigFromEnv() Config {
 	signedURLExpireDays := 0

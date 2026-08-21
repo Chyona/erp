@@ -1,4 +1,4 @@
-import { DB } from './db';
+import { ErpApi } from './erpApi';
 
 const SETTING_KEY = 'voucherTemplates';
 
@@ -23,7 +23,7 @@ export interface VoucherTemplate {
 }
 
 export async function getAll(): Promise<VoucherTemplate[]> {
-  const list = await DB.getSetting(SETTING_KEY);
+  const list = await ErpApi.getSetting(SETTING_KEY);
   return Array.isArray(list) ? (list as VoucherTemplate[]) : [];
 }
 
@@ -38,7 +38,7 @@ export async function save(template: VoucherTemplate) {
   if (duplicate) throw new Error('已存在同名模板，请换一个名称');
 
   const item: VoucherTemplate = {
-    id: template.id || DB.generateId(),
+    id: template.id || ErpApi.generateId(),
     name,
     createdAt: template.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -64,8 +64,8 @@ export async function save(template: VoucherTemplate) {
     list.unshift(item);
   }
 
-  await DB.setSetting(SETTING_KEY, list);
-  await DB.addAuditLog('保存', '凭证模板', item.name);
+  await ErpApi.setSetting(SETTING_KEY, list);
+  await ErpApi.addAuditLog('保存', '凭证模板', item.name);
   return item;
 }
 
@@ -73,9 +73,9 @@ export async function remove(id: string) {
   const list = await getAll();
   const target = list.find((t) => t.id === id);
   const filtered = list.filter((t) => t.id !== id);
-  await DB.setSetting(SETTING_KEY, filtered);
+  await ErpApi.setSetting(SETTING_KEY, filtered);
   if (target) {
-    await DB.addAuditLog('删除', '凭证模板', target.name);
+    await ErpApi.addAuditLog('删除', '凭证模板', target.name);
   }
 }
 

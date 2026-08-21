@@ -12,7 +12,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { Voucher } from '../services/voucher';
 import { ExportUtil } from '../services/export';
-import { DB } from '../services/db';
+import { ErpApi } from '../services/erpApi';
 import VoucherTable from '../components/VoucherTable';
 import VoucherDetailModal from '../components/VoucherDetailModal';
 import VoucherImportModal from '../components/VoucherImportModal';
@@ -131,7 +131,7 @@ export default function VoucherList() {
       `凭证导出_${new Date().toISOString().slice(0, 10)}.csv`,
       'text/csv;charset=utf-8'
     );
-    await DB.addAuditLog('导出', 'CSV', `${list.length} 条凭证`);
+    await ErpApi.addAuditLog('导出', 'CSV', `${list.length} 条凭证`);
     message.success('CSV 导出成功');
   };
 

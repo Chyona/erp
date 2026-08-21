@@ -80,6 +80,7 @@ func (c *Client) UploadFile(ctx context.Context, localPath, objectKey string) (s
 // UploadReader 将数据流上传到对象存储。
 //
 // size 为数据总字节数，未知时可传 -1（部分后端可能退化为缓冲上传）。
+// 返回值仍为带签名的访问 URL（兼容旧调用方）；附件持久化请用 UploadPublic。
 func (c *Client) UploadReader(ctx context.Context, r io.Reader, objectKey string, size int64) (string, error) {
 	if r == nil {
 		return "", fmt.Errorf("上传数据流不能为空")
@@ -88,4 +89,43 @@ func (c *Client) UploadReader(ctx context.Context, r io.Reader, objectKey string
 		return "", fmt.Errorf("对象键名不能为空")
 	}
 	return c.provider.UploadReader(ctx, r, c.ObjectKey(objectKey), size)
+}
+
+// ObjectURL 返回对象的公开访问地址（未签名、不含 query）。
+// objectKey 为相对键名，会自动附加 BasePath 前缀。
+func (c *Client) ObjectURL(objectKey string) string {
+	return c.provider.ObjectURL(c.ObjectKey(objectKey))
+}
+
+// UploadPublic 上传数据流并返回未签名公开 URL（用于入库持久化，避免签名过期）。
+func (c *Client) UploadPublic(ctx context.Context, r io.Reader, objectKey string, size int64) (string, error) {
+	if r == nil {
+		return "", fmt.Errorf("上传数据流不能为空")
+	}
+	if objectKey == "" {
+		return "", fmt.Errorf("对象键名不能为空")
+	}
+	fullKey := c.ObjectKey(objectKey)
+	if _, err := c.provider.UploadReader(ctx, r, fullKey, size); err != nil {
+		return "", err
+	}
+	return c.provider.ObjectURL(fullKey), nil
+}
+
+// DeleteObject 删除相对对象键（自动附加 BasePath）。
+func (c *Client) DeleteObject(ctx context.Context, objectKey string) error {
+	if objectKey == "" {
+		return fmt.Errorf("对象键名不能为空")
+	}
+	return c.provider.DeleteObject(ctx, c.ObjectKey(objectKey))
+}
+
+// DeleteByPublicURL 根据入库的公开 URL 删除对象（从 path 解析对象键，不再附加 BasePath）。
+// data: URL 或无法解析的地址会跳过。
+func (c *Client) DeleteByPublicURL(ctx context.Context, publicURL string) error {
+	key := ObjectKeyFromPublicURL(publicURL)
+	if key == "" {
+		return nil
+	}
+	return c.provider.DeleteObject(ctx, key)
 }

@@ -1,4 +1,4 @@
-import { DB } from './db';
+import { ErpApi } from './erpApi';
 import {
   formatQuarterLabel,
   taxExemptionPeriodKey
@@ -41,7 +41,7 @@ function quarterFromDate(dateStr: string): QuarterPeriod {
 }
 
 async function getDeclaredQuarters(): Promise<DeclaredQuarterRecord[]> {
-  const raw = await DB.getSetting(SETTING_KEY);
+  const raw = await ErpApi.getSetting(SETTING_KEY);
   return normalizeDeclaredList(raw).sort((a, b) => {
     if (a.year !== b.year) return b.year - a.year;
     return b.quarter - a.quarter;
@@ -83,8 +83,8 @@ async function markQuarterDeclared(period: QuarterPeriod): Promise<DeclaredQuart
     quarter: period.quarter,
     declaredAt: new Date().toISOString()
   };
-  await DB.setSetting(SETTING_KEY, [...list, record]);
-  await DB.addAuditLog('标记已申报', '税务', formatQuarterLabel(period.year, period.quarter));
+  await ErpApi.setSetting(SETTING_KEY, [...list, record]);
+  await ErpApi.addAuditLog('标记已申报', '税务', formatQuarterLabel(period.year, period.quarter));
   return record;
 }
 
@@ -99,8 +99,8 @@ async function unmarkQuarterDeclared(period: QuarterPeriod): Promise<void> {
   const { Voucher } = await import('./voucher');
   await Voucher.unlockManyInQuarter(period);
 
-  await DB.setSetting(SETTING_KEY, next);
-  await DB.addAuditLog('取消申报', '税务', formatQuarterLabel(period.year, period.quarter));
+  await ErpApi.setSetting(SETTING_KEY, next);
+  await ErpApi.addAuditLog('取消申报', '税务', formatQuarterLabel(period.year, period.quarter));
 }
 
 /** 启动时补齐：已结项季度内凭证状态同步为已结项 */

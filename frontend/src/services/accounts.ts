@@ -1,4 +1,4 @@
-import { DB } from './db';
+import { ErpApi } from './erpApi';
 import { DEFAULT_ACCOUNTS } from './defaultAccounts';
 import type { Account } from '../types';
 
@@ -8,7 +8,7 @@ const defaultCodes = new Set(DEFAULT_ACCOUNTS.map((a) => a.code));
 
 /** 按科目编码去重，保留最早创建的一条 */
 async function dedupeByCode() {
-  const existing = await DB.getAll('accounts');
+  const existing = await ErpApi.getAll('accounts');
   const seen = new Map();
   const toDelete = [];
 
@@ -22,10 +22,10 @@ async function dedupeByCode() {
     }
   }
 
-  await DB.removeMany('accounts', toDelete);
+  await ErpApi.removeMany('accounts', toDelete);
 
   if (toDelete.length) {
-    await DB.addAuditLog('清理', '会计科目', `删除 ${toDelete.length} 个重复科目`);
+    await ErpApi.addAuditLog('清理', '会计科目', `删除 ${toDelete.length} 个重复科目`);
   }
 
   return toDelete.length;
@@ -33,7 +33,7 @@ async function dedupeByCode() {
 
 /** 补全默认科目，并校正默认科目的名称/类别（修复历史错误数据） */
 async function syncDefaultAccounts() {
-  const existing = await DB.getAll('accounts');
+  const existing = await ErpApi.getAll('accounts');
   const byCode = new Map(existing.map((a) => [a.code, a]));
   let added = 0;
   let updated = 0;
@@ -43,7 +43,7 @@ async function syncDefaultAccounts() {
     const current = byCode.get(acc.code);
     if (!current) {
       toSave.push({
-        id: DB.generateId(),
+        id: ErpApi.generateId(),
         ...acc,
         createdAt: new Date().toISOString()
       });
@@ -68,13 +68,13 @@ async function syncDefaultAccounts() {
     }
   }
 
-  await DB.putMany('accounts', toSave);
+  await ErpApi.putMany('accounts', toSave);
 
   if (added > 0) {
-    await DB.addAuditLog('同步', '会计科目', `导入默认科目 ${added} 个`);
+    await ErpApi.addAuditLog('同步', '会计科目', `导入默认科目 ${added} 个`);
   }
   if (updated > 0) {
-    await DB.addAuditLog('同步', '会计科目', `校正默认科目 ${updated} 个`);
+    await ErpApi.addAuditLog('同步', '会计科目', `校正默认科目 ${updated} 个`);
   }
 
   return { added, updated };
@@ -85,7 +85,7 @@ async function syncVoucherEntryAccountNames() {
   const accounts = await getAll();
   const byId = new Map(accounts.map((a) => [a.id, a]));
   const byCode = new Map(accounts.map((a) => [a.code, a]));
-  const vouchers = await DB.getAll('vouchers');
+  const vouchers = await ErpApi.getAll('vouchers');
   const toSave = [];
 
   for (const v of vouchers) {
@@ -109,10 +109,10 @@ async function syncVoucherEntryAccountNames() {
     }
   }
 
-  await DB.putMany('vouchers', toSave);
+  await ErpApi.putMany('vouchers', toSave);
 
   if (toSave.length > 0) {
-    await DB.addAuditLog('同步', '凭证分录', `校正 ${toSave.length} 张凭证的科目引用`);
+    await ErpApi.addAuditLog('同步', '凭证分录', `校正 ${toSave.length} 张凭证的科目引用`);
   }
 
   return toSave.length;
@@ -120,8 +120,8 @@ async function syncVoucherEntryAccountNames() {
 
 /** 删除不在默认列表中、且未被凭证引用的科目 */
 async function pruneExtraAccounts() {
-  const existing = await DB.getAll('accounts');
-  const vouchers = await DB.getAll('vouchers');
+  const existing = await ErpApi.getAll('accounts');
+  const vouchers = await ErpApi.getAll('vouchers');
   const usedIds = new Set();
 
   for (const v of vouchers) {
@@ -138,10 +138,10 @@ async function pruneExtraAccounts() {
     toDelete.push(acc.id);
     removed++;
   }
-  await DB.removeMany('accounts', toDelete);
+  await ErpApi.removeMany('accounts', toDelete);
 
   if (removed > 0) {
-    await DB.addAuditLog('清理', '会计科目', `移除 ${removed} 个非默认科目`);
+    await ErpApi.addAuditLog('清理', '会计科目', `移除 ${removed} 个非默认科目`);
   }
 
   return removed;
@@ -165,12 +165,12 @@ async function init() {
 }
 
 async function getAll() {
-  const accounts = await DB.getAll('accounts');
+  const accounts = await ErpApi.getAll('accounts');
   return accounts.sort((a, b) => a.code.localeCompare(b.code));
 }
 
 async function getById(id) {
-  return DB.get('accounts', id);
+  return ErpApi.get('accounts', id);
 }
 
 async function save(account: Account): Promise<Account> {
@@ -182,12 +182,12 @@ async function save(account: Account): Promise<Account> {
 
   const isNew = !account.id;
   if (isNew) {
-    account.id = DB.generateId();
+    account.id = ErpApi.generateId();
     account.createdAt = new Date().toISOString();
   }
   account.updatedAt = new Date().toISOString();
-  await DB.put('accounts', account);
-  await DB.addAuditLog(
+  await ErpApi.put('accounts', account);
+  await ErpApi.addAuditLog(
     isNew ? '新增' : '修改',
     '会计科目',
     `${account.code} ${account.name}`
@@ -198,8 +198,8 @@ async function save(account: Account): Promise<Account> {
 async function remove(id) {
   const account = await getById(id);
   if (account) {
-    await DB.remove('accounts', id);
-    await DB.addAuditLog('删除', '会计科目', `${account.code} ${account.name}`);
+    await ErpApi.remove('accounts', id);
+    await ErpApi.addAuditLog('删除', '会计科目', `${account.code} ${account.name}`);
   }
 }
 

@@ -46,6 +46,7 @@ func RegisterErpRoutes(rg *gin.RouterGroup, erpHandler *v1handler.ErpHandler, ap
 	{
 		attachments.GET("", erpHandler.ListAttachments)
 		attachments.DELETE("", erpHandler.ClearAttachments)
+		attachments.POST("/upload", erpHandler.UploadAttachment)
 		attachments.POST("/batch", erpHandler.AttachmentsBatch)
 		attachments.PUT("/batch", erpHandler.AttachmentsBatch)
 		attachments.DELETE("/batch", erpHandler.DeleteAttachmentsBatch)

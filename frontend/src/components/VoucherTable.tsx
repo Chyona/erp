@@ -1,15 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Table, Button, Space, Typography, App, Popconfirm, Upload, Tooltip, Checkbox } from 'antd';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Table, Button, Space, Typography, App, Popconfirm, Upload, Tooltip, Checkbox, Popover } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import ScrollTable from './ScrollTable';
 import { DeleteOutlined, EyeOutlined, PaperClipOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { Voucher } from '../services/voucher';
-import type { Voucher as VoucherRecord } from '../types';
+import type { Attachment, Voucher as VoucherRecord } from '../types';
 import { useApp } from '../context/AppContext';
 import { isCarryForwardVoucher } from '../utils/carryForwardVoucher';
 import StatusBadge from './StatusBadge';
 import VoucherMoreActions from './VoucherMoreActions';
+import VoucherAttachmentColumn from './VoucherAttachmentColumn';
 
 const { Link } = Typography;
 
@@ -86,6 +87,26 @@ export default function VoucherTable({
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(100);
   const [uploadingId, setUploadingId] = useState('');
+  const [attachPanelVoucher, setAttachPanelVoucher] = useState<VoucherRecord | null>(null);
+  const [attachPanelItems, setAttachPanelItems] = useState<Attachment[]>([]);
+  const [attachPanelLoading, setAttachPanelLoading] = useState(false);
+  const listUploadTailRef = useRef(new Map<string, Promise<void>>());
+  const listUploadToastRef = useRef({ count: 0, timer: 0 as ReturnType<typeof setTimeout> | 0 });
+
+  const noteListUploadSuccess = (count = 1) => {
+    listUploadToastRef.current.count += count;
+    if (listUploadToastRef.current.timer) {
+      clearTimeout(listUploadToastRef.current.timer);
+    }
+    listUploadToastRef.current.timer = setTimeout(() => {
+      const n = listUploadToastRef.current.count;
+      listUploadToastRef.current.count = 0;
+      listUploadToastRef.current.timer = 0;
+      if (n > 0) {
+        message.success(n > 1 ? `已上传 ${n} 个附件` : '附件上传成功');
+      }
+    }, 280);
+  };
 
   useEffect(() => {
     setPage(1);
@@ -222,25 +243,195 @@ export default function VoucherTable({
     </Space>
   );
 
-  const handleListUpload = async (voucher: VoucherRecord, option: Parameters<NonNullable<import('antd/es/upload/interface').UploadProps['customRequest']>>[0]) => {
+  const attachPanelVoucherRef = useRef(attachPanelVoucher);
+  attachPanelVoucherRef.current = attachPanelVoucher;
+
+  const handleListUpload = (
+    voucher: VoucherRecord,
+    option: Parameters<NonNullable<import('antd/es/upload/interface').UploadProps['customRequest']>>[0]
+  ) => {
     const file = option.file as File;
-    setUploadingId(voucher.id);
+    const prev = listUploadTailRef.current.get(voucher.id) || Promise.resolve();
+    const job = prev
+      .catch(() => undefined)
+      .then(async () => {
+        setUploadingId(voucher.id);
+        try {
+          const updated = await Voucher.addAttachmentToVoucher(voucher.id, file);
+          option.onSuccess?.({});
+          noteListUploadSuccess(1);
+          if (attachPanelVoucherRef.current?.id === voucher.id) {
+            await loadAttachPanel(updated);
+          }
+          notifyDataChanged();
+        } catch (err) {
+          message.error((err as Error).message || '附件上传失败');
+          option.onError?.(err as Error);
+        } finally {
+          setUploadingId((cur) => (cur === voucher.id ? '' : cur));
+        }
+      });
+    listUploadTailRef.current.set(
+      voucher.id,
+      job.then(
+        () => undefined,
+        () => undefined
+      )
+    );
+  };
+
+  const loadAttachPanel = async (voucher: VoucherRecord) => {
+    setAttachPanelLoading(true);
     try {
-      await Voucher.addAttachmentToVoucher(voucher.id, file);
-      message.success('附件上传成功');
-      option.onSuccess?.({});
-      onRefresh?.();
+      const latest = (await Voucher.getById(voucher.id)) || voucher;
+      const ids = latest.attachmentIds?.length
+        ? latest.attachmentIds
+        : voucher.attachmentIds || [];
+      const atts: Attachment[] = [];
+      for (const attId of ids) {
+        try {
+          const att = await Voucher.getAttachment(attId);
+          if (att) atts.push(att);
+        } catch {
+          // 单条失败不阻断其余附件
+        }
+      }
+      setAttachPanelVoucher(latest);
+      setAttachPanelItems(atts);
+      if (!atts.length) {
+        message.warning('未找到附件文件，请重新上传');
+        setAttachPanelVoucher(null);
+      }
     } catch (err) {
-      message.error((err as Error).message || '附件上传失败');
-      option.onError?.(err as Error);
+      message.error((err as Error).message || '加载附件失败');
+      setAttachPanelVoucher(null);
+      setAttachPanelItems([]);
     } finally {
-      setUploadingId('');
+      setAttachPanelLoading(false);
     }
+  };
+
+  const openAttachPanel = (voucher: VoucherRecord) => {
+    setAttachPanelVoucher(voucher);
+    setAttachPanelItems([]);
+    void loadAttachPanel(voucher);
+  };
+
+  const closeAttachPanel = () => {
+    setAttachPanelVoucher(null);
+    setAttachPanelItems([]);
+  };
+
+  // 点击面板外空白、滚动表格时自动关闭附件浮层
+  useEffect(() => {
+    if (!attachPanelVoucher) return;
+
+    const isInsideAttachUi = (node: EventTarget | null) => {
+      if (!(node instanceof Element)) return false;
+      return Boolean(
+        node.closest('.voucher-list-attach-popover') ||
+          node.closest('.voucher-grouped-table__attach-count') ||
+          node.closest('.ant-popconfirm') ||
+          node.closest('.ant-modal-root') ||
+          node.closest('.ant-image-preview')
+      );
+    };
+
+    const onPointerDown = (e: PointerEvent) => {
+      if (isInsideAttachUi(e.target)) return;
+      closeAttachPanel();
+    };
+
+    const onScroll = (e: Event) => {
+      const target = e.target;
+      if (target instanceof Element && target.closest('.voucher-list-attach-popover')) {
+        return;
+      }
+      closeAttachPanel();
+    };
+
+    document.addEventListener('pointerdown', onPointerDown, true);
+    document.addEventListener('scroll', onScroll, true);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown, true);
+      document.removeEventListener('scroll', onScroll, true);
+    };
+  }, [attachPanelVoucher]);
+
+  const toggleAttachPanel = (voucher: VoucherRecord) => {
+    if (attachPanelVoucher?.id === voucher.id) {
+      closeAttachPanel();
+      return;
+    }
+    openAttachPanel(voucher);
+  };
+
+  const handlePanelRemove = async (index: number) => {
+    if (!attachPanelVoucher) return;
+    const att = attachPanelItems[index];
+    if (!att) return;
+    try {
+      const updated = await Voucher.removeAttachmentsFromVoucher(attachPanelVoucher.id, [att.id]);
+      message.success('附件已删除');
+      const next = attachPanelItems.filter((_, i) => i !== index);
+      setAttachPanelItems(next);
+      setAttachPanelVoucher(updated);
+      if (!next.length) closeAttachPanel();
+      notifyDataChanged();
+    } catch (err) {
+      message.error((err as Error).message || '删除附件失败');
+    }
+  };
+
+  const handlePanelRemoveMany = async (indices: number[]) => {
+    if (!attachPanelVoucher || !indices?.length) return;
+    const ids = indices
+      .map((i) => attachPanelItems[i]?.id)
+      .filter(Boolean) as string[];
+    if (!ids.length) return;
+    try {
+      const updated = await Voucher.removeAttachmentsFromVoucher(attachPanelVoucher.id, ids);
+      message.success(`已删除 ${ids.length} 个附件`);
+      const removeSet = new Set(ids);
+      const next = attachPanelItems.filter((att) => !removeSet.has(att.id));
+      setAttachPanelItems(next);
+      setAttachPanelVoucher(updated);
+      if (!next.length) closeAttachPanel();
+      notifyDataChanged();
+    } catch (err) {
+      message.error((err as Error).message || '批量删除失败');
+    }
+  };
+
+  const handlePanelUpload = async (option: Parameters<NonNullable<import('antd/es/upload/interface').UploadProps['customRequest']>>[0]) => {
+    if (!attachPanelVoucher) return;
+    await handleListUpload(attachPanelVoucher, option);
+  };
+
+  const renderAttachPanelContent = (voucher: VoucherRecord) => {
+    if (attachPanelLoading && !attachPanelItems.length) {
+      return <div className="voucher-list-attach-popover__loading">加载中…</div>;
+    }
+    if (!attachPanelItems.length) {
+      return <div className="voucher-list-attach-popover__loading">暂无附件</div>;
+    }
+    return (
+      <VoucherAttachmentColumn
+        attachments={attachPanelItems}
+        open
+        onClose={closeAttachPanel}
+        onRemove={handlePanelRemove}
+        onRemoveMany={handlePanelRemoveMany}
+        onUpload={handlePanelUpload}
+        canModify={Voucher.canModifyAttachments(voucher.status)}
+      />
+    );
   };
 
   const renderAttachments = (voucher) => {
     const count = (voucher.attachmentIds || []).length;
     const editable = Voucher.canModifyAttachments(voucher.status);
+    const panelOpen = attachPanelVoucher?.id === voucher.id;
 
     const uploadLink = editable ? (
       <Upload
@@ -255,6 +446,7 @@ export default function VoucherTable({
           icon={<PaperClipOutlined />}
           loading={uploadingId === voucher.id}
           className="voucher-grouped-table__upload"
+          title="可一次选择多个文件"
         >
           上传附件
         </Button>
@@ -276,14 +468,29 @@ export default function VoucherTable({
     return (
       <Space size={2} direction="vertical" className="voucher-grouped-table__attach">
         {count > 0 && (
-          <Button
-            type="link"
-            size="small"
-            className="voucher-grouped-table__attach-count"
-            onClick={() => onView?.(voucher.id)}
+          <Popover
+            open={panelOpen}
+            trigger={[]}
+            placement="leftTop"
+            arrow={{ pointAtCenter: true }}
+            getPopupContainer={() => document.body}
+            zIndex={1100}
+            overlayClassName="voucher-list-attach-popover"
+            content={renderAttachPanelContent(voucher)}
           >
-            {count} 张
-          </Button>
+            <Button
+              type="link"
+              size="small"
+              className="voucher-grouped-table__attach-count"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleAttachPanel(voucher);
+              }}
+            >
+              {count} 张
+            </Button>
+          </Popover>
         )}
         {uploadLink}
       </Space>

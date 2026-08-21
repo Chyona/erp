@@ -63,7 +63,7 @@ frontend/
 │   └── vitePluginErpMock.ts
 └── src/services/
     ├── apiClient.ts
-    └── db.ts               # 统一走 /openapi/erp/v1
+    └── erpApi.ts           # ERP 后端 API 客户端（/openapi/erp/v1）
 ```
 
 ## 常用脚本

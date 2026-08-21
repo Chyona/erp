@@ -335,6 +335,58 @@ function normalizeFinanceInterestEntries(voucher) {
   return normalizeVoucherFinanceInterestEntries(voucher, hints);
 }
 
+function roundMoney2(n) {
+  return Math.round((Number(n) || 0) * 100) / 100;
+}
+
+function entriesDebitCreditTotals(entries) {
+  let debit = 0;
+  let credit = 0;
+  for (const entry of entries || []) {
+    debit += parseFloat(String(entry.debit)) || 0;
+    credit += parseFloat(String(entry.credit)) || 0;
+  }
+  return { debit: roundMoney2(debit), credit: roundMoney2(credit) };
+}
+
+/**
+ * 截图识别常见错误：把某一行借方金额写到贷方（或相反）。
+ * 若「只翻转一行单侧金额」即可借贷平衡，则自动纠正。
+ */
+function fixDebitCreditSideSwaps(voucher) {
+  const entries = voucher.entries || [];
+  if (entries.length < 2) return false;
+
+  for (const entry of entries) {
+    const d = parseFloat(String(entry.debit)) || 0;
+    const c = parseFloat(String(entry.credit)) || 0;
+    if (d > 0 && c > 0) return false;
+  }
+
+  const { debit, credit } = entriesDebitCreditTotals(entries);
+  if (Math.abs(debit - credit) < 0.005) return false;
+
+  for (const entry of entries) {
+    const d = parseFloat(String(entry.debit)) || 0;
+    const c = parseFloat(String(entry.credit)) || 0;
+    if (c > 0 && d === 0) {
+      if (Math.abs(debit + c - (credit - c)) < 0.005) {
+        entry.debit = c;
+        entry.credit = '';
+        return true;
+      }
+    }
+    if (d > 0 && c === 0) {
+      if (Math.abs(debit - d - (credit + d)) < 0.005) {
+        entry.debit = '';
+        entry.credit = d;
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 function appendUnique(list, value) {
   const text = normalizeText(value);
   if (!text || list.includes(text)) return;
@@ -556,6 +608,9 @@ function rowsToVouchers(rows, accounts) {
       continue;
     }
     normalizeFinanceInterestEntries(voucher);
+    if (fixDebitCreditSideSwaps(voucher)) {
+      warnings.push(`${voucher.voucherNo} 已自动纠正借贷方向（识别侧写错）`);
+    }
     inferVoucherMeta(voucher);
     vouchers.push(voucher);
   }

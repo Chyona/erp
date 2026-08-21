@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Alert, Spin } from 'antd';
-import { DB } from '../services/db';
+import { ErpApi } from '../services/erpApi';
 import { apiRequest } from '../services/apiClient';
 import { repairFinanceInterestEntries } from '../services/financeExpenseRepair';
 import { useApp } from '../context/AppContext';
@@ -23,7 +23,7 @@ export default function AppInit({ children }: { children: ReactNode }) {
     (async () => {
       try {
         setError('');
-        await DB.open();
+        await ErpApi.open();
 
         const result = await apiRequest<AppInitResult>('POST', '/app/init');
         const repaired = await repairFinanceInterestEntries();

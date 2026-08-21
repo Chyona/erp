@@ -1,6 +1,6 @@
 import { TaxExemption } from './taxExemption';
 import { ProfitLossClosing } from './profitLossClosing';
-import { DB } from './db';
+import { ErpApi } from './erpApi';
 import { TaxDeclaration } from './taxDeclaration';
 import { formatReportPeriod } from '../utils/reportPeriod';
 import type { Voucher } from '../types';
@@ -140,7 +140,7 @@ export async function createUnifiedClosing(period: ReportPeriod, { approve = tru
   if (taxVoucher) parts.push(`普票 ${taxVoucher.voucherNo}`);
   if (profitLossVoucher) parts.push(`损益 ${profitLossVoucher.voucherNo}`);
 
-  await DB.addAuditLog(
+  await ErpApi.addAuditLog(
     approve ? '新建并审核' : '新建草稿',
     summary.closingLabel,
     `${summary.periodLabel}：${parts.join('、')}`
@@ -176,7 +176,7 @@ export async function reverseUnifiedClosing(period: ReportPeriod) {
     await TaxExemption.reverseCarryForward(period, taxCf.id);
   }
 
-  await DB.addAuditLog('反结转', summary.closingLabel, summary.periodLabel);
+  await ErpApi.addAuditLog('反结转', summary.closingLabel, summary.periodLabel);
 
   return {
     profitLossVoucher: summary.profitLossVoucher,

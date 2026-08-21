@@ -30,6 +30,51 @@ function readBody(req: IncomingMessage): Promise<string> {
   });
 }
 
+function readBodyBuffer(req: IncomingMessage): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    req.on('data', (c) => chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(c)));
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', reject);
+  });
+}
+
+/** 简易 multipart 解析（仅 Mock：取 file 字段与可选 text 字段）。 */
+function parseMockMultipart(
+  buf: Buffer,
+  contentType: string
+): { fields: Record<string, string>; file?: { filename: string; mime: string; data: Buffer } } {
+  const boundaryMatch = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(contentType);
+  const boundary = boundaryMatch?.[1] || boundaryMatch?.[2];
+  if (!boundary) return { fields: {} };
+  const parts = buf.toString('binary').split(`--${boundary}`);
+  const fields: Record<string, string> = {};
+  let file: { filename: string; mime: string; data: Buffer } | undefined;
+  for (const part of parts) {
+    if (!part || part === '--\r\n' || part === '--') continue;
+    const sep = part.indexOf('\r\n\r\n');
+    if (sep < 0) continue;
+    const header = part.slice(0, sep);
+    let body = part.slice(sep + 4);
+    if (body.endsWith('\r\n')) body = body.slice(0, -2);
+    const nameMatch = /name="([^"]+)"/i.exec(header);
+    const filenameMatch = /filename="([^"]*)"/i.exec(header);
+    const mimeMatch = /Content-Type:\s*([^\r\n]+)/i.exec(header);
+    const name = nameMatch?.[1];
+    if (!name) continue;
+    if (filenameMatch) {
+      file = {
+        filename: filenameMatch[1] || 'file',
+        mime: (mimeMatch?.[1] || 'application/octet-stream').trim(),
+        data: Buffer.from(body, 'binary')
+      };
+    } else {
+      fields[name] = Buffer.from(body, 'binary').toString('utf8');
+    }
+  }
+  return { fields, file };
+}
+
 async function parseJSON<T>(req: IncomingMessage): Promise<T | undefined> {
   const raw = await readBody(req);
   if (!raw) return undefined;
@@ -457,6 +502,29 @@ export async function handleErpMockRequest(
         return true;
       }
     }
+    if (method === 'POST' && path === '/attachments/upload') {
+      const contentType = String(req.headers['content-type'] || '');
+      const buf = await readBodyBuffer(req);
+      const parsed = parseMockMultipart(buf, contentType);
+      if (!parsed.file) {
+        fail(res, 400, '请上传 file 字段');
+        return true;
+      }
+      const id = parsed.fields.id || mockId();
+      const name = parsed.fields.name || parsed.file.filename || 'file';
+      const url = `data:${parsed.file.mime};base64,${parsed.file.data.toString('base64')}`;
+      const item: MockAttachment = {
+        id,
+        name,
+        type: parsed.file.mime,
+        size: parsed.file.data.length,
+        url,
+        uploadedAt: new Date().toISOString()
+      };
+      store.attachments.set(id, item);
+      ok(res, item);
+      return true;
+    }
     if ((method === 'PUT' || method === 'POST') && path === '/attachments/batch') {
       const body =
         (await parseJSON<{ action?: string; items?: MockAttachment[]; ids?: string[] }>(req)) ?? {};
@@ -501,13 +569,14 @@ export async function handleErpMockRequest(
       }
       if (method === 'PUT') {
         const body = (await parseJSON<Partial<MockAttachment>>(req)) ?? {};
+        const existing = store.attachments.get(id);
         const item: MockAttachment = {
           id,
-          name: body.name ?? '',
-          type: body.type ?? '',
-          size: body.size ?? 0,
-          data: body.data ?? '',
-          uploadedAt: body.uploadedAt ?? new Date().toISOString()
+          name: body.name ?? existing?.name ?? '',
+          type: body.type ?? existing?.type ?? '',
+          size: body.size ?? existing?.size ?? 0,
+          url: body.url ?? existing?.url ?? '',
+          uploadedAt: body.uploadedAt ?? existing?.uploadedAt ?? new Date().toISOString()
         };
         store.attachments.set(id, item);
         ok(res, item);

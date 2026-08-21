@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Typography } from 'antd';
-import { DB } from '../services/db';
+import { ErpApi } from '../services/erpApi';
 import { useApp } from '../context/AppContext';
 import ScrollTable from '../components/ScrollTable';
 
@@ -12,7 +12,7 @@ export default function Audit() {
 
   useEffect(() => {
     (async () => {
-      const all = await DB.getAll('auditLogs');
+      const all = await ErpApi.getAll('auditLogs');
       setLogs(all.sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 200));
     })();
   }, [refreshKey]);

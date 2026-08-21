@@ -1,5 +1,5 @@
 import { Voucher } from './voucher';
-import { DB } from './db';
+import { ErpApi } from './erpApi';
 import { INVOICE_TYPE_LABEL } from '../constants/invoice';
 import { mergeBalanceSheetRows } from '../utils/balanceSheetRows';
 import { formatStoredTaxExemptionPeriod } from '../utils/reportPeriod';
@@ -326,7 +326,7 @@ export const ExportUtil = {
 
 export async function getCompanyInfo() {
   return {
-    name: await DB.getSetting('companyName'),
-    taxId: await DB.getSetting('companyTaxId')
+    name: await ErpApi.getSetting('companyName'),
+    taxId: await ErpApi.getSetting('companyTaxId')
   };
 }

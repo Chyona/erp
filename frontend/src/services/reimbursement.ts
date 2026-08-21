@@ -1,4 +1,4 @@
-import { DB } from './db';
+import { ErpApi } from './erpApi';
 import { Accounts } from './accounts';
 import { Voucher } from './voucher';
 import { TaxDeclaration } from './taxDeclaration';
@@ -210,7 +210,7 @@ export async function createReimbursementVoucher(period, person, { approve = tru
     throw new Error('缺少 2241 其他应付款 或 1002 银行存款 科目');
   }
 
-  const signatory = String((await DB.getSetting('defaultSignatory')) ?? '');
+  const signatory = String((await ErpApi.getSetting('defaultSignatory')) ?? '');
   const periodLabel = formatTaxExemptionPeriod(period);
   const entries = [];
 
@@ -254,7 +254,7 @@ export async function createReimbursementVoucher(period, person, { approve = tru
 
   const saved = await Voucher.save(voucherData as import('../types').VoucherInput, approve);
 
-  await DB.addAuditLog(
+  await ErpApi.addAuditLog(
     approve ? '新建并审核' : '新建草稿',
     '月底报销',
     `${saved.voucherNo} ${person} ¥${group.total.toFixed(2)}`
