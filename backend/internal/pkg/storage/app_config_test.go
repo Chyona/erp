@@ -57,10 +57,10 @@ func TestNewClientFromAppConfig(t *testing.T) {
 }
 
 func TestNewClientFromAppConfig_LoadIntegration(t *testing.T) {
-	t.Setenv("APP_STORAGE_OSS_ACCESS_KEY_ID", "id")
-	t.Setenv("APP_STORAGE_OSS_ACCESS_KEY_SECRET", "secret")
-	t.Setenv("APP_STORAGE_OSS_BUCKET_NAME", "bucket")
-	t.Setenv("APP_STORAGE_OSS_ENDPOINT", "oss-cn-hangzhou.aliyuncs.com")
+	t.Setenv("OSS_ACCESS_KEY_ID", "id")
+	t.Setenv("OSS_ACCESS_KEY_SECRET", "secret")
+	t.Setenv("OSS_BUCKET_NAME", "bucket")
+	t.Setenv("OSS_ENDPOINT", "oss-cn-hangzhou.aliyuncs.com")
 
 	appCfg, err := appconfig.Load("")
 	if err != nil {
@@ -135,10 +135,10 @@ func TestNewClientFromAppConfig_OSSPriorityOverTOS(t *testing.T) {
 }
 
 func TestNewClientFromAppConfig_TOSIntegration(t *testing.T) {
-	t.Setenv("APP_STORAGE_TOS_ACCESS_KEY_ID", "id")
-	t.Setenv("APP_STORAGE_TOS_ACCESS_KEY_SECRET", "secret")
-	t.Setenv("APP_STORAGE_TOS_BUCKET_NAME", "bucket")
-	t.Setenv("APP_STORAGE_TOS_REGION", "cn-beijing")
+	t.Setenv("TOS_ACCESS_KEY_ID", "id")
+	t.Setenv("TOS_ACCESS_KEY_SECRET", "secret")
+	t.Setenv("TOS_BUCKET_NAME", "bucket")
+	t.Setenv("TOS_REGION", "cn-beijing")
 
 	appCfg, err := appconfig.Load("")
 	if err != nil {
