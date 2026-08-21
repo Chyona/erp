@@ -5,7 +5,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// RegisterErpRoutes 注册 ERP 数据存储路由，对应前端 IndexedDB 五个 object store。
+// RegisterErpRoutes 注册 ERP 数据存储路由（/openapi/erp/v1），对应前端 db.ts 五个 store 及 init/export。
 func RegisterErpRoutes(rg *gin.RouterGroup, erpHandler *v1handler.ErpHandler, appHandler *v1handler.AppHandler) {
 	rg.POST("/app/init", appHandler.Init)
 

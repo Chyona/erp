@@ -2,14 +2,12 @@ package service
 
 import (
 	"context"
-	"crypto/rand"
-	"embed"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"sort"
 	"time"
 
+	"erp/internal/data"
 	"erp/internal/model"
 	"erp/internal/repository"
 	"gorm.io/datatypes"
@@ -43,6 +41,7 @@ func NewAppService(repo repository.ErpRepository) AppService {
 	return &appService{repo: repo}
 }
 
+// Init 应用启动初始化：同步默认科目、校正凭证分录科目名、同步已申报季度结项锁定。
 func (s *appService) Init(ctx context.Context) (*AppInitResult, error) {
 	if err := s.initChartAccounts(ctx); err != nil {
 		return nil, err
@@ -77,6 +76,7 @@ func (s *appService) Init(ctx context.Context) (*AppInitResult, error) {
 	}, nil
 }
 
+// initChartAccounts 去重、补齐默认科目并删除未使用的多余科目。
 func (s *appService) initChartAccounts(ctx context.Context) error {
 	defaults, err := loadDefaultAccounts()
 	if err != nil {
@@ -96,14 +96,16 @@ func (s *appService) initChartAccounts(ctx context.Context) error {
 	return s.pruneExtraChartAccounts(ctx, defaultCodes)
 }
 
+// loadDefaultAccounts 从内嵌 JSON 加载默认会计科目定义。
 func loadDefaultAccounts() ([]defaultAccountDef, error) {
 	var items []defaultAccountDef
-	if err := json.Unmarshal(defaultAccountsJSON, &items); err != nil {
+	if err := json.Unmarshal(data.DefaultAccountsJSON, &items); err != nil {
 		return nil, fmt.Errorf("解析默认科目失败: %w", err)
 	}
 	return items, nil
 }
 
+// dedupeChartAccounts 按科目编码去重，保留最早创建的一条。
 func (s *appService) dedupeChartAccounts(ctx context.Context) error {
 	items, err := s.repo.ListChartAccounts(ctx)
 	if err != nil {
@@ -125,6 +127,7 @@ func (s *appService) dedupeChartAccounts(ctx context.Context) error {
 	return nil
 }
 
+// syncDefaultChartAccounts 按默认科目表补齐缺失项，并校正名称/类别/余额方向。
 func (s *appService) syncDefaultChartAccounts(ctx context.Context, defaults []defaultAccountDef) error {
 	items, err := s.repo.ListChartAccounts(ctx)
 	if err != nil {
@@ -139,7 +142,7 @@ func (s *appService) syncDefaultChartAccounts(ctx context.Context, defaults []de
 		current, ok := byCode[def.Code]
 		if !ok {
 			acc := model.ChartAccount{
-				ID:        generateAppID(),
+				ID:        generateID(),
 				Code:      def.Code,
 				Name:      def.Name,
 				Category:  def.Category,
@@ -164,6 +167,7 @@ func (s *appService) syncDefaultChartAccounts(ctx context.Context, defaults []de
 	return nil
 }
 
+// syncVoucherEntryAccountNames 用科目主数据回填凭证分录中的 accountCode / accountName。
 func (s *appService) syncVoucherEntryAccountNames(ctx context.Context) (int, error) {
 	accounts, err := s.repo.ListChartAccounts(ctx)
 	if err != nil {
@@ -209,6 +213,7 @@ func (s *appService) syncVoucherEntryAccountNames(ctx context.Context) (int, err
 	return updated, nil
 }
 
+// pruneExtraChartAccounts 删除非默认且未被任何凭证引用的科目。
 func (s *appService) pruneExtraChartAccounts(ctx context.Context, defaultCodes map[string]defaultAccountDef) error {
 	items, err := s.repo.ListChartAccounts(ctx)
 	if err != nil {
@@ -250,6 +255,7 @@ type declaredQuarterRecord struct {
 	Quarter   int    `json:"quarter"`
 }
 
+// syncDeclaredQuarterVoucherLocks 根据 settings.declaredQuarters 将已申报季度内凭证结项锁定。
 func (s *appService) syncDeclaredQuarterVoucherLocks(ctx context.Context) (int, error) {
 	setting, err := s.repo.GetSetting(ctx, "declaredQuarters")
 	if err != nil {
@@ -270,6 +276,7 @@ func (s *appService) syncDeclaredQuarterVoucherLocks(ctx context.Context) (int, 
 	return total, nil
 }
 
+// lockVouchersInQuarter 将指定季度内非草稿凭证状态设为 locked，并写入季度申报键。
 func (s *appService) lockVouchersInQuarter(ctx context.Context, year, quarter int, periodKey string) (int, error) {
 	startMonth := (quarter-1)*3 + 1
 	endMonth := startMonth + 2
@@ -304,16 +311,8 @@ func (s *appService) lockVouchersInQuarter(ctx context.Context, year, quarter in
 	return locked, nil
 }
 
+// daysInMonth 返回公历某年某月的天数。
 func daysInMonth(year, month int) int {
 	t := time.Date(year, time.Month(month+1), 0, 0, 0, 0, 0, time.UTC)
 	return t.Day()
 }
-
-func generateAppID() string {
-	buf := make([]byte, 4)
-	_, _ = rand.Read(buf)
-	return fmt.Sprintf("%x%s", time.Now().UnixNano()/1e6, hex.EncodeToString(buf))
-}
-
-//go:embed ../data/default_accounts.json
-var defaultAccountsJSON []byte

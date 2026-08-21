@@ -2,7 +2,7 @@ package model
 
 import "gorm.io/datatypes"
 
-// Voucher 会计凭证，对应前端 IndexedDB vouchers 存储。
+// Voucher 会计凭证，对应前端 vouchers store（表 vouchers）。
 type Voucher struct {
 	ID                         string         `gorm:"primaryKey;size:64" json:"id"`
 	VoucherType                string         `gorm:"size:16" json:"voucherType"`

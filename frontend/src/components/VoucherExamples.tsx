@@ -108,7 +108,7 @@ export const VOUCHER_EXAMPLES = [
     businessType: '销售收入',
     invoiceType: 'ordinary',
     taxAmount: 3000,
-    remark: '价税分离；普票税额月底可减免结转',
+    remark: '价税分离；普票税额月底可参与减免结转',
     entries: [
       { summary: '收到XX项目开发款（含税）', accountCode: '1002', debit: 103000, credit: 0 },
       { summary: '确认主营业务收入', accountCode: '5001', debit: 0, credit: 100000 },
@@ -130,14 +130,35 @@ export const VOUCHER_EXAMPLES = [
     ]
   },
   {
-    key: 'tax-exemption-carry',
-    category: '税务',
-    title: '月底普票增值税减免结转',
-    businessType: '税费缴纳',
-    remark: '也可在工作台一键生成；专票不参与此项结转',
+    key: 'wecom-withdraw',
+    category: '主营收入',
+    title: '企业微信提现到公账',
+    businessType: '销售收入',
+    invoiceType: 'ordinary',
+    taxAmount: 9.11,
+    remark:
+      '商户提现回流公账：借 1002，贷 5001 + 多笔 2221（按发票拆分税额）；金额仅为演示，请按实际对账单修改',
     entries: [
-      { summary: '2026年3月普票增值税减免结转', accountCode: '2221', debit: 3000, credit: 0 },
-      { summary: '2026年3月免税收入', accountCode: '5301', debit: 0, credit: 3000 }
+      { summary: '【提现】企业微信提现到公账', accountCode: '1002', debit: 2994, credit: 0 },
+      { summary: '确认收入（微信提现）', accountCode: '5001', debit: 0, credit: 2984.89 },
+      { summary: '应交增值税（有明确客户，开票 20）', accountCode: '2221', debit: 0, credit: 0.2 },
+      { summary: '应交增值税（有明确客户，开票 900）', accountCode: '2221', debit: 0, credit: 8.91 }
+    ]
+  },
+  {
+    key: 'wechat-pay-withdraw',
+    category: '主营收入',
+    title: '微信支付商户提现到公账',
+    businessType: '销售收入',
+    invoiceType: 'ordinary',
+    taxAmount: 1.16,
+    remark:
+      '微信支付商户平台提现：借 1002，贷 5001 + 多笔 2221；金额仅为演示，请按实际对账单与发票修改',
+    entries: [
+      { summary: '【提现】微信支付商户平台提现到公账', accountCode: '1002', debit: 1558, credit: 0 },
+      { summary: '确认收入（微信提现）', accountCode: '5001', debit: 0, credit: 1556.84 },
+      { summary: '应交增值税（有明确客户，开票 58.42）', accountCode: '2221', debit: 0, credit: 0.58 },
+      { summary: '应交增值税（有明确客户，开票 58）', accountCode: '2221', debit: 0, credit: 0.58 }
     ]
   },
   {

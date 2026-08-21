@@ -14,6 +14,7 @@ import { DB } from '../services/db';
 import { ExportUtil } from '../services/export';
 import { useApp } from '../context/AppContext';
 import { confirmWarning } from '../utils/confirmAction';
+import { APP_CONFIG } from '../config/app';
 
 const { Sider, Header, Content } = Layout;
 
@@ -86,8 +87,8 @@ export default function MainLayout() {
       <Sider width={220} theme="dark" className="app-sider">
         <div className="sidebar-logo">
           <span className="logo-icon">📒</span>
-          <Typography.Title level={5} style={{ color: '#fff', margin: 0 }}>
-            电子凭证
+          <Typography.Title level={5} style={{ color: '#fff', margin: 0 }} title={APP_CONFIG.name}>
+            {APP_CONFIG.shortName}
           </Typography.Title>
         </div>
         <Menu
@@ -99,7 +100,7 @@ export default function MainLayout() {
           className="sidebar-menu"
         />
         <div className="sidebar-footer">
-          <small>数据本地存储 · 不上传云端</small>
+          <small>{APP_CONFIG.footer}</small>
         </div>
       </Sider>
       <Layout className="app-main">

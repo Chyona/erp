@@ -2,15 +2,13 @@ package service
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"time"
 
 	"erp/internal/model"
 	"erp/internal/repository"
+	"github.com/google/uuid"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -58,10 +56,9 @@ func NewErpService(repo repository.ErpRepository) ErpService {
 	return &erpService{repo: repo}
 }
 
+// generateID 生成业务主键（UUID v4）。
 func generateID() string {
-	buf := make([]byte, 4)
-	_, _ = rand.Read(buf)
-	return fmt.Sprintf("%x%s", time.Now().UnixNano()/1e6, hex.EncodeToString(buf))
+	return uuid.NewString()
 }
 
 func (s *erpService) ListChartAccounts(ctx context.Context) ([]model.ChartAccount, error) {

@@ -22,6 +22,7 @@ import BusinessTypeHint from '../components/BusinessTypeHint';
 import VoucherEntrySheet from '../components/VoucherEntrySheet';
 import VoucherSheetTools from '../components/VoucherSheetTools';
 import VoucherFormActions from '../components/VoucherFormActions';
+import VoucherExamples from '../components/VoucherExamples';
 import { buildAttachmentFileName } from '../utils/attachmentName';
 import { INVOICE_TYPE, INVOICE_TYPE_OPTIONS } from '../constants/invoice';
 import { isCarryForwardVoucher, CARRY_FORWARD_VOUCHER_READONLY_TIP } from '../utils/carryForwardVoucher';
@@ -624,13 +625,10 @@ export default function VoucherForm() {
     <VoucherFormActions
       readOnly={readOnly}
       canUnapprove={isEdit && voucherStatus === Voucher.STATUS.APPROVED}
-      accounts={accounts}
       onSave={() => save()}
       onSaveAndNew={() => save({ continueNew: true })}
       onCancel={() => navigate('/vouchers')}
       onUnapprove={handleUnapprove}
-      onApplyExample={applyExample}
-      getTemplateSnapshot={getTemplateSnapshot}
     />
   );
 
@@ -661,6 +659,14 @@ export default function VoucherForm() {
       <div className="page-header voucher-form-page__toolbar">
         <div className="voucher-form-page__toolbar-start">{formActions}</div>
         <div className="voucher-form-page__toolbar-end">
+          {/* 模板属辅助填单，放右侧与护眼/翻页同组，不与保存主操作抢注意力 */}
+          {!readOnly ? (
+            <VoucherExamples
+              accounts={accounts}
+              onApply={applyExample}
+              getSnapshot={getTemplateSnapshot}
+            />
+          ) : null}
           {sheetTools}
         </div>
       </div>

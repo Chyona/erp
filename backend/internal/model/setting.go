@@ -2,7 +2,7 @@ package model
 
 import "gorm.io/datatypes"
 
-// Setting 系统设置，对应前端 IndexedDB settings 存储。
+// Setting 系统设置，对应前端 settings store（表 settings；value 为 JSON）。
 type Setting struct {
 	Key   string         `gorm:"primaryKey;size:128" json:"key"`
 	Value datatypes.JSON `gorm:"type:jsonb" json:"value"`

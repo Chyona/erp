@@ -3,7 +3,11 @@ frontend/node_modules
 frontend/dist
 frontend/.DS_Store
 frontend/*.local
+frontend/package-lock.json
 frontend/.env
+frontend/.env.*
+!frontend/.env.example
+!frontend/.env.production
 
 # backend dependencies
 backend/.env

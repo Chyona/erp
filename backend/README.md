@@ -37,6 +37,12 @@ base/
 | 数据库名 | `base_db` |
 | 数据库用户 | `postgres` / `postgres` |
 
+## ERP 前端对接
+
+前端通过 `frontend/src/services/db.ts` 访问 **`/openapi/erp/v1`**（科目/凭证/附件/审计/设置、`/app/init`、备份导入）。接口说明见 `docs/ERP_API.md`。
+
+健康检查：`GET /health`（无 `/openapi` 前缀）。
+
 ## 初始化
 
 ### 1. 安装依赖

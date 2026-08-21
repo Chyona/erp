@@ -1,6 +1,6 @@
 package model
 
-// ChartAccount 会计科目，对应前端 IndexedDB accounts 存储。
+// ChartAccount 会计科目，对应前端 accounts store（表 chart_accounts）。
 type ChartAccount struct {
 	ID        string `gorm:"primaryKey;size:64" json:"id"`
 	Code      string `gorm:"size:32;index;not null" json:"code"`

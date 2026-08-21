@@ -7,7 +7,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// ErpRepository ERP 数据存储访问，对应前端 IndexedDB 五个 object store。
+// ErpRepository ERP 数据访问接口，对应前端 db.ts 五个 store。
 type ErpRepository interface {
 	ListChartAccounts(ctx context.Context) ([]model.ChartAccount, error)
 	GetChartAccount(ctx context.Context, id string) (*model.ChartAccount, error)
@@ -184,6 +184,7 @@ func (r *erpRepository) ClearSettings(ctx context.Context) error {
 	return r.db.WithContext(ctx).Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&model.Setting{}).Error
 }
 
+// ImportAll 在事务内清空五张表后全量写入，对应前端 DB.importAll。
 func (r *erpRepository) ImportAll(ctx context.Context, data *model.ExportData) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		repo := &erpRepository{db: tx}

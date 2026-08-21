@@ -1,30 +1,20 @@
 import { Button, Space } from 'antd';
-import VoucherExamples from './VoucherExamples';
-
-import type { ReactNode } from 'react';
-import type { Account } from '../types';
 
 export default function VoucherFormActions({
   readOnly,
   canUnapprove = false,
-  accounts,
   onSave,
   onSaveAndNew,
   onCancel,
   onUnapprove,
-  onApplyExample,
-  getTemplateSnapshot,
   variant = 'toolbar'
 }: {
   readOnly: boolean;
   canUnapprove?: boolean;
-  accounts?: Account[];
   onSave: () => void;
   onSaveAndNew: () => void;
   onCancel?: () => void;
   onUnapprove?: () => void;
-  onApplyExample?: (example: unknown) => void;
-  getTemplateSnapshot?: () => unknown;
   variant?: 'toolbar' | 'footer';
 }) {
   if (readOnly) {
@@ -54,13 +44,9 @@ export default function VoucherFormActions({
     );
   }
 
+  // 工具栏仅放主操作；「模板」放在右侧辅助工具区，避免打断保存流程
   return (
     <Space wrap>
-      <VoucherExamples
-        accounts={accounts}
-        onApply={onApplyExample}
-        getSnapshot={getTemplateSnapshot}
-      />
       <Button type="primary" onClick={() => onSaveAndNew()}>
         保存并新增
       </Button>

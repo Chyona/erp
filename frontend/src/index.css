@@ -1815,7 +1815,7 @@ body,
   color: rgba(0, 0, 0, 0.88);
 }
 
-.report-trial-imbalance-tooltip__steps li + li {
+.report-trial-imbalance-tooltip__steps li+li {
   margin-top: 4px;
 }
 
@@ -2033,7 +2033,7 @@ body,
   background: rgb(255, 238, 239) !important;
 }
 
-.trial-balance-report .ant-table-tbody > tr:hover > .trial-balance-report__cell--negative {
+.trial-balance-report .ant-table-tbody>tr:hover>.trial-balance-report__cell--negative {
   background: rgb(255, 228, 230) !important;
 }
 
@@ -2158,6 +2158,7 @@ body,
   flex: 0 0 auto;
   display: flex;
   align-items: center;
+  gap: 10px;
   margin-left: auto;
 }
 
@@ -2177,7 +2178,6 @@ body,
   flex-wrap: wrap;
   margin-top: 12px;
   padding-top: 8px;
-  border-top: 1px dashed #e2e8f0;
   font-size: 13px;
 }
 
@@ -2243,6 +2243,40 @@ body,
   align-items: start;
 }
 
+/* 附加区：label 左、控件右，与上方凭证区信息栏风格一致 */
+.voucher-form__extra .ant-form-item {
+  margin-bottom: 0;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.voucher-form__extra .ant-form-item-row {
+  flex-direction: row !important;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.voucher-form__extra .ant-form-item-label {
+  flex: 0 0 auto;
+  padding: 0 !important;
+  white-space: nowrap;
+  width: auto !important;
+  max-width: none !important;
+}
+
+.voucher-form__extra .ant-form-item-label > label {
+  height: 32px;
+  margin-inline-end: 0 !important;
+}
+
+.voucher-form__extra .ant-form-item-control {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
 @media (min-width: 768px) {
   .voucher-form__extra {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2254,14 +2288,6 @@ body,
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px 20px;
   }
-
-  .voucher-form__extra .ant-form-item {
-    margin-bottom: 0;
-  }
-}
-
-.voucher-form__extra .ant-form-item {
-  margin-bottom: 0;
 }
 
 .voucher-sheet {

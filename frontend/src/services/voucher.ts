@@ -826,7 +826,9 @@ async function reorder(voucherId, beforeNumber) {
   return { changed: true, voucher: updated };
 }
 
-/** 插入凭证：在指定字号前腾出空位（其后凭证顺次后移） */
+/** 插入凭证：在指定字号前腾出空位（其后凭证顺次后移）
+ * 规则：已审核/草稿前可插入；已申报结项（locked）凭证前不可插入，且其后结项凭证不可被后移。
+ */
 async function prepareInsertSlot(voucherType, date, beforeNumber) {
   const targetNum = parseVoucherNum(beforeNumber);
   if (!targetNum) throw new Error('请输入有效的凭证号');
@@ -837,11 +839,24 @@ async function prepareInsertSlot(voucherType, date, beforeNumber) {
   const periodVouchers = await getPeriodVouchers(voucherType, yearMonth);
 
   const pad = getNumberPad(periodVouchers);
+  const anchor = periodVouchers.find((v) => parseVoucherNum(v.voucherNumber) === targetNum);
+  // 锚点为已结项（含已申报结项）时禁止在其前插入；已审核允许
+  if (anchor && anchor.status === STATUS.LOCKED) {
+    throw new Error(
+      `凭证 ${anchor.voucherNo} 已申报结项，不能在其前面插入新凭证；已审核凭证前可以插入`
+    );
+  }
+
   const toShift = periodVouchers
     .filter((v) => parseVoucherNum(v.voucherNumber) >= targetNum)
     .sort((a, b) => parseVoucherNum(b.voucherNumber) - parseVoucherNum(a.voucherNumber));
 
-  assertVouchersUnlocked(toShift);
+  const lockedShift = toShift.filter((v) => v.status === STATUS.LOCKED);
+  if (lockedShift.length) {
+    throw new Error(
+      `其后凭证 ${lockedShift.map((v) => v.voucherNo).join('、')} 已申报结项，无法顺次后移，不能在此插入`
+    );
+  }
 
   for (const voucher of toShift) {
     voucher.voucherNumber = formatVoucherNum(parseVoucherNum(voucher.voucherNumber) + 1, pad);

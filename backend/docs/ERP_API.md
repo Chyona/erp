@@ -1,6 +1,6 @@
 # ERP 数据存储 API
 
-对应前端 `frontend/src/services/db.ts` 的 IndexedDB 五个 object store，持久化到 PostgreSQL。
+对应前端 `frontend/src/services/db.ts` 的五个数据 store，持久化到 PostgreSQL。
 
 **Base URL:** `/openapi/erp/v1`
 
@@ -48,7 +48,7 @@ JSON 字段与前端 `Voucher` 类型一致（含 `entries` JSON 数组）。
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/audit-logs?limit=200` | 列表（可选 limit，默认全部） |
+| GET | `/audit-logs?limit=0` | 列表（`limit=0` 表示全部；>0 为条数上限） |
 | GET | `/audit-logs/:id` | 单条 |
 | POST | `/audit-logs` | 追加日志 `{ action, target, details }` |
 | DELETE | `/audit-logs` | 清空 |
@@ -71,7 +71,18 @@ JSON 字段与前端 `Voucher` 类型一致（含 `entries` JSON 数组）。
 |------|------|------|
 | POST | `/app/init` | 启动初始化：默认科目同步、凭证分录科目名校正、已申报季度凭证结项同步 |
 
-前端远程模式下 `AppInit` 会调用此接口，替代本地 `Accounts.init()`。
+前端 `AppInit` 会调用此接口。返回：
+
+```json
+{ "companyName": "", "accounts": [], "repaired": 0, "syncedLocks": 0 }
+```
+
+## 备份 / 恢复
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/data/export` | 导出全库（对应 `DB.exportAll()`） |
+| POST | `/data/import` | 导入全库（清空后写入，对应 `DB.importAll()`） |
 
 ---
 
@@ -85,18 +96,9 @@ VITE_API_BASE_URL=/openapi/erp/v1
 
 `vite.config.ts` 已将 `/openapi`、`/health` 代理到 `http://127.0.0.1:30000`。
 
-所有业务数据仅存 PostgreSQL，前端不再使用 IndexedDB。
+所有业务数据仅存 PostgreSQL，前端通过 `db.ts` + `apiClient.ts` 访问本 API（不再使用 IndexedDB）。
 
-业务逻辑（凭证审核、报表、税务结转等）在前端 services 中执行，通过 HTTP 存储层读写服务端数据。
-
----
-
-## 备份 / 恢复
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/data/export` | 导出全库（对应 `DB.exportAll()`） |
-| POST | `/data/import` | 导入全库（清空后写入，对应 `DB.importAll()`） |
+业务逻辑（凭证审核、报表、税务结转等）在前端 services 中执行，通过本存储层读写服务端数据。
 
 ---
 
@@ -110,16 +112,22 @@ VITE_API_BASE_URL=/openapi/erp/v1
 | `audit_logs` | auditLogs |
 | `settings` | settings |
 
-初始化：
+初始化（二选一即可，全新部署）：
 
 ```bash
-go run ./cmd/envinit schema   # GORM AutoMigrate
-go run ./cmd/webserver        # 默认 :30000
+# 推荐：GORM AutoMigrate
+go run ./cmd/envinit schema
+
+# 或执行原生 SQL（migrations/erp.up.sql）
+```
+
+启动 API：
+
+```bash
+go run ./cmd/webserver   # 默认 :30000
 ```
 
 ## 与原有 `/openapi/base` 的区别
 
 - `/openapi/base/v1/accounts` — 系统登录用户（`account` 表）
 - `/openapi/erp/v1/accounts` — 会计科目（`chart_accounts` 表）
-
-前端尚未接入这些接口，当前仍使用 IndexedDB；后续可将 `db.ts` 改为 HTTP 客户端调用本 API。
