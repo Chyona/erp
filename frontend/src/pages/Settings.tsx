@@ -35,14 +35,16 @@ export default function Settings() {
 
   useEffect(() => {
     (async () => {
+      const all = await DB.getAll('settings');
+      const map = new Map(all.map((s) => [s.key, s.value]));
       const values: Record<string, string> = {};
       for (const f of FIELDS) {
-        values[f] = String((await DB.getSetting(f)) ?? '');
+        values[f] = String(map.get(f) ?? '');
       }
       if (!values.defaultSignatory) {
         values.defaultSignatory =
-          String((await DB.getSetting('defaultPreparedBy')) ?? '') ||
-          String((await DB.getSetting('defaultReviewedBy')) ?? '') ||
+          String(map.get('defaultPreparedBy') ?? '') ||
+          String(map.get('defaultReviewedBy') ?? '') ||
           '';
       }
       form.setFieldsValue(values);
@@ -50,12 +52,13 @@ export default function Settings() {
   }, [form]);
 
   const handleSave = async (values) => {
-    for (const f of FIELDS) {
-      await DB.setSetting(f, (values[f] || '').trim());
-    }
     const signatory = (values.defaultSignatory || '').trim();
-    await DB.setSetting('defaultPreparedBy', signatory);
-    await DB.setSetting('defaultReviewedBy', signatory);
+    const items = [
+      ...FIELDS.map((f) => ({ key: f, value: (values[f] || '').trim() })),
+      { key: 'defaultPreparedBy', value: signatory },
+      { key: 'defaultReviewedBy', value: signatory }
+    ];
+    await DB.setSettingsBatch(items);
     await DB.addAuditLog('修改', '系统设置', '企业信息更新');
     setCompanyName(values.companyName || '');
     message.success('设置已保存');

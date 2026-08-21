@@ -907,14 +907,50 @@ body,
 }
 
 .voucher-import-warnings {
-  margin: 8px 0 0;
+  margin: 0;
   padding-left: 18px;
+  max-height: 240px;
+  overflow: auto;
 }
 
 .voucher-import-warnings li {
   margin-bottom: 4px;
   font-size: 12px;
   color: #64748b;
+}
+
+.voucher-import-warnings-popover {
+  max-width: 440px;
+}
+
+.voucher-import-tip-block--focus {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #fff7e6;
+  border: 1px solid #ffd591;
+}
+
+.voucher-import-tip-block--focus .voucher-import-warnings {
+  margin-top: 6px;
+}
+
+.voucher-import-modal__tip-icon {
+  color: #64748b;
+  cursor: help;
+  font-size: 14px;
+}
+
+.voucher-import-modal__tip-icon:hover {
+  color: var(--ant-color-primary, #1677ff);
+}
+
+.voucher-import-modal__skip-tip {
+  margin-bottom: 16px;
+}
+
+.voucher-import-modal__skip-tip-label {
+  color: #d46b08 !important;
+  margin-right: 2px;
 }
 
 .voucher-grouped-table .ant-table-thead>tr>th {
@@ -1010,6 +1046,10 @@ body,
   overflow: hidden;
 }
 
+.voucher-import-modal-wrap .ant-modal {
+  max-width: calc(100vw - 32px);
+}
+
 .voucher-import-modal .ant-modal-content {
   max-height: calc(100vh - 48px);
   display: flex;
@@ -1036,6 +1076,30 @@ body,
 
 .voucher-import-modal__table {
   flex-shrink: 0;
+}
+
+.voucher-import-modal__table .ant-table {
+  table-layout: fixed !important;
+  width: 100% !important;
+}
+
+.voucher-import-modal__table .ant-table-container,
+.voucher-import-modal__table .ant-table-content,
+.voucher-import-modal__table .ant-table-body {
+  overflow-x: hidden !important;
+}
+
+.voucher-import-modal__cell-ellipsis {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.voucher-import-modal__amount--unbalanced {
+  color: #cf1322;
+  font-weight: 600;
 }
 
 .voucher-examples-drawer .ant-drawer-body {
@@ -2266,7 +2330,7 @@ body,
   max-width: none !important;
 }
 
-.voucher-form__extra .ant-form-item-label > label {
+.voucher-form__extra .ant-form-item-label>label {
   height: 32px;
   margin-inline-end: 0 !important;
 }

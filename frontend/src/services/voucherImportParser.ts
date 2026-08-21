@@ -326,16 +326,54 @@ function parseVoucherNo(raw) {
   };
 }
 
-function buildSummary(summary, counterparty) {
-  const base = normalizeText(summary);
-  const party = normalizeText(counterparty);
-  if (!party || base.includes(party)) return base;
-  return base ? `${base}（${party}）` : party;
+function buildSummary(summary) {
+  return normalizeText(summary);
 }
 
 function normalizeFinanceInterestEntries(voucher) {
   const hints = (voucher._level2Hints || []).join(' ');
   return normalizeVoucherFinanceInterestEntries(voucher, hints);
+}
+
+function appendUnique(list, value) {
+  const text = normalizeText(value);
+  if (!text || list.includes(text)) return;
+  list.push(text);
+}
+
+/**
+ * 贷记其他应付款(2241)的个人垫付：将往来单位中的 XX垫付 写入各分录摘要末尾，
+ * 供月底报销按垫付人汇总识别。返回已写入摘要的往来原文，便于从备注中剔除。
+ */
+function applyPersonalAdvanceSummaryMarker(voucher) {
+  const hasAdvanceCredit = (voucher.entries || []).some(
+    (e) => e.accountCode === '2241' && (parseFloat(String(e.credit)) || 0) > 0
+  );
+  if (!hasAdvanceCredit) return '';
+
+  const counterparties = voucher._counterparties || [];
+  let advanceCounterparty = '';
+  let marker = '';
+  for (const text of counterparties) {
+    const normalized = normalizeText(text);
+    if (!normalized) continue;
+    const match = normalized.match(/^(.+?)垫付$/);
+    if (match?.[1]) {
+      advanceCounterparty = normalized;
+      marker = `（${match[1].trim()}垫付）`;
+      break;
+    }
+  }
+  if (!marker) return '';
+
+  for (const entry of voucher.entries || []) {
+    const summary = normalizeText(entry.summary);
+    if (!summary) continue;
+    if (/（[^）]+?垫付）/.test(summary)) continue;
+    entry.summary = `${summary}${marker}`;
+  }
+
+  return advanceCounterparty;
 }
 
 function inferVoucherMeta(voucher) {
@@ -376,13 +414,18 @@ function inferVoucherMeta(voucher) {
     voucher.businessType = '其他';
   }
 
-  if (voucher._quarter && voucher.remark && !voucher.remark.includes(voucher._quarter)) {
-    voucher.remark = `${voucher._quarter}；${voucher.remark}`;
-  } else if (voucher._quarter && !voucher.remark) {
-    voucher.remark = voucher._quarter;
-  }
+  const advanceCounterparty = applyPersonalAdvanceSummaryMarker(voucher);
+
+  // 备注：往来单位 + 原始备注；已写入摘要的 XX垫付 不再重复进备注
+  const remarkParts = [
+    ...(voucher._counterparties || []).filter((c) => c !== advanceCounterparty),
+    ...(voucher._remarks || [])
+  ];
+  voucher.remark = remarkParts.join('；');
 
   delete voucher._level2Hints;
+  delete voucher._counterparties;
+  delete voucher._remarks;
   delete voucher._quarter;
 }
 
@@ -477,6 +520,8 @@ function rowsToVouchers(rows, accounts) {
         taxAmount: 0,
         _quarter: quarter,
         _level2Hints: [],
+        _counterparties: [],
+        _remarks: [],
         entries: []
       });
     }
@@ -489,12 +534,11 @@ function rowsToVouchers(rows, accounts) {
     if (resolvedLevel2) voucher._level2Hints.push(resolvedLevel2);
 
     voucher.attachmentCount = Math.max(voucher.attachmentCount, attachmentCount);
-    if (remark && !voucher.remark.includes(remark)) {
-      voucher.remark = voucher.remark ? `${voucher.remark}；${remark}` : remark;
-    }
+    appendUnique(voucher._counterparties, counterparty);
+    appendUnique(voucher._remarks, remark);
 
     voucher.entries.push({
-      summary: buildSummary(summary, counterparty),
+      summary: buildSummary(summary),
       accountId: account.id,
       accountCode: account.code,
       accountName: account.name,
@@ -504,9 +548,11 @@ function rowsToVouchers(rows, accounts) {
   }
 
   const vouchers = [];
+  let invalidVoucherCount = 0;
   for (const voucher of grouped.values()) {
     if (voucher.entries.length < 2) {
       warnings.push(`${voucher.voucherNo} 分录不足 2 条，已跳过`);
+      invalidVoucherCount++;
       continue;
     }
     normalizeFinanceInterestEntries(voucher);
@@ -518,7 +564,12 @@ function rowsToVouchers(rows, accounts) {
     throw new Error('未能解析出有效凭证，请检查文件格式与科目名称');
   }
 
-  return { vouchers, warnings, headerRowIndex: headerRowIndex + 1 };
+  return {
+    vouchers,
+    warnings,
+    invalidVoucherCount,
+    headerRowIndex: headerRowIndex + 1
+  };
 }
 
 export const VoucherImportParser = {

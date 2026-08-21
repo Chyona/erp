@@ -184,7 +184,7 @@ function isCarryForwardActive(voucher, voucherById) {
 /** 结转凭证被手动删除后，清除销售凭证上的失效结转标记 */
 async function repairOrphanTaxExemptionLinks(vouchers) {
   const voucherById = new Map(vouchers.map((v) => [v.id, v]));
-  let repaired = 0;
+  const toSave = [];
 
   for (const voucher of vouchers) {
     if (!voucher.taxExemptionDone) continue;
@@ -192,11 +192,11 @@ async function repairOrphanTaxExemptionLinks(vouchers) {
 
     voucher.taxExemptionDone = false;
     voucher.taxExemptionVoucherId = '';
-    await DB.put('vouchers', voucher);
-    repaired += 1;
+    toSave.push(voucher);
   }
 
-  return repaired;
+  await DB.putMany('vouchers', toSave);
+  return toSave.length;
 }
 
 /** 指定期间（按月 / 按季）普票 / 专票减免结转汇总 */
@@ -343,13 +343,15 @@ export async function createCarryForward(period, { approve = true } = {}) {
 
   const saved = await Voucher.save(voucherData as import('../types').VoucherInput, approve);
 
+  const linked = [];
   for (const voucherId of pendingVoucherIds) {
     const source = await Voucher.getById(voucherId);
     if (!source) continue;
     source.taxExemptionDone = true;
     source.taxExemptionVoucherId = saved.id;
-    await DB.put('vouchers', source);
+    linked.push(source);
   }
+  await DB.putMany('vouchers', linked);
 
   await DB.addAuditLog(
     approve ? '新建并审核' : '新建草稿',
@@ -404,8 +406,8 @@ export async function reverseCarryForward(period, carryForwardId) {
   for (const v of linked) {
     v.taxExemptionDone = false;
     v.taxExemptionVoucherId = '';
-    await DB.put('vouchers', v);
   }
+  await DB.putMany('vouchers', linked);
 
   if (cf.status === Voucher.STATUS.LOCKED) {
     await Voucher.forceRemove(cf.id, { allowCarryForwardBypass: true });

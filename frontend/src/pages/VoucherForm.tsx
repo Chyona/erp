@@ -297,8 +297,11 @@ export default function VoucherForm() {
       if (!ok) return;
     }
 
-    for (const att of attachments) {
-      await DB.remove('attachments', att.id);
+    if (attachments.length) {
+      await DB.removeMany(
+        'attachments',
+        attachments.map((att) => att.id)
+      );
     }
 
     const signatory = await loadDefaultSignatory();

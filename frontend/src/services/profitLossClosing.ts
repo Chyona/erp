@@ -79,18 +79,19 @@ function buildAccountSums(
     if (fromDate && d < fromDate) continue;
     if (toDate && d > toDate) continue;
     for (const e of v.entries || []) {
-      if (!e.accountId) continue;
-      const cur = sums.get(e.accountId) || { debit: 0, credit: 0 };
+      const code = String(e.accountCode || '').trim();
+      if (!code) continue;
+      const cur = sums.get(code) || { debit: 0, credit: 0 };
       cur.debit += parseFloat(String(e.debit)) || 0;
       cur.credit += parseFloat(String(e.credit)) || 0;
-      sums.set(e.accountId, cur);
+      sums.set(code, cur);
     }
   }
   return sums;
 }
 
-function sumSums(sums: Map<string, { debit: number; credit: number }>, accountId: string) {
-  return sums.get(accountId) || { debit: 0, credit: 0 };
+function sumSums(sums: Map<string, { debit: number; credit: number }>, accountCode: string) {
+  return sums.get(accountCode) || { debit: 0, credit: 0 };
 }
 
 /** 模拟普票减免结转后 5301 增加的贷方余额，用于一键结转前的损益预览 */
@@ -104,8 +105,8 @@ function projectPendingTaxExemptionOnSums(
   if (!acc5301) return endingSums;
 
   const projected = new Map(endingSums);
-  const cur = sumSums(projected, acc5301.id);
-  projected.set(acc5301.id, {
+  const cur = sumSums(projected, acc5301.code);
+  projected.set(acc5301.code, {
     debit: cur.debit,
     credit: roundMoney(cur.credit + taxTotal)
   });
@@ -152,7 +153,7 @@ function buildClosingEntries(
   const entries: VoucherEntry[] = [];
 
   for (const account of plAccounts) {
-    const ending = sumSums(endingSums, account.id);
+    const ending = sumSums(endingSums, account.code);
     const balance = accountBalance(ending.debit, ending.credit, account.direction);
     const { debit, credit } = closingEntryAmount(account, balance);
     if (Math.abs(debit) < 0.005 && Math.abs(credit) < 0.005) continue;

@@ -51,7 +51,16 @@ func (s *stubErpService) SaveChartAccount(ctx context.Context, account *model.Ch
 	}
 	return account, nil
 }
+func (s *stubErpService) SaveChartAccountsBatch(ctx context.Context, accounts []model.ChartAccount) ([]model.ChartAccount, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return accounts, nil
+}
 func (s *stubErpService) DeleteChartAccount(ctx context.Context, id string) error {
+	return s.err
+}
+func (s *stubErpService) DeleteChartAccountsBatch(ctx context.Context, ids []string) error {
 	return s.err
 }
 func (s *stubErpService) ClearChartAccounts(ctx context.Context) error { return s.err }
@@ -71,7 +80,31 @@ func (s *stubErpService) SaveVoucher(ctx context.Context, voucher *model.Voucher
 	}
 	return voucher, nil
 }
+func (s *stubErpService) SaveVouchersBatch(ctx context.Context, vouchers []model.Voucher) ([]model.Voucher, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return vouchers, nil
+}
+func (s *stubErpService) ApproveVouchersBatch(ctx context.Context, ids []string) (*service.VoucherBatchOpResult, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return &service.VoucherBatchOpResult{Approved: len(ids), Failed: []service.VoucherBatchFailItem{}}, nil
+}
+func (s *stubErpService) UnapproveVouchersBatch(ctx context.Context, ids []string) (*service.VoucherBatchOpResult, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return &service.VoucherBatchOpResult{Unapproved: len(ids), Failed: []service.VoucherBatchFailItem{}}, nil
+}
 func (s *stubErpService) DeleteVoucher(ctx context.Context, id string) error { return s.err }
+func (s *stubErpService) DeleteVouchersBatch(ctx context.Context, ids []string) (*service.VoucherBatchOpResult, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return &service.VoucherBatchOpResult{Deleted: len(ids), Failed: []service.VoucherBatchFailItem{}}, nil
+}
 func (s *stubErpService) ClearVouchers(ctx context.Context) error           { return s.err }
 
 func (s *stubErpService) ListAttachments(ctx context.Context) ([]model.Attachment, error) {
@@ -89,7 +122,16 @@ func (s *stubErpService) SaveAttachment(ctx context.Context, attachment *model.A
 	}
 	return attachment, nil
 }
+func (s *stubErpService) SaveAttachmentsBatch(ctx context.Context, items []model.Attachment) ([]model.Attachment, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	return items, nil
+}
 func (s *stubErpService) DeleteAttachment(ctx context.Context, id string) error { return s.err }
+func (s *stubErpService) DeleteAttachmentsBatch(ctx context.Context, ids []string) error {
+	return s.err
+}
 func (s *stubErpService) ClearAttachments(ctx context.Context) error            { return s.err }
 
 func (s *stubErpService) ListAuditLogs(ctx context.Context, limit int) ([]model.AuditLog, error) {
@@ -120,6 +162,16 @@ func (s *stubErpService) SetSetting(ctx context.Context, key string, value json.
 		return nil, s.err
 	}
 	return &model.Setting{Key: key, Value: datatypes.JSON(value)}, nil
+}
+func (s *stubErpService) SetSettingsBatch(ctx context.Context, items []service.SettingKV) ([]model.Setting, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	out := make([]model.Setting, 0, len(items))
+	for _, item := range items {
+		out = append(out, model.Setting{Key: item.Key, Value: datatypes.JSON(item.Value)})
+	}
+	return out, nil
 }
 func (s *stubErpService) DeleteSetting(ctx context.Context, key string) error { return s.err }
 func (s *stubErpService) ClearSettings(ctx context.Context) error            { return s.err }

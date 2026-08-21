@@ -106,6 +106,64 @@ export async function handleErpMockRequest(
         return true;
       }
     }
+    if (method === 'PUT' && path === '/accounts/batch') {
+      const body =
+        (await parseJSON<{ action?: string; items?: import('./erpStore').MockAccount[]; ids?: string[] }>(
+          req
+        )) ?? {};
+      const action = body.action || (body.items?.length ? 'upsert' : body.ids?.length ? 'delete' : '');
+      if (action === 'upsert') {
+        const items = body.items ?? [];
+        for (const item of items) {
+          if (!item?.id) {
+            fail(res, 400, '科目 ID 不能为空');
+            return true;
+          }
+          store.accounts.set(item.id, item);
+        }
+        ok(res, { action: 'upsert', count: items.length, items });
+        return true;
+      }
+      if (action === 'delete') {
+        for (const id of body.ids ?? []) store.accounts.delete(id);
+        ok(res, { action: 'delete', count: (body.ids ?? []).length, ids: body.ids ?? [] });
+        return true;
+      }
+      fail(res, 400, 'action 仅支持 upsert 或 delete');
+      return true;
+    }
+    if (method === 'POST' && path === '/accounts/batch') {
+      const body =
+        (await parseJSON<{ action?: string; items?: import('./erpStore').MockAccount[]; ids?: string[] }>(
+          req
+        )) ?? {};
+      const action = body.action || (body.items?.length ? 'upsert' : body.ids?.length ? 'delete' : '');
+      if (action === 'upsert') {
+        const items = body.items ?? [];
+        for (const item of items) {
+          if (!item?.id) {
+            fail(res, 400, '科目 ID 不能为空');
+            return true;
+          }
+          store.accounts.set(item.id, item);
+        }
+        ok(res, { action: 'upsert', count: items.length, items });
+        return true;
+      }
+      if (action === 'delete') {
+        for (const id of body.ids ?? []) store.accounts.delete(id);
+        ok(res, { action: 'delete', count: (body.ids ?? []).length, ids: body.ids ?? [] });
+        return true;
+      }
+      fail(res, 400, 'action 仅支持 upsert 或 delete');
+      return true;
+    }
+    if (method === 'DELETE' && path === '/accounts/batch') {
+      const body = (await parseJSON<{ ids?: string[] }>(req)) ?? {};
+      for (const id of body.ids ?? []) store.accounts.delete(id);
+      ok(res, { action: 'delete', count: (body.ids ?? []).length, ids: body.ids ?? [] });
+      return true;
+    }
     const accountMatch = path.match(/^\/accounts\/([^/]+)$/);
     if (accountMatch) {
       const id = decodeURIComponent(accountMatch[1]);
@@ -144,6 +202,215 @@ export async function handleErpMockRequest(
         return true;
       }
     }
+    if (method === 'PUT' && path === '/vouchers/batch') {
+      const body = (await parseJSON<{ items?: MockVoucher[] }>(req)) ?? {};
+      const items = body.items ?? [];
+      for (const item of items) {
+        if (!item?.id) {
+          fail(res, 400, '凭证 ID 不能为空');
+          return true;
+        }
+        store.vouchers.set(item.id, { ...item, entries: item.entries ?? [] });
+      }
+      ok(res, items);
+      return true;
+    }
+    if (method === 'POST' && path === '/vouchers/batch') {
+      const body =
+        (await parseJSON<{ action?: string; ids?: string[]; items?: MockVoucher[] }>(req)) ?? {};
+      const failed: Array<{ id: string; voucherNo?: string; message: string }> = [];
+      const now = new Date().toISOString();
+
+      if (body.action === 'upsert') {
+        const items = body.items ?? [];
+        for (const item of items) {
+          if (!item?.id) {
+            fail(res, 400, '凭证 ID 不能为空');
+            return true;
+          }
+          store.vouchers.set(item.id, { ...item, entries: item.entries ?? [] });
+        }
+        ok(res, { action: 'upsert', count: items.length, items });
+        return true;
+      }
+
+      const ids = [...new Set((body.ids ?? []).filter(Boolean))];
+      if (body.action === 'approve') {
+        let approved = 0;
+        let skipped = 0;
+        for (const id of ids) {
+          const item = store.vouchers.get(id);
+          if (!item || item.status !== 'draft') {
+            skipped++;
+            continue;
+          }
+          item.status = 'approved';
+          item.approvedAt = now;
+          item.updatedAt = now;
+          store.vouchers.set(id, item);
+          approved++;
+        }
+        ok(res, { action: 'approve', approved, skipped, failed });
+        return true;
+      }
+      if (body.action === 'unapprove') {
+        let unapproved = 0;
+        let skipped = 0;
+        for (const id of ids) {
+          const item = store.vouchers.get(id);
+          if (!item) {
+            skipped++;
+            continue;
+          }
+          if (item.status === 'locked') {
+            failed.push({ id, voucherNo: String(item.voucherNo || ''), message: '已结项，不可反审核' });
+            continue;
+          }
+          if (item.status !== 'approved') {
+            skipped++;
+            continue;
+          }
+          if (item.isTaxExemptionCarryForward || item.isProfitLossClosing) {
+            failed.push({
+              id,
+              voucherNo: String(item.voucherNo || ''),
+              message: '系统结转凭证不可反审核'
+            });
+            continue;
+          }
+          item.status = 'draft';
+          delete item.approvedAt;
+          item.updatedAt = now;
+          store.vouchers.set(id, item);
+          unapproved++;
+        }
+        ok(res, { action: 'unapprove', unapproved, skipped, failed });
+        return true;
+      }
+      if (body.action === 'delete') {
+        let deleted = 0;
+        let skipped = 0;
+        for (const id of ids) {
+          const item = store.vouchers.get(id);
+          if (!item) {
+            skipped++;
+            continue;
+          }
+          if (item.status === 'locked') {
+            failed.push({ id, voucherNo: String(item.voucherNo || ''), message: '已结项，不可删除' });
+            continue;
+          }
+          if (item.isTaxExemptionCarryForward || item.isProfitLossClosing) {
+            failed.push({
+              id,
+              voucherNo: String(item.voucherNo || ''),
+              message: '系统结转凭证不可删除'
+            });
+            continue;
+          }
+          const attIds = Array.isArray(item.attachmentIds) ? (item.attachmentIds as string[]) : [];
+          for (const attId of attIds) store.attachments.delete(attId);
+          store.vouchers.delete(id);
+          deleted++;
+        }
+        ok(res, { action: 'delete', deleted, skipped, failed });
+        return true;
+      }
+      fail(res, 400, 'action 仅支持 upsert、approve、unapprove、delete');
+      return true;
+    }
+    if (method === 'DELETE' && path === '/vouchers/batch') {
+      const body = (await parseJSON<{ ids?: string[] }>(req)) ?? {};
+      const ids = [...new Set((body.ids ?? []).filter(Boolean))];
+      const failed: Array<{ id: string; voucherNo?: string; message: string }> = [];
+      let deleted = 0;
+      let skipped = 0;
+      for (const id of ids) {
+        const item = store.vouchers.get(id);
+        if (!item) {
+          skipped++;
+          continue;
+        }
+        if (item.status === 'locked') {
+          failed.push({ id, voucherNo: String(item.voucherNo || ''), message: '已结项，不可删除' });
+          continue;
+        }
+        if (item.isTaxExemptionCarryForward || item.isProfitLossClosing) {
+          failed.push({
+            id,
+            voucherNo: String(item.voucherNo || ''),
+            message: '系统结转凭证不可删除'
+          });
+          continue;
+        }
+        const attIds = Array.isArray(item.attachmentIds) ? (item.attachmentIds as string[]) : [];
+        for (const attId of attIds) store.attachments.delete(attId);
+        store.vouchers.delete(id);
+        deleted++;
+      }
+      ok(res, { deleted, skipped, failed });
+      return true;
+    }
+    if (method === 'POST' && path === '/vouchers/batch-approve') {
+      const body = (await parseJSON<{ ids?: string[] }>(req)) ?? {};
+      const ids = [...new Set((body.ids ?? []).filter(Boolean))];
+      const failed: Array<{ id: string; voucherNo?: string; message: string }> = [];
+      let approved = 0;
+      let skipped = 0;
+      const now = new Date().toISOString();
+      for (const id of ids) {
+        const item = store.vouchers.get(id);
+        if (!item) {
+          skipped++;
+          continue;
+        }
+        if (item.status !== 'draft') {
+          skipped++;
+          continue;
+        }
+        item.status = 'approved';
+        item.approvedAt = now;
+        item.updatedAt = now;
+        store.vouchers.set(id, item);
+        approved++;
+      }
+      ok(res, { approved, skipped, failed });
+      return true;
+    }
+    if (method === 'POST' && path === '/vouchers/batch-unapprove') {
+      const body = (await parseJSON<{ ids?: string[] }>(req)) ?? {};
+      const ids = [...new Set((body.ids ?? []).filter(Boolean))];
+      const failed: Array<{ id: string; voucherNo?: string; message: string }> = [];
+      let unapproved = 0;
+      let skipped = 0;
+      const now = new Date().toISOString();
+      for (const id of ids) {
+        const item = store.vouchers.get(id);
+        if (!item) {
+          skipped++;
+          continue;
+        }
+        if (item.status === 'locked') {
+          failed.push({ id, voucherNo: item.voucherNo as string, message: '已结项，不可反审核' });
+          continue;
+        }
+        if (item.status !== 'approved') {
+          skipped++;
+          continue;
+        }
+        if (item.isTaxExemptionCarryForward || item.isProfitLossClosing) {
+          failed.push({ id, voucherNo: item.voucherNo as string, message: '系统结转凭证不可反审核' });
+          continue;
+        }
+        item.status = 'draft';
+        delete item.approvedAt;
+        item.updatedAt = now;
+        store.vouchers.set(id, item);
+        unapproved++;
+      }
+      ok(res, { unapproved, skipped, failed });
+      return true;
+    }
     const voucherMatch = path.match(/^\/vouchers\/([^/]+)$/);
     if (voucherMatch) {
       const id = decodeURIComponent(voucherMatch[1]);
@@ -181,6 +448,36 @@ export async function handleErpMockRequest(
         ok(res, null, '已清空附件');
         return true;
       }
+    }
+    if ((method === 'PUT' || method === 'POST') && path === '/attachments/batch') {
+      const body =
+        (await parseJSON<{ action?: string; items?: MockAttachment[]; ids?: string[] }>(req)) ?? {};
+      const action = body.action || (body.items?.length ? 'upsert' : body.ids?.length ? 'delete' : '');
+      if (action === 'upsert') {
+        const items = body.items ?? [];
+        for (const item of items) {
+          if (!item?.id) {
+            fail(res, 400, '附件 ID 不能为空');
+            return true;
+          }
+          store.attachments.set(item.id, item);
+        }
+        ok(res, { action: 'upsert', count: items.length, items });
+        return true;
+      }
+      if (action === 'delete') {
+        for (const id of body.ids ?? []) store.attachments.delete(id);
+        ok(res, { action: 'delete', count: (body.ids ?? []).length, ids: body.ids ?? [] });
+        return true;
+      }
+      fail(res, 400, 'action 仅支持 upsert 或 delete');
+      return true;
+    }
+    if (method === 'DELETE' && path === '/attachments/batch') {
+      const body = (await parseJSON<{ ids?: string[] }>(req)) ?? {};
+      for (const id of body.ids ?? []) store.attachments.delete(id);
+      ok(res, { action: 'delete', count: (body.ids ?? []).length, ids: body.ids ?? [] });
+      return true;
     }
     const attMatch = path.match(/^\/attachments\/([^/]+)$/);
     if (attMatch) {
@@ -275,6 +572,22 @@ export async function handleErpMockRequest(
         ok(res, null, '已清空设置');
         return true;
       }
+    }
+    if (method === 'PUT' && path === '/settings/batch') {
+      const body = (await parseJSON<{ items?: Array<{ key?: string; value?: unknown }> }>(req)) ?? {};
+      const items = body.items ?? [];
+      const out: Array<{ key: string; value: unknown }> = [];
+      for (const item of items) {
+        if (!item?.key) {
+          fail(res, 400, '设置 key 不能为空');
+          return true;
+        }
+        const row = { key: item.key, value: item.value ?? null };
+        store.settings.set(item.key, row);
+        out.push(row);
+      }
+      ok(res, out);
+      return true;
     }
     const settingMatch = path.match(/^\/settings\/([^/]+)$/);
     if (settingMatch) {

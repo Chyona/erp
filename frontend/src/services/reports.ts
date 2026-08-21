@@ -65,18 +65,20 @@ function buildAccountSums(
     if (toDate && d > toDate) continue;
     if (excludeProfitLossClosing && v.isProfitLossClosing) continue;
     for (const e of v.entries || []) {
-      if (!e.accountId) continue;
-      const cur = sums.get(e.accountId) || { debit: 0, credit: 0 };
+      // 报表按科目编码汇总，避免科目重建导致 accountId 变化后取数为空
+      const code = String(e.accountCode || '').trim();
+      if (!code) continue;
+      const cur = sums.get(code) || { debit: 0, credit: 0 };
       cur.debit += parseFloat(String(e.debit)) || 0;
       cur.credit += parseFloat(String(e.credit)) || 0;
-      sums.set(e.accountId, cur);
+      sums.set(code, cur);
     }
   }
   return sums;
 }
 
-function sumSums(sums, accountId) {
-  return sums.get(accountId) || { debit: 0, credit: 0 };
+function sumSums(sums, accountCode) {
+  return sums.get(accountCode) || { debit: 0, credit: 0 };
 }
 
 /**
@@ -296,15 +298,15 @@ async function buildReportLedger(startDate, endDate, reportPeriod = null) {
   const endingSums = buildAccountSums(vouchers, { toDate: endDate });
 
   const accountRows = accounts.map((account) => {
-    const opening = sumSums(openingSums, account.id);
-    const period = sumSums(periodSums, account.id);
-    const periodBusiness = sumSums(periodBusinessSums, account.id);
-    const ytd = sumSums(ytdSums, account.id);
-    const ytdBusiness = sumSums(ytdBusinessSums, account.id);
-    const beforePeriod = sumSums(beforePeriodSums, account.id);
-    const beforePeriodBusiness = sumSums(beforePeriodBusinessSums, account.id);
-    const openingYear = sumSums(openingYearSums, account.id);
-    const ending = sumSums(endingSums, account.id);
+    const opening = sumSums(openingSums, account.code);
+    const period = sumSums(periodSums, account.code);
+    const periodBusiness = sumSums(periodBusinessSums, account.code);
+    const ytd = sumSums(ytdSums, account.code);
+    const ytdBusiness = sumSums(ytdBusinessSums, account.code);
+    const beforePeriod = sumSums(beforePeriodSums, account.code);
+    const beforePeriodBusiness = sumSums(beforePeriodBusinessSums, account.code);
+    const openingYear = sumSums(openingYearSums, account.code);
+    const ending = sumSums(endingSums, account.code);
 
     return {
       account,

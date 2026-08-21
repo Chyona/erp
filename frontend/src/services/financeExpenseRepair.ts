@@ -13,7 +13,7 @@ function recalcTotals(voucher: VoucherRecord) {
 /** 修复已入库凭证中 5603 利息误记借方的问题 */
 export async function repairFinanceInterestEntries() {
   const vouchers = await DB.getAll('vouchers');
-  let repaired = 0;
+  const toSave: VoucherRecord[] = [];
 
   for (const voucher of vouchers) {
     if (voucher.isProfitLossClosing || voucher.isTaxExemptionCarryForward) continue;
@@ -24,9 +24,11 @@ export async function repairFinanceInterestEntries() {
 
     recalcTotals(normalized);
     normalized.updatedAt = new Date().toISOString();
-    await DB.put('vouchers', normalized);
-    repaired += 1;
+    toSave.push(normalized);
   }
+
+  await DB.putMany('vouchers', toSave);
+  const repaired = toSave.length;
 
   if (repaired > 0) {
     await DB.addAuditLog('修复', '财务费用利息分录', `已纠正 ${repaired} 张凭证`);

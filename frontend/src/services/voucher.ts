@@ -60,6 +60,22 @@ async function assertVoucherDateMutable(dateStr: string) {
   await TaxDeclaration.assertDateNotInDeclaredQuarter(dateStr);
 }
 
+/** 批量场景：用已加载的申报季度列表做本地校验，避免反复读设置。 */
+function assertDateMutableWithDeclared(
+  dateStr: string,
+  declared: Awaited<ReturnType<typeof TaxDeclaration.getDeclaredQuarters>>
+) {
+  if (!dateStr) return;
+  const year = parseInt(dateStr.slice(0, 4), 10);
+  const month = parseInt(dateStr.slice(5, 7), 10);
+  const quarter = Math.ceil(month / 3);
+  const key = taxExemptionPeriodKey({ type: 'quarter', year, quarter });
+  if (!declared.some((record) => record.periodKey === key)) return;
+  throw new Error(
+    `${formatQuarterLabel(year, quarter)} 已申报。${TaxDeclaration.DECLARED_QUARTER_READONLY_TIP}`
+  );
+}
+
 function isRedLetterVoucher(voucher: Pick<VoucherRecord, 'reversedFromId' | 'reversedFromNo' | 'remark' | 'entries'> | null | undefined) {
   if (!voucher) return false;
   if (voucher.reversedFromId || voucher.reversedFromNo) return true;
@@ -115,13 +131,15 @@ async function findNumberConflict(voucherType, yearMonth, voucherNumber, exclude
 }
 
 async function persistVoucherNumbers(vouchers, pad) {
-  for (const voucher of vouchers) {
+  const now = new Date().toISOString();
+  const items = vouchers.map((voucher) => {
     voucher.voucherNumber = formatVoucherNum(parseVoucherNum(voucher.voucherNumber), pad);
     voucher.voucherNo = `${voucher.voucherType}-${voucher.voucherNumber}`;
-    voucher.updatedAt = new Date().toISOString();
+    voucher.updatedAt = now;
     voucher.checksum = generateChecksum(voucher);
-    await DB.put('vouchers', voucher);
-  }
+    return voucher;
+  });
+  await DB.putMany('vouchers', items);
 }
 
 function assertVouchersUnlocked(vouchers) {
@@ -266,22 +284,26 @@ async function lockManyInQuarter(period: { type: 'quarter'; year: number; quarte
     throw new Error(`该季度还有 ${drafts.length} 张草稿凭证，请先审核后再结项`);
   }
 
+  const now = new Date().toISOString();
+  const toSave: VoucherRecord[] = [];
   let locked = 0;
   for (const voucher of inQuarter) {
     if (voucher.status === STATUS.LOCKED) {
       if (!voucher.quarterDeclaredKey) {
         voucher.quarterDeclaredKey = periodKey;
-        await DB.put('vouchers', voucher);
+        toSave.push(voucher);
       }
       continue;
     }
     if (voucher.status !== STATUS.APPROVED) continue;
     voucher.status = STATUS.LOCKED;
-    voucher.lockedAt = new Date().toISOString();
+    voucher.lockedAt = now;
     voucher.quarterDeclaredKey = periodKey;
-    await DB.put('vouchers', voucher);
+    toSave.push(voucher);
     locked++;
   }
+
+  await DB.putMany('vouchers', toSave);
 
   if (locked > 0) {
     await DB.addAuditLog(
@@ -303,6 +325,7 @@ async function unlockManyInQuarter(period: { type: 'quarter'; year: number; quar
   const vouchers = await DB.getAll('vouchers');
   const inQuarter = vouchers.filter((v) => v.date >= startDate && v.date <= endDate);
 
+  const toSave: VoucherRecord[] = [];
   let unlocked = 0;
   for (const voucher of inQuarter) {
     if (voucher.status !== STATUS.LOCKED) continue;
@@ -310,9 +333,11 @@ async function unlockManyInQuarter(period: { type: 'quarter'; year: number; quar
     voucher.status = STATUS.APPROVED;
     voucher.lockedAt = undefined;
     voucher.quarterDeclaredKey = undefined;
-    await DB.put('vouchers', voucher);
+    toSave.push(voucher);
     unlocked++;
   }
+
+  await DB.putMany('vouchers', toSave);
 
   if (unlocked > 0) {
     await DB.addAuditLog(
@@ -328,10 +353,17 @@ async function unlockManyInQuarter(period: { type: 'quarter'; year: number; quar
 /** 批量审核草稿凭证 */
 async function approveMany(ids: string[]) {
   const uniqueIds = [...new Set(ids)];
-  const result = { approved: 0, skipped: 0, failed: [] };
+  const result = { approved: 0, skipped: 0, failed: [] as Array<{ id: string; voucherNo?: string; message: string }> };
+
+  if (!uniqueIds.length) return result;
+
+  const all = await DB.getAll('vouchers');
+  const byId = new Map(all.map((v) => [v.id, v]));
+  const declared = await TaxDeclaration.getDeclaredQuarters();
+  const eligible: string[] = [];
 
   for (const id of uniqueIds) {
-    const voucher = await DB.get('vouchers', id);
+    const voucher = byId.get(id);
     if (!voucher) {
       result.skipped++;
       continue;
@@ -341,16 +373,22 @@ async function approveMany(ids: string[]) {
       continue;
     }
     try {
-      await assertVoucherDateMutable(voucher.date);
-      await save(voucher, true);
-      result.approved++;
+      assertDateMutableWithDeclared(voucher.date, declared);
+      eligible.push(id);
     } catch (err) {
       result.failed.push({
         id,
         voucherNo: voucher.voucherNo,
-        message: err.message || '审核失败'
+        message: (err as Error).message || '审核失败'
       });
     }
+  }
+
+  if (eligible.length) {
+    const batch = await DB.vouchersBatch({ action: 'approve', ids: eligible });
+    result.approved += batch.approved ?? 0;
+    result.skipped += batch.skipped;
+    result.failed.push(...batch.failed);
   }
 
   if (result.approved > 0) {
@@ -362,10 +400,21 @@ async function approveMany(ids: string[]) {
 /** 批量反审核：已审核 → 草稿（已结项不可反审核） */
 async function unapproveMany(ids: string[]) {
   const uniqueIds = [...new Set(ids)];
-  const result = { unapproved: 0, skipped: 0, failed: [] };
+  const result = {
+    unapproved: 0,
+    skipped: 0,
+    failed: [] as Array<{ id: string; voucherNo?: string; message: string }>
+  };
+
+  if (!uniqueIds.length) return result;
+
+  const all = await DB.getAll('vouchers');
+  const byId = new Map(all.map((v) => [v.id, v]));
+  const declared = await TaxDeclaration.getDeclaredQuarters();
+  const eligible: string[] = [];
 
   for (const id of uniqueIds) {
-    const voucher = await DB.get('vouchers', id);
+    const voucher = byId.get(id);
     if (!voucher) {
       result.skipped++;
       continue;
@@ -391,19 +440,22 @@ async function unapproveMany(ids: string[]) {
       continue;
     }
     try {
-      await assertVoucherDateMutable(voucher.date);
-      voucher.status = STATUS.DRAFT;
-      voucher.approvedAt = undefined;
-      voucher.updatedAt = new Date().toISOString();
-      await DB.put('vouchers', voucher);
-      result.unapproved++;
+      assertDateMutableWithDeclared(voucher.date, declared);
+      eligible.push(id);
     } catch (err) {
       result.failed.push({
         id,
         voucherNo: voucher.voucherNo,
-        message: err.message || '反审核失败'
+        message: (err as Error).message || '反审核失败'
       });
     }
+  }
+
+  if (eligible.length) {
+    const batch = await DB.vouchersBatch({ action: 'unapprove', ids: eligible });
+    result.unapproved += batch.unapproved ?? 0;
+    result.skipped += batch.skipped;
+    result.failed.push(...batch.failed);
   }
 
   if (result.unapproved > 0) {
@@ -435,22 +487,22 @@ async function unapprove(id) {
 
 async function clearTaxExemptionLinksForCarryForward(carryForwardId) {
   const vouchers = await DB.getAll('vouchers');
-  for (const voucher of vouchers) {
-    if (voucher.taxExemptionVoucherId !== carryForwardId) continue;
-    voucher.taxExemptionDone = false;
-    voucher.taxExemptionVoucherId = '';
-    await DB.put('vouchers', voucher);
-  }
+  const toSave = vouchers
+    .filter((voucher) => voucher.taxExemptionVoucherId === carryForwardId)
+    .map((voucher) => {
+      voucher.taxExemptionDone = false;
+      voucher.taxExemptionVoucherId = '';
+      return voucher;
+    });
+  await DB.putMany('vouchers', toSave);
 }
 
 async function removeVoucherData(voucher) {
   if (voucher.isTaxExemptionCarryForward) {
     await clearTaxExemptionLinksForCarryForward(voucher.id);
   }
-  if (voucher.attachmentIds) {
-    for (const attId of voucher.attachmentIds) {
-      await DB.remove('attachments', attId);
-    }
+  if (voucher.attachmentIds?.length) {
+    await DB.removeMany('attachments', voucher.attachmentIds);
   }
   await DB.remove('vouchers', voucher.id);
 }
@@ -488,10 +540,21 @@ async function removeByVoucherNo(voucherNo) {
 /** 批量删除未结项凭证（草稿、已审核） */
 async function removeMany(ids: string[]) {
   const uniqueIds = [...new Set(ids)];
-  const result = { deleted: 0, skipped: 0, failed: [] };
+  const result = {
+    deleted: 0,
+    skipped: 0,
+    failed: [] as Array<{ id: string; voucherNo?: string; message: string }>
+  };
+
+  if (!uniqueIds.length) return result;
+
+  const all = await DB.getAll('vouchers');
+  const byId = new Map(all.map((v) => [v.id, v]));
+  const declared = await TaxDeclaration.getDeclaredQuarters();
+  const eligible: string[] = [];
 
   for (const id of uniqueIds) {
-    const voucher = await DB.get('vouchers', id);
+    const voucher = byId.get(id);
     if (!voucher) {
       result.skipped++;
       continue;
@@ -513,16 +576,26 @@ async function removeMany(ids: string[]) {
       continue;
     }
     try {
-      await assertVoucherDateMutable(voucher.date);
-      await removeVoucherData(voucher);
-      result.deleted++;
+      assertDateMutableWithDeclared(voucher.date, declared);
+      eligible.push(id);
     } catch (err) {
       result.failed.push({
         id,
         voucherNo: voucher.voucherNo,
-        message: err.message || '删除失败'
+        message: (err as Error).message || '删除失败'
       });
     }
+  }
+
+  if (eligible.length) {
+    const batch = (await DB.removeMany('vouchers', eligible)) as {
+      deleted?: number;
+      skipped?: number;
+      failed?: Array<{ id: string; voucherNo?: string; message: string }>;
+    };
+    result.deleted += batch.deleted ?? 0;
+    result.skipped += batch.skipped ?? 0;
+    result.failed.push(...(batch.failed ?? []));
   }
 
   if (result.deleted > 0) {
@@ -534,7 +607,8 @@ async function removeMany(ids: string[]) {
 /** 批量删除所有未结项凭证（草稿、已审核） */
 async function removeAllUnlocked() {
   const vouchers = await DB.getAll('vouchers');
-  const targets = [];
+  const declared = await TaxDeclaration.getDeclaredQuarters();
+  const targets: string[] = [];
   let lockedCount = 0;
   let declaredCount = 0;
 
@@ -543,23 +617,26 @@ async function removeAllUnlocked() {
       lockedCount++;
       continue;
     }
-    if (await TaxDeclaration.isDateInDeclaredQuarter(voucher.date)) {
-      declaredCount++;
+    if (isCarryForwardVoucher(voucher)) {
       continue;
     }
-    targets.push(voucher);
+    try {
+      assertDateMutableWithDeclared(voucher.date, declared);
+      targets.push(voucher.id);
+    } catch {
+      declaredCount++;
+    }
   }
 
   if (!targets.length) {
     return { deleted: 0, locked: lockedCount, declared: declaredCount };
   }
 
-  for (const voucher of targets) {
-    await removeVoucherData(voucher);
-  }
+  const batch = (await DB.removeMany('vouchers', targets)) as { deleted?: number };
+  const deleted = batch.deleted ?? targets.length;
 
-  await DB.addAuditLog('批量删除', '凭证', `删除 ${targets.length} 张未结项凭证`);
-  return { deleted: targets.length, locked: lockedCount, declared: declaredCount };
+  await DB.addAuditLog('批量删除', '凭证', `删除 ${deleted} 张未结项凭证`);
+  return { deleted, locked: lockedCount, declared: declaredCount };
 }
 
 async function getAll(filters: VoucherFilters = {}) {
@@ -863,8 +940,8 @@ async function prepareInsertSlot(voucherType, date, beforeNumber) {
     voucher.voucherNo = `${voucher.voucherType}-${voucher.voucherNumber}`;
     voucher.updatedAt = new Date().toISOString();
     voucher.checksum = generateChecksum(voucher);
-    await DB.put('vouchers', voucher);
   }
+  await DB.putMany('vouchers', toShift);
 
   const reservedNumber = formatVoucherNum(targetNum, pad);
   await DB.addAuditLog(
@@ -901,10 +978,14 @@ async function getLedger(accountId, startDate, endDate) {
   let balance = 0;
   const account = await Accounts.getById(accountId);
   const isDebit = account ? account.direction === 'debit' : true;
+  const accountCode = account?.code || '';
 
   for (const v of approved.sort((a, b) => a.date.localeCompare(b.date))) {
     for (const e of v.entries) {
-      if (e.accountId !== accountId) continue;
+      const sameAccount =
+        e.accountId === accountId ||
+        (accountCode && e.accountCode === accountCode);
+      if (!sameAccount) continue;
       const debit = parseFloat(String(e.debit)) || 0;
       const credit = parseFloat(String(e.credit)) || 0;
       balance += isDebit ? debit - credit : credit - debit;

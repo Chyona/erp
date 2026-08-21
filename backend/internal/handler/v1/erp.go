@@ -30,6 +30,33 @@ type addAuditLogRequest struct {
 	Details string `json:"details"`
 }
 
+type batchIDsRequest struct {
+	IDs []string `json:"ids" binding:"required"`
+}
+
+// voucherBatchRequest 凭证统一批量入口：action 区分操作，ids/items 均为数组（1 条即单条）。
+type voucherBatchRequest struct {
+	Action string          `json:"action" binding:"required"`
+	IDs    []string        `json:"ids"`
+	Items  []model.Voucher `json:"items"`
+}
+
+type batchAttachmentsRequest struct {
+	Action string             `json:"action"`
+	IDs    []string           `json:"ids"`
+	Items  []model.Attachment `json:"items"`
+}
+
+type batchAccountsRequest struct {
+	Action string               `json:"action"`
+	IDs    []string             `json:"ids"`
+	Items  []model.ChartAccount `json:"items"`
+}
+
+type batchSettingsRequest struct {
+	Items []service.SettingKV `json:"items" binding:"required"`
+}
+
 // ListChartAccounts GET /accounts — 列出全部会计科目。
 func (h *ErpHandler) ListChartAccounts(c *gin.Context) {
 	items, err := h.erpService.ListChartAccounts(c.Request.Context())
@@ -84,6 +111,58 @@ func (h *ErpHandler) ClearChartAccounts(c *gin.Context) {
 	response.SuccessWithMessage(c, "已清空科目", nil)
 }
 
+// SaveChartAccountsBatch POST|PUT /accounts/batch — action=upsert|delete（缺省时有 items 则 upsert）。
+func (h *ErpHandler) SaveChartAccountsBatch(c *gin.Context) {
+	var req batchAccountsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	action := req.Action
+	if action == "" {
+		if len(req.Items) > 0 {
+			action = "upsert"
+		} else if len(req.IDs) > 0 {
+			action = "delete"
+		}
+	}
+	switch action {
+	case "upsert":
+		if len(req.Items) == 0 {
+			response.Success(c, gin.H{"action": "upsert", "count": 0, "items": []model.ChartAccount{}})
+			return
+		}
+		saved, err := h.erpService.SaveChartAccountsBatch(c.Request.Context(), req.Items)
+		if err != nil {
+			response.BadRequest(c, err.Error())
+			return
+		}
+		response.Success(c, gin.H{"action": "upsert", "count": len(saved), "items": saved})
+	case "delete":
+		if err := h.erpService.DeleteChartAccountsBatch(c.Request.Context(), req.IDs); err != nil {
+			response.InternalError(c, err.Error())
+			return
+		}
+		response.Success(c, gin.H{"action": "delete", "count": len(req.IDs), "ids": req.IDs})
+	default:
+		response.BadRequest(c, "action 仅支持 upsert 或 delete")
+	}
+}
+
+// DeleteChartAccountsBatch 兼容旧 DELETE /accounts/batch。
+func (h *ErpHandler) DeleteChartAccountsBatch(c *gin.Context) {
+	var req batchIDsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	if err := h.erpService.DeleteChartAccountsBatch(c.Request.Context(), req.IDs); err != nil {
+		response.InternalError(c, err.Error())
+		return
+	}
+	response.Success(c, gin.H{"action": "delete", "count": len(req.IDs), "ids": req.IDs})
+}
+
 // ListVouchers GET /vouchers — 列出全部凭证。
 func (h *ErpHandler) ListVouchers(c *gin.Context) {
 	items, err := h.erpService.ListVouchers(c.Request.Context())
@@ -92,6 +171,122 @@ func (h *ErpHandler) ListVouchers(c *gin.Context) {
 		return
 	}
 	response.Success(c, items)
+}
+
+// VouchersBatch POST /vouchers/batch — 统一批量入口。
+// action=upsert 用 items；approve|unapprove|delete 用 ids；数组长度为 1 即单条。
+func (h *ErpHandler) VouchersBatch(c *gin.Context) {
+	var req voucherBatchRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	ctx := c.Request.Context()
+	switch req.Action {
+	case "upsert":
+		if len(req.Items) == 0 {
+			response.Success(c, gin.H{"action": "upsert", "count": 0, "items": []model.Voucher{}})
+			return
+		}
+		saved, err := h.erpService.SaveVouchersBatch(ctx, req.Items)
+		if err != nil {
+			response.BadRequest(c, err.Error())
+			return
+		}
+		response.Success(c, gin.H{"action": "upsert", "count": len(saved), "items": saved})
+	case "approve":
+		result, err := h.erpService.ApproveVouchersBatch(ctx, req.IDs)
+		if err != nil {
+			response.InternalError(c, err.Error())
+			return
+		}
+		result.Action = "approve"
+		response.Success(c, result)
+	case "unapprove":
+		result, err := h.erpService.UnapproveVouchersBatch(ctx, req.IDs)
+		if err != nil {
+			response.InternalError(c, err.Error())
+			return
+		}
+		result.Action = "unapprove"
+		response.Success(c, result)
+	case "delete":
+		result, err := h.erpService.DeleteVouchersBatch(ctx, req.IDs)
+		if err != nil {
+			response.InternalError(c, err.Error())
+			return
+		}
+		result.Action = "delete"
+		response.Success(c, result)
+	default:
+		response.BadRequest(c, "action 仅支持 upsert、approve、unapprove、delete")
+	}
+}
+
+// SaveVouchersBatch 兼容旧 PUT /vouchers/batch。
+func (h *ErpHandler) SaveVouchersBatch(c *gin.Context) {
+	var req struct {
+		Items []model.Voucher `json:"items" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	saved, err := h.erpService.SaveVouchersBatch(c.Request.Context(), req.Items)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	response.Success(c, gin.H{"action": "upsert", "count": len(saved), "items": saved})
+}
+
+// DeleteVouchersBatch 兼容旧 DELETE /vouchers/batch。
+func (h *ErpHandler) DeleteVouchersBatch(c *gin.Context) {
+	var req batchIDsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	result, err := h.erpService.DeleteVouchersBatch(c.Request.Context(), req.IDs)
+	if err != nil {
+		response.InternalError(c, err.Error())
+		return
+	}
+	result.Action = "delete"
+	response.Success(c, result)
+}
+
+// ApproveVouchersBatch 兼容旧路径 POST /vouchers/batch-approve。
+func (h *ErpHandler) ApproveVouchersBatch(c *gin.Context) {
+	var req batchIDsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	result, err := h.erpService.ApproveVouchersBatch(c.Request.Context(), req.IDs)
+	if err != nil {
+		response.InternalError(c, err.Error())
+		return
+	}
+	result.Action = "approve"
+	response.Success(c, result)
+}
+
+// UnapproveVouchersBatch 兼容旧路径 POST /vouchers/batch-unapprove。
+func (h *ErpHandler) UnapproveVouchersBatch(c *gin.Context) {
+	var req batchIDsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	result, err := h.erpService.UnapproveVouchersBatch(c.Request.Context(), req.IDs)
+	if err != nil {
+		response.InternalError(c, err.Error())
+		return
+	}
+	result.Action = "unapprove"
+	response.Success(c, result)
 }
 
 // GetVoucher GET /vouchers/:id — 按 ID 查询凭证。
@@ -146,6 +341,58 @@ func (h *ErpHandler) ListAttachments(c *gin.Context) {
 		return
 	}
 	response.Success(c, items)
+}
+
+// AttachmentsBatch POST|PUT /attachments/batch — action=upsert|delete。
+func (h *ErpHandler) AttachmentsBatch(c *gin.Context) {
+	var req batchAttachmentsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	action := req.Action
+	if action == "" {
+		if len(req.Items) > 0 {
+			action = "upsert"
+		} else if len(req.IDs) > 0 {
+			action = "delete"
+		}
+	}
+	switch action {
+	case "upsert":
+		if len(req.Items) == 0 {
+			response.Success(c, gin.H{"action": "upsert", "count": 0, "items": []model.Attachment{}})
+			return
+		}
+		saved, err := h.erpService.SaveAttachmentsBatch(c.Request.Context(), req.Items)
+		if err != nil {
+			response.BadRequest(c, err.Error())
+			return
+		}
+		response.Success(c, gin.H{"action": "upsert", "count": len(saved), "items": saved})
+	case "delete":
+		if err := h.erpService.DeleteAttachmentsBatch(c.Request.Context(), req.IDs); err != nil {
+			response.InternalError(c, err.Error())
+			return
+		}
+		response.Success(c, gin.H{"action": "delete", "count": len(req.IDs), "ids": req.IDs})
+	default:
+		response.BadRequest(c, "action 仅支持 upsert 或 delete")
+	}
+}
+
+// DeleteAttachmentsBatch 兼容旧 DELETE /attachments/batch。
+func (h *ErpHandler) DeleteAttachmentsBatch(c *gin.Context) {
+	var req batchIDsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	if err := h.erpService.DeleteAttachmentsBatch(c.Request.Context(), req.IDs); err != nil {
+		response.InternalError(c, err.Error())
+		return
+	}
+	response.Success(c, gin.H{"action": "delete", "count": len(req.IDs), "ids": req.IDs})
 }
 
 // GetAttachment GET /attachments/:id — 按 ID 查询附件。
@@ -246,6 +493,27 @@ func (h *ErpHandler) ListSettings(c *gin.Context) {
 		return
 	}
 	response.Success(c, items)
+}
+
+// SetSettingsBatch PUT /settings/batch — 批量写入设置。
+func (h *ErpHandler) SetSettingsBatch(c *gin.Context) {
+	var req batchSettingsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	saved, err := h.erpService.SetSettingsBatch(c.Request.Context(), req.Items)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	out := make([]gin.H, 0, len(saved))
+	for _, item := range saved {
+		var decoded interface{}
+		_ = json.Unmarshal(item.Value, &decoded)
+		out = append(out, gin.H{"key": item.Key, "value": decoded})
+	}
+	response.Success(c, out)
 }
 
 // GetSetting GET /settings/:key — 读取设置；不存在时 value 为 null。

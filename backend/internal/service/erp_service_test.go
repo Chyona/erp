@@ -98,6 +98,59 @@ func TestErpService_Vouchers(t *testing.T) {
 	}
 }
 
+// TestErpService_VoucherBatch 覆盖批量 upsert / 审核 / 反审核。
+func TestErpService_VoucherBatch(t *testing.T) {
+	svc := NewErpService(newMemoryErpRepo())
+	ctx := context.Background()
+
+	carry := true
+	_, err := svc.SaveVouchersBatch(ctx, []model.Voucher{
+		{ID: "d1", VoucherNo: "记-1", Date: "2026-01-01", Status: "draft"},
+		{ID: "d2", VoucherNo: "记-2", Date: "2026-01-02", Status: "draft"},
+		{ID: "a1", VoucherNo: "记-3", Date: "2026-01-03", Status: "approved", ApprovedAt: "2026-01-03T00:00:00Z"},
+		{ID: "l1", VoucherNo: "记-4", Date: "2026-01-04", Status: "locked"},
+		{ID: "c1", VoucherNo: "记-5", Date: "2026-01-05", Status: "approved", IsProfitLossClosing: &carry},
+	})
+	if err != nil {
+		t.Fatalf("SaveVouchersBatch() error = %v", err)
+	}
+
+	approve, err := svc.ApproveVouchersBatch(ctx, []string{"d1", "d2", "a1", "missing", "d1"})
+	if err != nil {
+		t.Fatalf("ApproveVouchersBatch() error = %v", err)
+	}
+	if approve.Approved != 2 || approve.Skipped != 2 {
+		t.Fatalf("ApproveVouchersBatch() = %+v, want approved=2 skipped=2", approve)
+	}
+	got, _ := svc.GetVoucher(ctx, "d1")
+	if got.Status != "approved" || got.ApprovedAt == "" {
+		t.Fatalf("d1 after approve = %+v", got)
+	}
+
+	unapprove, err := svc.UnapproveVouchersBatch(ctx, []string{"d1", "l1", "c1", "missing"})
+	if err != nil {
+		t.Fatalf("UnapproveVouchersBatch() error = %v", err)
+	}
+	if unapprove.Unapproved != 1 || unapprove.Skipped != 1 || len(unapprove.Failed) != 2 {
+		t.Fatalf("UnapproveVouchersBatch() = %+v", unapprove)
+	}
+	got, _ = svc.GetVoucher(ctx, "d1")
+	if got.Status != "draft" || got.ApprovedAt != "" {
+		t.Fatalf("d1 after unapprove = %+v", got)
+	}
+
+	del, err := svc.DeleteVouchersBatch(ctx, []string{"d2", "l1", "c1", "missing"})
+	if err != nil {
+		t.Fatalf("DeleteVouchersBatch() error = %v", err)
+	}
+	// d2 was approved then still exists as approved from earlier - wait d2 was approved in approve batch
+	// d2 status is approved, not locked/CF -> should delete
+	// l1 locked fail, c1 CF fail, missing skipped
+	if del.Deleted != 1 || del.Skipped != 1 || len(del.Failed) != 2 {
+		t.Fatalf("DeleteVouchersBatch() = %+v, want deleted=1 skipped=1 failed=2", del)
+	}
+}
+
 // TestErpService_Attachments 覆盖附件 CRUD。
 func TestErpService_Attachments(t *testing.T) {
 	svc := NewErpService(newMemoryErpRepo())

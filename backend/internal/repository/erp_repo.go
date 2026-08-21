@@ -12,19 +12,26 @@ type ErpRepository interface {
 	ListChartAccounts(ctx context.Context) ([]model.ChartAccount, error)
 	GetChartAccount(ctx context.Context, id string) (*model.ChartAccount, error)
 	SaveChartAccount(ctx context.Context, account *model.ChartAccount) error
+	SaveChartAccountsBatch(ctx context.Context, accounts []model.ChartAccount) error
 	DeleteChartAccount(ctx context.Context, id string) error
+	DeleteChartAccountsByIDs(ctx context.Context, ids []string) error
 	ClearChartAccounts(ctx context.Context) error
 
 	ListVouchers(ctx context.Context) ([]model.Voucher, error)
 	GetVoucher(ctx context.Context, id string) (*model.Voucher, error)
+	GetVouchersByIDs(ctx context.Context, ids []string) ([]model.Voucher, error)
 	SaveVoucher(ctx context.Context, voucher *model.Voucher) error
+	SaveVouchersBatch(ctx context.Context, vouchers []model.Voucher) error
 	DeleteVoucher(ctx context.Context, id string) error
+	DeleteVouchersByIDs(ctx context.Context, ids []string) error
 	ClearVouchers(ctx context.Context) error
 
 	ListAttachments(ctx context.Context) ([]model.Attachment, error)
 	GetAttachment(ctx context.Context, id string) (*model.Attachment, error)
 	SaveAttachment(ctx context.Context, attachment *model.Attachment) error
+	SaveAttachmentsBatch(ctx context.Context, items []model.Attachment) error
 	DeleteAttachment(ctx context.Context, id string) error
+	DeleteAttachmentsByIDs(ctx context.Context, ids []string) error
 	ClearAttachments(ctx context.Context) error
 
 	ListAuditLogs(ctx context.Context, limit int) ([]model.AuditLog, error)
@@ -68,8 +75,31 @@ func (r *erpRepository) SaveChartAccount(ctx context.Context, account *model.Cha
 	return r.db.WithContext(ctx).Save(account).Error
 }
 
+// SaveChartAccountsBatch 事务内批量 upsert 科目。
+func (r *erpRepository) SaveChartAccountsBatch(ctx context.Context, accounts []model.ChartAccount) error {
+	if len(accounts) == 0 {
+		return nil
+	}
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		for i := range accounts {
+			if err := tx.Save(&accounts[i]).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
 func (r *erpRepository) DeleteChartAccount(ctx context.Context, id string) error {
 	return r.db.WithContext(ctx).Delete(&model.ChartAccount{}, "id = ?", id).Error
+}
+
+// DeleteChartAccountsByIDs 批量删除科目。
+func (r *erpRepository) DeleteChartAccountsByIDs(ctx context.Context, ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	return r.db.WithContext(ctx).Where("id IN ?", ids).Delete(&model.ChartAccount{}).Error
 }
 
 func (r *erpRepository) ClearChartAccounts(ctx context.Context) error {
@@ -91,12 +121,45 @@ func (r *erpRepository) GetVoucher(ctx context.Context, id string) (*model.Vouch
 	return &item, nil
 }
 
+// GetVouchersByIDs 按 ID 列表批量查询凭证。
+func (r *erpRepository) GetVouchersByIDs(ctx context.Context, ids []string) ([]model.Voucher, error) {
+	if len(ids) == 0 {
+		return []model.Voucher{}, nil
+	}
+	var items []model.Voucher
+	err := r.db.WithContext(ctx).Where("id IN ?", ids).Find(&items).Error
+	return items, err
+}
+
 func (r *erpRepository) SaveVoucher(ctx context.Context, voucher *model.Voucher) error {
 	return r.db.WithContext(ctx).Save(voucher).Error
 }
 
+// SaveVouchersBatch 事务内批量 upsert 凭证。
+func (r *erpRepository) SaveVouchersBatch(ctx context.Context, vouchers []model.Voucher) error {
+	if len(vouchers) == 0 {
+		return nil
+	}
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		for i := range vouchers {
+			if err := tx.Save(&vouchers[i]).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
 func (r *erpRepository) DeleteVoucher(ctx context.Context, id string) error {
 	return r.db.WithContext(ctx).Delete(&model.Voucher{}, "id = ?", id).Error
+}
+
+// DeleteVouchersByIDs 批量删除凭证。
+func (r *erpRepository) DeleteVouchersByIDs(ctx context.Context, ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	return r.db.WithContext(ctx).Where("id IN ?", ids).Delete(&model.Voucher{}).Error
 }
 
 func (r *erpRepository) ClearVouchers(ctx context.Context) error {
@@ -122,8 +185,31 @@ func (r *erpRepository) SaveAttachment(ctx context.Context, attachment *model.At
 	return r.db.WithContext(ctx).Save(attachment).Error
 }
 
+// SaveAttachmentsBatch 事务内批量 upsert 附件。
+func (r *erpRepository) SaveAttachmentsBatch(ctx context.Context, items []model.Attachment) error {
+	if len(items) == 0 {
+		return nil
+	}
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		for i := range items {
+			if err := tx.Save(&items[i]).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
 func (r *erpRepository) DeleteAttachment(ctx context.Context, id string) error {
 	return r.db.WithContext(ctx).Delete(&model.Attachment{}, "id = ?", id).Error
+}
+
+// DeleteAttachmentsByIDs 批量删除附件。
+func (r *erpRepository) DeleteAttachmentsByIDs(ctx context.Context, ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	return r.db.WithContext(ctx).Where("id IN ?", ids).Delete(&model.Attachment{}).Error
 }
 
 func (r *erpRepository) ClearAttachments(ctx context.Context) error {

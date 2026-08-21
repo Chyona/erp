@@ -22,9 +22,7 @@ async function dedupeByCode() {
     }
   }
 
-  for (const id of toDelete) {
-    await DB.remove('accounts', id);
-  }
+  await DB.removeMany('accounts', toDelete);
 
   if (toDelete.length) {
     await DB.addAuditLog('清理', '会计科目', `删除 ${toDelete.length} 个重复科目`);
@@ -39,11 +37,12 @@ async function syncDefaultAccounts() {
   const byCode = new Map(existing.map((a) => [a.code, a]));
   let added = 0;
   let updated = 0;
+  const toSave: Account[] = [];
 
   for (const acc of DEFAULT_ACCOUNTS) {
     const current = byCode.get(acc.code);
     if (!current) {
-      await DB.put('accounts', {
+      toSave.push({
         id: DB.generateId(),
         ...acc,
         createdAt: new Date().toISOString()
@@ -58,7 +57,7 @@ async function syncDefaultAccounts() {
       current.direction !== acc.direction;
 
     if (needsUpdate) {
-      await DB.put('accounts', {
+      toSave.push({
         ...current,
         name: acc.name,
         category: acc.category,
@@ -68,6 +67,8 @@ async function syncDefaultAccounts() {
       updated++;
     }
   }
+
+  await DB.putMany('accounts', toSave);
 
   if (added > 0) {
     await DB.addAuditLog('同步', '会计科目', `导入默认科目 ${added} 个`);
@@ -79,35 +80,42 @@ async function syncDefaultAccounts() {
   return { added, updated };
 }
 
-/** 按科目主数据校正凭证分录里缓存的科目名称 */
+/** 按科目编码校正凭证分录的 accountId / 名称（科目重建后 ID 会变） */
 async function syncVoucherEntryAccountNames() {
   const accounts = await getAll();
   const byId = new Map(accounts.map((a) => [a.id, a]));
+  const byCode = new Map(accounts.map((a) => [a.code, a]));
   const vouchers = await DB.getAll('vouchers');
-  let voucherCount = 0;
+  const toSave = [];
 
   for (const v of vouchers) {
     let changed = false;
     for (const e of v.entries || []) {
-      const acc = byId.get(e.accountId);
+      const acc = byId.get(e.accountId) || byCode.get(String(e.accountCode || '').trim());
       if (!acc) continue;
-      if (e.accountName !== acc.name || e.accountCode !== acc.code) {
+      if (
+        e.accountId !== acc.id ||
+        e.accountName !== acc.name ||
+        e.accountCode !== acc.code
+      ) {
+        e.accountId = acc.id;
         e.accountName = acc.name;
         e.accountCode = acc.code;
         changed = true;
       }
     }
     if (changed) {
-      await DB.put('vouchers', v);
-      voucherCount++;
+      toSave.push(v);
     }
   }
 
-  if (voucherCount > 0) {
-    await DB.addAuditLog('同步', '凭证分录', `校正 ${voucherCount} 张凭证的科目名称`);
+  await DB.putMany('vouchers', toSave);
+
+  if (toSave.length > 0) {
+    await DB.addAuditLog('同步', '凭证分录', `校正 ${toSave.length} 张凭证的科目引用`);
   }
 
-  return voucherCount;
+  return toSave.length;
 }
 
 /** 删除不在默认列表中、且未被凭证引用的科目 */
@@ -123,12 +131,14 @@ async function pruneExtraAccounts() {
   }
 
   let removed = 0;
+  const toDelete: string[] = [];
   for (const acc of existing) {
     if (defaultCodes.has(acc.code)) continue;
     if (usedIds.has(acc.id)) continue;
-    await DB.remove('accounts', acc.id);
+    toDelete.push(acc.id);
     removed++;
   }
+  await DB.removeMany('accounts', toDelete);
 
   if (removed > 0) {
     await DB.addAuditLog('清理', '会计科目', `移除 ${removed} 个非默认科目`);

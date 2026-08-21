@@ -17,6 +17,7 @@
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/accounts` | 列出全部科目 |
+| POST | `/accounts/batch` | 统一批量：`{ action: "upsert"\|"delete", items?\|ids? }` |
 | GET | `/accounts/:id` | 按 ID 查询 |
 | PUT | `/accounts/:id` | 新增/更新（upsert） |
 | DELETE | `/accounts/:id` | 删除一条 |
@@ -27,18 +28,47 @@
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/vouchers` | 列出全部凭证 |
+| POST | `/vouchers/batch` | **统一批量入口**（见下） |
 | GET | `/vouchers/:id` | 按 ID 查询 |
 | PUT | `/vouchers/:id` | 新增/更新 |
 | DELETE | `/vouchers/:id` | 删除一条 |
 | DELETE | `/vouchers` | 清空全部 |
 
-JSON 字段与前端 `Voucher` 类型一致（含 `entries` JSON 数组）。
+### `POST /vouchers/batch`
+
+通过 `action` 区分操作；`ids` / `items` 均为数组，**长度 1 = 单条，多条 = 批量**。
+
+```json
+// 写入
+{ "action": "upsert", "items": [ { "id": "...", "...": "..." } ] }
+
+// 审核 / 反审核 / 删除
+{ "action": "approve", "ids": ["id1", "id2"] }
+{ "action": "unapprove", "ids": ["id1"] }
+{ "action": "delete", "ids": ["id1", "id2"] }
+```
+
+状态类操作返回：
+
+```json
+{
+  "action": "approve",
+  "approved": 2,
+  "unapproved": 0,
+  "deleted": 0,
+  "skipped": 1,
+  "failed": [{ "id": "...", "voucherNo": "记-1", "message": "..." }]
+}
+```
+
+upsert 返回：`{ "action": "upsert", "count": N, "items": [...] }`。
 
 ## 附件 attachments
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/attachments` | 列出全部 |
+| POST | `/attachments/batch` | 统一批量：`{ action: "upsert"\|"delete", items?\|ids? }` |
 | GET | `/attachments/:id` | 按 ID 查询 |
 | PUT | `/attachments/:id` | 新增/更新（`data` 为 base64 字符串） |
 | DELETE | `/attachments/:id` | 删除 |
@@ -58,6 +88,7 @@ JSON 字段与前端 `Voucher` 类型一致（含 `entries` JSON 数组）。
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/settings` | 全部 `{ key, value }[]` |
+| PUT | `/settings/batch` | 批量写入（body: `{ items: [{ key, value }] }`） |
 | GET | `/settings/:key` | 单条，不存在时 `value: null` |
 | PUT | `/settings/:key` | 写入 `{ "value": ... }` |
 | DELETE | `/settings/:key` | 删除 |

@@ -4,6 +4,7 @@ import { Voucher } from './voucher';
 import type { Voucher as VoucherRecord } from '../types';
 import { VoucherImportParser } from './voucherImportParser';
 import { INVOICE_TYPE } from '../constants/invoice';
+import { isCarryForwardImportVoucher } from '../utils/carryForwardVoucher';
 
 function fillMergedCells(sheet, rows) {
   const merges = sheet['!merges'] || [];
@@ -142,7 +143,25 @@ async function parseFile(file, accounts) {
   const { rows, sheetMeta } = await readFileToRows(file);
   try {
     const parsed = VoucherImportParser.rowsToVouchers(rows, accounts);
-    return { ...parsed, sheetMeta };
+    const vouchers = [];
+    const filteredCarryForward = [];
+    for (const voucher of parsed.vouchers || []) {
+      if (isCarryForwardImportVoucher(voucher)) {
+        filteredCarryForward.push(voucher);
+        continue;
+      }
+      vouchers.push(voucher);
+    }
+    const warnings = [...(parsed.warnings || [])];
+    // 结转过滤不混入行级 warnings，单独用 filteredCarryForwardCount 展示
+    return {
+      ...parsed,
+      vouchers,
+      warnings,
+      sheetMeta,
+      filteredCarryForwardCount: filteredCarryForward.length,
+      invalidVoucherCount: parsed.invalidVoucherCount || 0
+    };
   } catch (err) {
     if (sheetMeta && String(err.message).includes('未找到表头')) {
       const preview = rows
@@ -170,7 +189,7 @@ function voucherImportKey(voucher) {
   return `${yearMonth}|${voucher.voucherNo}`;
 }
 
-async function importVouchers(vouchers, { skipDuplicates = true, approve = false } = {}) {
+async function importVouchers(vouchers, { skipDuplicates = false, approve = false } = {}) {
   const existing = await Voucher.getAll();
   const existingKeys = new Set(existing.map((v) => voucherImportKey(v)));
   const result = {
@@ -189,7 +208,19 @@ async function importVouchers(vouchers, { skipDuplicates = true, approve = false
     return a.voucherNo.localeCompare(b.voucherNo);
   });
 
+  const toSave: VoucherRecord[] = [];
+
   for (const raw of sorted) {
+    if (isCarryForwardImportVoucher(raw)) {
+      result.skipped++;
+      result.skippedItems.push({
+        voucherNo: raw.voucherNo,
+        date: raw.date,
+        reason: '系统结转凭证（不导入）'
+      });
+      continue;
+    }
+
     const importKey = voucherImportKey(raw);
     if (skipDuplicates && existingKeys.has(importKey)) {
       result.skipped++;
@@ -252,7 +283,7 @@ async function importVouchers(vouchers, { skipDuplicates = true, approve = false
       };
       voucher.checksum = Voucher.generateChecksum(voucher);
 
-      await DB.put('vouchers', voucher);
+      toSave.push(voucher);
       existingKeys.add(voucherImportKey(voucher));
       result.imported++;
     } catch (err) {
@@ -260,6 +291,8 @@ async function importVouchers(vouchers, { skipDuplicates = true, approve = false
       result.errors.push({ voucherNo: raw.voucherNo, message: err.message });
     }
   }
+
+  await DB.putMany('vouchers', toSave);
 
   if (result.imported > 0 || result.skipped > 0 || result.failed > 0) {
     await DB.addAuditLog(

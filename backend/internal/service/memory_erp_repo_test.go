@@ -56,10 +56,28 @@ func (r *memoryErpRepo) SaveChartAccount(ctx context.Context, account *model.Cha
 	return nil
 }
 
+func (r *memoryErpRepo) SaveChartAccountsBatch(ctx context.Context, accounts []model.ChartAccount) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, account := range accounts {
+		r.accounts[account.ID] = account
+	}
+	return nil
+}
+
 func (r *memoryErpRepo) DeleteChartAccount(ctx context.Context, id string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	delete(r.accounts, id)
+	return nil
+}
+
+func (r *memoryErpRepo) DeleteChartAccountsByIDs(ctx context.Context, ids []string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, id := range ids {
+		delete(r.accounts, id)
+	}
 	return nil
 }
 
@@ -91,6 +109,18 @@ func (r *memoryErpRepo) GetVoucher(ctx context.Context, id string) (*model.Vouch
 	return &cp, nil
 }
 
+func (r *memoryErpRepo) GetVouchersByIDs(ctx context.Context, ids []string) ([]model.Voucher, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	items := make([]model.Voucher, 0, len(ids))
+	for _, id := range ids {
+		if item, ok := r.vouchers[id]; ok {
+			items = append(items, item)
+		}
+	}
+	return items, nil
+}
+
 func (r *memoryErpRepo) SaveVoucher(ctx context.Context, voucher *model.Voucher) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -98,10 +128,28 @@ func (r *memoryErpRepo) SaveVoucher(ctx context.Context, voucher *model.Voucher)
 	return nil
 }
 
+func (r *memoryErpRepo) SaveVouchersBatch(ctx context.Context, vouchers []model.Voucher) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, voucher := range vouchers {
+		r.vouchers[voucher.ID] = voucher
+	}
+	return nil
+}
+
 func (r *memoryErpRepo) DeleteVoucher(ctx context.Context, id string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	delete(r.vouchers, id)
+	return nil
+}
+
+func (r *memoryErpRepo) DeleteVouchersByIDs(ctx context.Context, ids []string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, id := range ids {
+		delete(r.vouchers, id)
+	}
 	return nil
 }
 
@@ -140,10 +188,28 @@ func (r *memoryErpRepo) SaveAttachment(ctx context.Context, attachment *model.At
 	return nil
 }
 
+func (r *memoryErpRepo) SaveAttachmentsBatch(ctx context.Context, items []model.Attachment) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, item := range items {
+		r.attachments[item.ID] = item
+	}
+	return nil
+}
+
 func (r *memoryErpRepo) DeleteAttachment(ctx context.Context, id string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	delete(r.attachments, id)
+	return nil
+}
+
+func (r *memoryErpRepo) DeleteAttachmentsByIDs(ctx context.Context, ids []string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, id := range ids {
+		delete(r.attachments, id)
+	}
 	return nil
 }
 
