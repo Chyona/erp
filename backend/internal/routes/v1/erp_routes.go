@@ -8,7 +8,7 @@ import (
 // RegisterErpRoutes 注册 ERP 数据存储路由（/openapi/erp/v1）。
 // 统一批量入口（须注册在 /:id 之前）：
 //   POST /{store}/batch  { action, ids?|items? }  — 数组长度 1 即单条
-func RegisterErpRoutes(rg *gin.RouterGroup, erpHandler *v1handler.ErpHandler, appHandler *v1handler.AppHandler) {
+func RegisterErpRoutes(rg *gin.RouterGroup, erpHandler *v1handler.ErpHandler, appHandler *v1handler.AppHandler, importHandler *v1handler.ImportHandler) {
 	rg.POST("/app/init", appHandler.Init)
 
 	accounts := rg.Group("/accounts")
@@ -33,6 +33,10 @@ func RegisterErpRoutes(rg *gin.RouterGroup, erpHandler *v1handler.ErpHandler, ap
 		vouchers.DELETE("/batch", erpHandler.DeleteVouchersBatch)
 		vouchers.POST("/batch-approve", erpHandler.ApproveVouchersBatch)
 		vouchers.POST("/batch-unapprove", erpHandler.UnapproveVouchersBatch)
+		if importHandler != nil {
+			vouchers.GET("/import-llm-status", importHandler.LLMStatus)
+			vouchers.POST("/parse-import-image", importHandler.ParseImportImage)
+		}
 		vouchers.GET("/:id", erpHandler.GetVoucher)
 		vouchers.PUT("/:id", erpHandler.SaveVoucher)
 		vouchers.DELETE("/:id", erpHandler.DeleteVoucher)

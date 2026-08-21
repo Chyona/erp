@@ -5,6 +5,7 @@ import type { Voucher as VoucherRecord } from '../types';
 import { VoucherImportParser } from './voucherImportParser';
 import { INVOICE_TYPE } from '../constants/invoice';
 import { isCarryForwardImportVoucher } from '../utils/carryForwardVoucher';
+import { imageFileToRows, isImportImageFile } from './voucherImportImage';
 
 function fillMergedCells(sheet, rows) {
   const merges = sheet['!merges'] || [];
@@ -55,7 +56,21 @@ function resolveImportSheet(workbook) {
   };
 }
 
-async function readFileToRows(file) {
+async function readFileToRows(file, onProgress) {
+  if (isImportImageFile(file)) {
+    const { rows } = await imageFileToRows(file, onProgress);
+    return {
+      rows,
+      sheetMeta: {
+        sheetName: file.name || '图片',
+        sheetIndex: 0,
+        totalSheets: 1,
+        ignoredSheetNames: [],
+        source: 'image-llm'
+      }
+    };
+  }
+
   const buffer = await file.arrayBuffer();
   const name = file.name.toLowerCase();
 
@@ -139,8 +154,8 @@ function parseCsv(text) {
   return rows;
 }
 
-async function parseFile(file, accounts) {
-  const { rows, sheetMeta } = await readFileToRows(file);
+async function parseFile(file, accounts, onProgress) {
+  const { rows, sheetMeta } = await readFileToRows(file, onProgress);
   try {
     const parsed = VoucherImportParser.rowsToVouchers(rows, accounts);
     const vouchers = [];
@@ -153,6 +168,9 @@ async function parseFile(file, accounts) {
       vouchers.push(voucher);
     }
     const warnings = [...(parsed.warnings || [])];
+    if (sheetMeta?.source === 'image-llm') {
+      warnings.unshift('截图已由视觉大模型识别，请核对借贷金额与科目后再导入。');
+    }
     // 结转过滤不混入行级 warnings，单独用 filteredCarryForwardCount 展示
     return {
       ...parsed,
@@ -163,6 +181,11 @@ async function parseFile(file, accounts) {
       invalidVoucherCount: parsed.invalidVoucherCount || 0
     };
   } catch (err) {
+    if (sheetMeta?.source === 'image-llm') {
+      throw new Error(
+        `${err.message || '图片解析失败'}\n建议：截取含表头的完整分录表，或改用 Excel/CSV 导入。`
+      );
+    }
     if (sheetMeta && String(err.message).includes('未找到表头')) {
       const preview = rows
         .filter((row) => row.some((cell) => String(cell || '').trim()))

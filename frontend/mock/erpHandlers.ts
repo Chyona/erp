@@ -202,6 +202,14 @@ export async function handleErpMockRequest(
         return true;
       }
     }
+    if (method === 'GET' && path === '/vouchers/import-llm-status') {
+      ok(res, { enabled: false, model: '' });
+      return true;
+    }
+    if (method === 'POST' && path === '/vouchers/parse-import-image') {
+      fail(res, 503, 'Mock 模式未接入大模型，请关闭 Mock 或改用 Excel/CSV');
+      return true;
+    }
     if (method === 'PUT' && path === '/vouchers/batch') {
       const body = (await parseJSON<{ items?: MockVoucher[] }>(req)) ?? {};
       const items = body.items ?? [];

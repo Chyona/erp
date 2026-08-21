@@ -20,6 +20,7 @@ type Config struct {
 	Database DatabaseConfig `mapstructure:"database"`
 	Logger   LoggerConfig   `mapstructure:"logger"`
 	Storage  StorageConfig  `mapstructure:"storage"`
+	LLM      LLMConfig      `mapstructure:"llm"`
 }
 
 // ServerConfig HTTP 服务相关配置。
@@ -83,6 +84,15 @@ type TOSStorageConfig struct {
 	BucketName      string `mapstructure:"bucket_name"`
 	Region          string `mapstructure:"region"`
 	Endpoint        string `mapstructure:"endpoint"`
+}
+
+// LLMConfig OpenAI 兼容大模型（DashScope 等），环境变量前缀 APP_LLM_*。
+type LLMConfig struct {
+	APIKey      string `mapstructure:"api_key"`
+	BaseURL     string `mapstructure:"base_url"`
+	Model       string `mapstructure:"model"`
+	FlashModel  string `mapstructure:"flash_model"`
+	VisionModel string `mapstructure:"vision_model"`
 }
 
 // DSN 生成 PostgreSQL 连接字符串。
@@ -248,5 +258,22 @@ func applyEnvOverrides(cfg *Config) {
 	}
 	if val, ok := os.LookupEnv("TOS_ENDPOINT"); ok {
 		cfg.Storage.TOS.Endpoint = val
+	}
+
+	// APP_LLM_*（与用户提供的环境变量名一致）
+	if val, ok := os.LookupEnv("APP_LLM_API_KEY"); ok {
+		cfg.LLM.APIKey = val
+	}
+	if val, ok := os.LookupEnv("APP_LLM_BASE_URL"); ok {
+		cfg.LLM.BaseURL = val
+	}
+	if val, ok := os.LookupEnv("APP_LLM_MODEL"); ok {
+		cfg.LLM.Model = val
+	}
+	if val, ok := os.LookupEnv("APP_LLM_FLASH_MODEL"); ok {
+		cfg.LLM.FlashModel = val
+	}
+	if val, ok := os.LookupEnv("APP_LLM_VISION_MODEL"); ok {
+		cfg.LLM.VisionModel = val
 	}
 }

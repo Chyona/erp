@@ -29,6 +29,8 @@
 |------|------|------|
 | GET | `/vouchers` | 列出全部凭证 |
 | POST | `/vouchers/batch` | **统一批量入口**（见下） |
+| GET | `/vouchers/import-llm-status` | 截图识别大模型是否已配置 |
+| POST | `/vouchers/parse-import-image` | 分录表截图 → 表格行列（视觉大模型） |
 | GET | `/vouchers/:id` | 按 ID 查询 |
 | PUT | `/vouchers/:id` | 新增/更新 |
 | DELETE | `/vouchers/:id` | 删除一条 |
