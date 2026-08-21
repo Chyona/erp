@@ -599,15 +599,19 @@ export default function VoucherTable({
     },
     {
       title: '制单人',
-      key: 'signatory',
+      key: 'preparedBy',
       width: 88,
       ellipsis: true,
       onCell: (record) => mergeCell(record.groupRowSpan),
-      render: (_, record) =>
-        record.voucher.preparedBy ||
-        record.voucher.reviewedBy ||
-        record.voucher.postedBy ||
-        ''
+      render: (_, record) => record.voucher.preparedBy || ''
+    },
+    {
+      title: '审核人',
+      key: 'reviewedBy',
+      width: 88,
+      ellipsis: true,
+      onCell: (record) => mergeCell(record.groupRowSpan),
+      render: (_, record) => record.voucher.reviewedBy || ''
     },
     {
       title: '状态',
@@ -710,7 +714,7 @@ export default function VoucherTable({
     return (
       <ScrollTable
         {...(tableProps as Record<string, unknown>)}
-        scroll={{ x: selectable ? 1240 : 1200 }}
+        scroll={{ x: selectable ? 1330 : 1290 }}
       />
     );
   }

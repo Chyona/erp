@@ -119,20 +119,54 @@ export default function VoucherList() {
     refresh();
   };
 
-  const handleExport = async () => {
+  const handleExport = async (withAttachments = false) => {
     const list = await Voucher.getAll(filters);
     if (!list.length) {
       message.error('无数据可导出');
       return;
     }
-    const csv = ExportUtil.vouchersToCSV(list);
-    ExportUtil.downloadBlob(
-      csv,
-      `凭证导出_${new Date().toISOString().slice(0, 10)}.csv`,
-      'text/csv;charset=utf-8'
-    );
-    await ErpApi.addAuditLog('导出', 'CSV', `${list.length} 条凭证`);
-    message.success('CSV 导出成功');
+
+    const loadingKey = 'voucher-export';
+    message.loading({
+      content: withAttachments ? '正在打包表格与附件…' : '正在导出表格…',
+      key: loadingKey,
+      duration: 0
+    });
+    try {
+      const result = await ExportUtil.exportVouchersPackage(list, {
+        withAttachments,
+        onProgress: (done, total) => {
+          if (!withAttachments || !total) return;
+          message.loading({
+            content: `正在下载附件 ${done}/${total}…`,
+            key: loadingKey,
+            duration: 0
+          });
+        }
+      });
+      await ErpApi.addAuditLog(
+        '导出',
+        withAttachments ? 'ZIP' : 'Excel',
+        withAttachments
+          ? `${result.voucherCount} 条凭证，附件 ${result.attachmentCount} 个${
+              result.failed ? `，失败 ${result.failed}` : ''
+            }`
+          : `${result.voucherCount} 条凭证`
+      );
+      if (withAttachments) {
+        message.success({
+          content:
+            `已导出 ZIP：表格 ${result.voucherCount} 条` +
+            (result.attachmentCount ? `，附件 ${result.attachmentCount} 个` : '（无附件）') +
+            (result.failed ? `，${result.failed} 个附件下载失败` : ''),
+          key: loadingKey
+        });
+      } else {
+        message.success({ content: 'Excel 导出成功', key: loadingKey });
+      }
+    } catch (err) {
+      message.error({ content: (err as Error).message || '导出失败', key: loadingKey });
+    }
   };
 
   const selectedDraftCount = selectedIds.filter((id) => {
@@ -241,13 +275,25 @@ export default function VoucherList() {
   };
 
   const moreMenuItems: MenuProps['items'] = [
-    { key: 'export', label: '导出 CSV', icon: <DownloadOutlined /> },
+    {
+      key: 'export',
+      label: '导出',
+      icon: <DownloadOutlined />,
+      children: [
+        { key: 'export-csv', label: '仅导出表格（Excel）' },
+        { key: 'export-zip', label: '导出表格及所属期间附件（ZIP）' }
+      ]
+    },
     { key: 'import', label: '导入历史凭证', icon: <UploadOutlined /> }
   ];
 
   const handleMoreMenuClick: MenuProps['onClick'] = ({ key }) => {
-    if (key === 'export') {
-      handleExport();
+    if (key === 'export-csv') {
+      void handleExport(false);
+      return;
+    }
+    if (key === 'export-zip') {
+      void handleExport(true);
       return;
     }
     if (key === 'import') {

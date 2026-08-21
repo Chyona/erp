@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ColumnsType } from 'antd/es/table';
 import {
   Button,
-  Space,
+  Dropdown,
   Tabs,
   Table,
   Typography,
@@ -10,9 +10,11 @@ import {
   Alert,
   Tooltip
 } from 'antd';
-import { DownloadOutlined } from '@ant-design/icons';
+import { DownloadOutlined, DownOutlined } from '@ant-design/icons';
+import type { MenuProps } from 'antd';
 import { Reports as ReportsService } from '../services/reports';
 import { ExportUtil } from '../services/export';
+import { Voucher } from '../services/voucher';
 import ScrollTable from '../components/ScrollTable';
 import BalanceSheetView from '../components/BalanceSheetView';
 import IncomeStatementView from '../components/IncomeStatementView';
@@ -211,7 +213,6 @@ function TrialBalanceImbalanceTooltip({ data, period }) {
 }
 
 function TrialBalanceTab({ period, dateRange, refreshToken, onHeaderAlertChange }) {
-  const { message } = App.useApp();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -248,27 +249,8 @@ function TrialBalanceTab({ period, dateRange, refreshToken, onHeaderAlertChange 
     return () => onHeaderAlertChange?.(null);
   }, [data, period, onHeaderAlertChange]);
 
-  const handleExport = () => {
-    if (!data?.rows?.length) {
-      message.error('请先查询科目余额表');
-      return;
-    }
-    const csv = ExportUtil.trialBalanceToCSV(data);
-    ExportUtil.downloadBlob(
-      csv,
-      `科目余额表_${data.startDate}_${data.endDate}.csv`,
-      'text/csv;charset=utf-8'
-    );
-    message.success('导出成功');
-  };
-
   return (
     <div className="report-tab-panel">
-      <Space wrap className="report-tab-panel__toolbar">
-        <Button icon={<DownloadOutlined />} onClick={handleExport}>
-          导出 CSV
-        </Button>
-      </Space>
       <div className="trial-balance-report">
         <ScrollTable
           autoHeight
@@ -313,7 +295,6 @@ function TrialBalanceTab({ period, dateRange, refreshToken, onHeaderAlertChange 
 }
 
 function IncomeStatementTab({ dateRange, refreshToken }) {
-  const { message } = App.useApp();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -333,27 +314,8 @@ function IncomeStatementTab({ dateRange, refreshToken }) {
     handleQuery();
   }, [dateRange, refreshToken]);
 
-  const handleExport = () => {
-    if (!data) {
-      message.error('请先查询利润表');
-      return;
-    }
-    const csv = ExportUtil.incomeStatementToCSV(data);
-    ExportUtil.downloadBlob(
-      csv,
-      `利润表_${data.startDate}_${data.endDate}.csv`,
-      'text/csv;charset=utf-8'
-    );
-    message.success('导出成功');
-  };
-
   return (
     <div className="report-tab-panel">
-      <Space wrap className="report-tab-panel__toolbar">
-        <Button icon={<DownloadOutlined />} onClick={handleExport}>
-          导出 CSV
-        </Button>
-      </Space>
       <div className={`income-statement-report${loading ? ' income-statement-report--loading' : ''}`}>
         <IncomeStatementView rows={data?.rows || []} />
       </div>
@@ -362,7 +324,6 @@ function IncomeStatementTab({ dateRange, refreshToken }) {
 }
 
 function BalanceSheetTab({ dateRange, refreshToken }) {
-  const { message } = App.useApp();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -382,20 +343,6 @@ function BalanceSheetTab({ dateRange, refreshToken }) {
     handleQuery();
   }, [dateRange, refreshToken]);
 
-  const handleExport = () => {
-    if (!data) {
-      message.error('请先查询资产负债表');
-      return;
-    }
-    const csv = ExportUtil.balanceSheetToCSV(data);
-    ExportUtil.downloadBlob(
-      csv,
-      `资产负债表_${data.startDate}_${data.endDate}.csv`,
-      'text/csv;charset=utf-8'
-    );
-    message.success('导出成功');
-  };
-
   const mergedRows = useMemo(
     () => mergeBalanceSheetRows(data?.assets?.rows, data?.liabilities?.rows),
     [data]
@@ -403,11 +350,6 @@ function BalanceSheetTab({ dateRange, refreshToken }) {
 
   return (
     <div className="report-tab-panel">
-      <Space wrap className="report-tab-panel__toolbar">
-        <Button icon={<DownloadOutlined />} onClick={handleExport}>
-          导出 CSV
-        </Button>
-      </Space>
       {data && !data.balanced && (
         <Alert
           type="warning"
@@ -430,11 +372,76 @@ function BalanceSheetTab({ dateRange, refreshToken }) {
 }
 
 export default function Reports() {
+  const { message } = App.useApp();
   const [period, setPeriod] = useState(defaultReportsPeriod);
   const [refreshToken, setRefreshToken] = useState(0);
   const [activeTab, setActiveTab] = useState('trial');
   const [trialHeaderAlert, setTrialHeaderAlert] = useState(null);
+  const [exporting, setExporting] = useState(false);
   const dateRange = useMemo(() => reportPeriodToDateRange(period), [period]);
+
+  const handleExportAll = async (withAttachments = false) => {
+    const start = dateRange[0].format('YYYY-MM-DD');
+    const end = dateRange[1].format('YYYY-MM-DD');
+    const periodLabel = formatReportPeriod(period);
+    setExporting(true);
+    const loadingKey = 'reports-export';
+    message.loading({
+      content: withAttachments ? '正在汇总表格与附件…' : '正在汇总并生成 Excel…',
+      key: loadingKey,
+      duration: 0
+    });
+    try {
+      const allInPeriod = await Voucher.getAll({ startDate: start, endDate: end });
+      const vouchers = allInPeriod.filter((v) => v.status !== Voucher.STATUS.DRAFT);
+      const [trialBalance, incomeStatement, balanceSheet] = await Promise.all([
+        ReportsService.getTrialBalance(start, end, period),
+        ReportsService.getIncomeStatement(start, end),
+        ReportsService.getBalanceSheet(start, end)
+      ]);
+      const result = await ExportUtil.exportFinancialReportsWorkbook({
+        vouchers,
+        trialBalance,
+        incomeStatement,
+        balanceSheet,
+        periodLabel,
+        year: period.year,
+        withAttachments,
+        onProgress: (done, total) => {
+          if (!withAttachments || !total) return;
+          message.loading({
+            content: `正在下载附件 ${done}/${total}…`,
+            key: loadingKey,
+            duration: 0
+          });
+        }
+      });
+      if (withAttachments) {
+        message.success({
+          content:
+            `已导出 ZIP：表格 ${result.voucherCount} 条凭证` +
+            (result.attachmentCount ? `，附件 ${result.attachmentCount} 个` : '（无附件）') +
+            (result.failed ? `，${result.failed} 个附件下载失败` : ''),
+          key: loadingKey
+        });
+      } else {
+        message.success({ content: '财务报表 Excel 导出成功', key: loadingKey });
+      }
+    } catch (err) {
+      message.error({ content: (err as Error).message || '导出失败', key: loadingKey });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const exportMenuItems: MenuProps['items'] = [
+    { key: 'excel', label: '仅导出表格（Excel）' },
+    { key: 'zip', label: '导出表格及所属期间附件（ZIP）' }
+  ];
+
+  const handleExportMenuClick: MenuProps['onClick'] = ({ key }) => {
+    void handleExportAll(key === 'zip');
+  };
 
   const items = [
     {
@@ -501,6 +508,17 @@ export default function Reports() {
             value={period}
             onChange={setPeriod}
             onRefresh={() => setRefreshToken((token) => token + 1)}
+            beforeRefresh={
+              <Dropdown
+                menu={{ items: exportMenuItems, onClick: handleExportMenuClick }}
+                placement="bottomRight"
+                disabled={exporting}
+              >
+                <Button icon={<DownloadOutlined />} loading={exporting}>
+                  导出 <DownOutlined />
+                </Button>
+              </Dropdown>
+            }
           />
         </div>
       </div>

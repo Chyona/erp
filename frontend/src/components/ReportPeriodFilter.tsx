@@ -85,7 +85,8 @@ export default function ReportPeriodFilter({
   onChange,
   onRefresh,
   loading = false,
-  typeOptions = REPORT_TYPE_OPTIONS
+  typeOptions = REPORT_TYPE_OPTIONS,
+  beforeRefresh = null
 }) {
   const [open, setOpen] = useState(false);
   const [panelYear, setPanelYear] = useState(value.year);
@@ -136,6 +137,7 @@ export default function ReportPeriodFilter({
           suffix={<CalendarOutlined className="report-period-filter__calendar" />}
         />
       </Popover>
+      {beforeRefresh}
       <Button icon={<ReloadOutlined />} loading={loading} onClick={onRefresh}>
         刷新
       </Button>
