@@ -7,3 +7,5 @@ frontend/.env
 
 # backend dependencies
 backend/.env
+backend/*/.env
+/backend/internal/config/config.yaml

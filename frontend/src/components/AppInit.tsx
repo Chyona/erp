@@ -1,30 +1,48 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Spin } from 'antd';
+import { Alert, Spin } from 'antd';
 import { DB } from '../services/db';
-import { Accounts } from '../services/accounts';
+import { apiRequest } from '../services/apiClient';
 import { repairFinanceInterestEntries } from '../services/financeExpenseRepair';
-import { TaxDeclaration } from '../services/taxDeclaration';
 import { useApp } from '../context/AppContext';
+import type { Account } from '../types';
+
+type AppInitResult = {
+  companyName: string;
+  accounts: Account[];
+  repaired: number;
+  syncedLocks: number;
+};
 
 export default function AppInit({ children }: { children: ReactNode }) {
   const { setCompanyName, setAccounts, refresh, refreshKey } = useApp();
   const [ready, setReady] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      await DB.open();
-      await Accounts.init();
-      const repaired = await repairFinanceInterestEntries();
-      const syncedLocks = await TaxDeclaration.syncDeclaredQuarterVoucherLocks();
-      const name = await DB.getSetting('companyName');
-      const accs = await Accounts.getAll();
-      if (!cancelled) {
-        setCompanyName(typeof name === 'string' ? name : '');
-        setAccounts(accs);
-        setReady(true);
-        if (repaired > 0 || syncedLocks > 0) {
-          refresh();
+      try {
+        setError('');
+        await DB.open();
+
+        const result = await apiRequest<AppInitResult>('POST', '/app/init');
+        const repaired = await repairFinanceInterestEntries();
+        const syncedFromServer = (result.repaired || 0) + (result.syncedLocks || 0);
+
+        if (!cancelled) {
+          setCompanyName(result.companyName || '');
+          setAccounts(result.accounts || []);
+          setReady(true);
+          if (syncedFromServer > 0 || repaired > 0) {
+            refresh();
+          }
+        }
+      } catch (err) {
+        if (!cancelled) {
+          const message = err instanceof Error ? err.message : '加载失败';
+          setError(
+            `${message}。请确认 PostgreSQL 已启动并已执行 go run ./cmd/envinit schema，且 API 运行在 :30000`
+          );
         }
       }
     })();
@@ -32,6 +50,14 @@ export default function AppInit({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, [refreshKey, setCompanyName, setAccounts, refresh]);
+
+  if (error) {
+    return (
+      <div style={{ maxWidth: 560, margin: '20vh auto', padding: '0 24px' }}>
+        <Alert type="error" showIcon message="应用初始化失败" description={error} />
+      </div>
+    );
+  }
 
   if (!ready) {
     return (

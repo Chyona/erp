@@ -51,9 +51,15 @@ func main() {
 	v1AccountHandler := v1handler.NewAccountHandler(accountService)
 	v2AccountHandler := v2handler.NewAccountHandler(accountService)
 
+	erpRepo := repository.NewErpRepository(db)
+	erpService := service.NewErpService(erpRepo)
+	erpHandler := v1handler.NewErpHandler(erpService)
+	appService := service.NewAppService(erpRepo)
+	appHandler := v1handler.NewAppHandler(appService)
+
 	gin.SetMode(cfg.Server.Mode)
 	r := gin.New()
-	r.Use(gin.Recovery(), middleware.RequestLogger(logger))
+	r.Use(gin.Recovery(), middleware.CORS(), middleware.RequestLogger(logger))
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
@@ -62,6 +68,9 @@ func main() {
 	api := r.Group("/openapi/base")
 	routesv1.RegisterRoutes(api.Group("/v1"), v1AccountHandler)
 	routesv2.RegisterRoutes(api.Group("/v2"), v2AccountHandler)
+
+	erpAPI := r.Group("/openapi/erp/v1")
+	routesv1.RegisterErpRoutes(erpAPI, erpHandler, appHandler)
 
 	docs.SwaggerInfo.Host = cfg.Server.Addr()
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
