@@ -29,6 +29,7 @@ export function isCarryForwardImportVoucher(
   // 与本系统生成的结转凭证文案对齐；避免仅因普通「结转成本」等业务摘要误杀
   return (
     /普票.*(?:增值税)?减免结转/.test(texts) ||
+    /免税结转/.test(texts) ||
     /结转损益/.test(texts) ||
     /损益结转/.test(texts)
   );

@@ -318,7 +318,7 @@ export async function createCarryForward(period, { approve = true } = {}) {
     remark: `${scopeLabel}普票增值税减免结转，${pendingVoucherIds.length} 张凭证 ${summary.ordinaryPending.length} 条税额`,
     entries: [
       ...summary.ordinaryPending.map((line) => ({
-        summary: line.entrySummary || `${periodLabel}普票增值税减免结转`,
+        summary: `${periodLabel}免税结转-${line.entrySummary || acc2221.name}`,
         accountId: acc2221.id,
         accountCode: acc2221.code,
         accountName: acc2221.name,
@@ -326,7 +326,7 @@ export async function createCarryForward(period, { approve = true } = {}) {
         credit: 0
       })),
       {
-        summary: `${periodLabel}免税收入`,
+        summary: `${periodLabel}免税结转-${acc5301.name}`,
         accountId: acc5301.id,
         accountCode: acc5301.code,
         accountName: acc5301.name,

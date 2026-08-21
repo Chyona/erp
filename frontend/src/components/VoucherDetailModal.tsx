@@ -6,6 +6,7 @@ import { ExportUtil, getCompanyInfo } from '../services/export';
 import { confirmWarning } from '../utils/confirmAction';
 import { useApp } from '../context/AppContext';
 import { isCarryForwardVoucher, CARRY_FORWARD_VOUCHER_READONLY_TIP } from '../utils/carryForwardVoucher';
+import { CarryForwardBadge } from './StatusBadge';
 
 function isPdfAttachment(att) {
   return att.type === 'application/pdf' || /\.pdf$/i.test(att.name || '');
@@ -206,7 +207,16 @@ export default function VoucherDetailModal({
   return (
     <>
       <Modal
-        title={voucher ? `凭证 ${voucher.voucherNo}` : '凭证详情'}
+        title={
+          voucher ? (
+            <Space size={8}>
+              <span>{`凭证 ${voucher.voucherNo}`}</span>
+              <CarryForwardBadge voucher={voucher} />
+            </Space>
+          ) : (
+            '凭证详情'
+          )
+        }
         open={open}
         onCancel={onClose}
         width={800}

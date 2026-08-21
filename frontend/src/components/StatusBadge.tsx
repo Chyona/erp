@@ -1,5 +1,6 @@
-import { Tag } from 'antd';
+import { Space, Tag } from 'antd';
 import { Voucher } from '../services/voucher';
+import type { Voucher as VoucherRecord } from '../types';
 
 const STATUS_COLOR = {
   draft: 'gold',
@@ -7,11 +8,43 @@ const STATUS_COLOR = {
   locked: 'blue'
 };
 
-export default function StatusBadge({ status }) {
+/** 系统结转类型标记：普票免税结转 / 损益结转 */
+export function CarryForwardBadge({
+  voucher
+}: {
+  voucher?: Pick<VoucherRecord, 'isTaxExemptionCarryForward' | 'isProfitLossClosing'> | null;
+}) {
+  if (voucher?.isTaxExemptionCarryForward) {
+    return (
+      <Tag color="purple" title="季度销售额未超标时的普票增值税减免结转（贷 5301 免税收入）">
+        免税结转
+      </Tag>
+    );
+  }
+  if (voucher?.isProfitLossClosing) {
+    return (
+      <Tag color="cyan" title="损益类科目结转至本年利润">
+        结转损益
+      </Tag>
+    );
+  }
+  return null;
+}
+
+export default function StatusBadge({
+  status,
+  voucher
+}: {
+  status: string;
+  voucher?: Pick<VoucherRecord, 'isTaxExemptionCarryForward' | 'isProfitLossClosing'> | null;
+}) {
   return (
-    <Tag color={STATUS_COLOR[status] || 'default'}>
-      {Voucher.STATUS_LABEL[status] || status}
-    </Tag>
+    <Space size={4} wrap>
+      <Tag color={STATUS_COLOR[status] || 'default'}>
+        {Voucher.STATUS_LABEL[status] || status}
+      </Tag>
+      <CarryForwardBadge voucher={voucher} />
+    </Space>
   );
 }
 

@@ -405,9 +405,11 @@ export default function VoucherTable({
     {
       title: '状态',
       key: 'status',
-      width: 88,
+      width: 148,
       onCell: (record) => mergeCell(record.groupRowSpan),
-      render: (_, record) => <StatusBadge status={record.voucher.status} />
+      render: (_, record) => (
+        <StatusBadge status={record.voucher.status} voucher={record.voucher} />
+      )
     },
     {
       title: '操作',
@@ -438,8 +440,8 @@ export default function VoucherTable({
     {
       title: '状态',
       dataIndex: 'status',
-      width: 90,
-      render: (status) => <StatusBadge status={status} />
+      width: 148,
+      render: (status, record) => <StatusBadge status={status} voucher={record} />
     }
   ];
 
