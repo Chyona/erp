@@ -17,7 +17,7 @@ services:
       SERVER_MODE: release
       LOGGER_LEVEL: info
       LOGGER_FORMAT: json
-      LOGGER_FILENAME: logs/base.log
+      LOGGER_FILENAME: logs/erp.log
       LOGGER_MAX_SIZE: 10
       LOGGER_MAX_BACKUPS: 10
       DATABASE_SSLMODE: disable
