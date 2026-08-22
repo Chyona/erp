@@ -82,6 +82,8 @@ jobs:
     needs: changes
     if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     defaults:
       run:
         working-directory: frontend
@@ -111,7 +113,14 @@ jobs:
     - name: 打包 dist.tar.gz
       run: tar -czf dist.tar.gz -C dist .
 
-    - name: 上传前端产物
+    - name: 上传到 GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ github.ref_name }}
+        files: frontend/dist.tar.gz
+        fail_on_unmatched_files: true
+
+    - name: 上传 Actions Artifact（可选备份）
       uses: actions/upload-artifact@v4
       with:
         name: frontend-dist-${{ github.ref_name }}
