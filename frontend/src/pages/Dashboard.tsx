@@ -5,6 +5,7 @@ import VoucherTable from '../components/VoucherTable';
 import VoucherDetailModal from '../components/VoucherDetailModal';
 import WorkbenchPanel from '../components/WorkbenchPanel';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 
 const { Title } = Typography;
 
@@ -18,6 +19,7 @@ const TIPS = [
 
 export default function Dashboard() {
   const { refreshKey } = useApp();
+  const { can } = useAuth();
   const [stats, setStats] = useState({ total: 0, month: 0, totalDebit: 0, totalAttachments: 0 });
   const [recent, setRecent] = useState([]);
   const [viewId, setViewId] = useState(null);
@@ -59,7 +61,7 @@ export default function Dashboard() {
         </Col>
       </Row>
 
-      <WorkbenchPanel />
+      {can('closing.view') ? <WorkbenchPanel readOnly={!can('closing')} /> : null}
 
       <Card title="最近凭证" style={{ marginBottom: 20 }}>
         <VoucherTable

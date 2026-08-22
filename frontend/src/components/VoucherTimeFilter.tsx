@@ -363,7 +363,7 @@ export default function VoucherTimeFilter({
           if (nextOpen) syncDraftFromValue();
           setTimeOpen(nextOpen);
         }}
-        overlayClassName="voucher-time-filter-popover-wrap"
+        classNames={{ root: 'voucher-time-filter-popover-wrap' }}
         content={timePopoverContent}
       >
         <button type="button" className="voucher-time-filter-group__value" onClick={openTimePicker}>
@@ -376,7 +376,7 @@ export default function VoucherTimeFilter({
         placement="bottomLeft"
         open={filterOpen}
         onOpenChange={onFilterOpenChange}
-        overlayClassName="voucher-filter-popover"
+        classNames={{ root: 'voucher-filter-popover' }}
         content={filterContent}
       >
         <button

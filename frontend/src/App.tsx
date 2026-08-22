@@ -2,8 +2,11 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { App as AntApp, ConfigProvider } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { AppProvider } from './context/AppContext';
-import AppInit from './components/AppInit';
+import { AuthProvider } from './context/AuthContext';
+import RequireAuth from './components/RequireAuth';
 import MainLayout from './layouts/MainLayout';
+import Login from './pages/Login';
+import SetupPassword from './pages/SetupPassword';
 import Dashboard from './pages/Dashboard';
 import VoucherList from './pages/VoucherList';
 import VoucherForm from './pages/VoucherForm';
@@ -11,6 +14,7 @@ import Accounts from './pages/Accounts';
 import Ledger from './pages/Ledger';
 import Reports from './pages/Reports';
 import Audit from './pages/Audit';
+import Users from './pages/Users';
 import Settings from './pages/Settings';
 import 'dayjs/locale/zh-cn';
 import dayjs from 'dayjs';
@@ -58,25 +62,30 @@ export default function App() {
       }}
     >
       <AntApp>
-        <AppProvider>
-          <AppInit>
+        <AuthProvider>
+          <AppProvider>
             <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
               <Routes>
-                <Route path="/" element={<MainLayout />}>
-                  <Route index element={<Dashboard />} />
-                  <Route path="vouchers" element={<VoucherList />} />
-                  <Route path="vouchers/new" element={<VoucherForm />} />
-                  <Route path="vouchers/:id/edit" element={<VoucherForm />} />
-                  <Route path="accounts" element={<Accounts />} />
-                  <Route path="ledger" element={<Ledger />} />
-                  <Route path="reports" element={<Reports />} />
-                  <Route path="audit" element={<Audit />} />
-                  <Route path="settings" element={<Settings />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/setup-password" element={<SetupPassword />} />
+                <Route element={<RequireAuth />}>
+                  <Route path="/" element={<MainLayout />}>
+                    <Route index element={<Dashboard />} />
+                    <Route path="vouchers" element={<VoucherList />} />
+                    <Route path="vouchers/new" element={<VoucherForm />} />
+                    <Route path="vouchers/:id/edit" element={<VoucherForm />} />
+                    <Route path="accounts" element={<Accounts />} />
+                    <Route path="ledger" element={<Ledger />} />
+                    <Route path="reports" element={<Reports />} />
+                    <Route path="audit" element={<Audit />} />
+                    <Route path="users" element={<Users />} />
+                    <Route path="settings" element={<Settings />} />
+                  </Route>
                 </Route>
               </Routes>
             </BrowserRouter>
-          </AppInit>
-        </AppProvider>
+          </AppProvider>
+        </AuthProvider>
       </AntApp>
     </ConfigProvider>
   );

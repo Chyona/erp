@@ -21,7 +21,9 @@ import VoucherTimeFilter from '../components/VoucherTimeFilter';
 import { defaultTimeFilter } from '../utils/voucherTimeFilter';
 import type { VoucherTimeFilterState } from '../utils/voucherTimeFilter';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { isCarryForwardVoucher } from '../utils/carryForwardVoucher';
+import { confirmDeleteWithPassword } from '../utils/confirmDeleteWithPassword';
 import type { VoucherFilters } from '../types';
 
 const { Title } = Typography;
@@ -50,6 +52,7 @@ export default function VoucherList() {
   const navigate = useNavigate();
   const { message, modal } = App.useApp();
   const { refreshKey, accounts, refresh } = useApp();
+  const { can, canMutateVoucher, role } = useAuth();
   const [vouchers, setVouchers] = useState([]);
   const [filters, setFilters] = useState<VoucherFilters>({
     ...EMPTY_VOUCHER_FILTERS,
@@ -183,7 +186,9 @@ export default function VoucherList() {
     const voucher = vouchers.find((v) => v.id === id);
     return (
       voucher &&
-      (voucher.status === Voucher.STATUS.DRAFT || voucher.status === Voucher.STATUS.APPROVED) &&
+      canMutateVoucher(voucher) &&
+      (voucher.status === Voucher.STATUS.DRAFT ||
+        (role === 'admin' && voucher.status === Voucher.STATUS.APPROVED)) &&
       !isCarryForwardVoucher(voucher)
     );
   }).length;
@@ -257,14 +262,13 @@ export default function VoucherList() {
       return;
     }
 
-    modal.confirm({
+    confirmDeleteWithPassword({
+      isAdmin: role === 'admin',
       title: '批量删除',
       content: `确定删除选中的 ${selectedDeletableCount} 张凭证及其附件？此操作不可恢复。`,
       okText: `删除 ${selectedDeletableCount} 张`,
-      okButtonProps: { danger: true },
-      cancelText: '取消',
-      onOk: async () => {
-        const result = await Voucher.removeMany(selectedIds);
+      onConfirm: async (confirmPassword) => {
+        const result = await Voucher.removeMany(selectedIds, { confirmPassword });
         finishBatchAction(result, {
           successKey: 'deleted',
           successLabel: '删除',
@@ -275,17 +279,21 @@ export default function VoucherList() {
   };
 
   const moreMenuItems: MenuProps['items'] = [
-    {
-      key: 'export',
-      label: '导出',
-      icon: <DownloadOutlined />,
-      children: [
-        { key: 'export-csv', label: '仅导出表格（Excel）' },
-        { key: 'export-zip', label: '导出表格及所属期间附件（ZIP）' }
-      ]
-    },
-    { key: 'import', label: '导入历史凭证', icon: <UploadOutlined /> }
-  ];
+    can('export')
+      ? {
+          key: 'export',
+          label: '导出',
+          icon: <DownloadOutlined />,
+          children: [
+            { key: 'export-csv', label: '仅导出表格（Excel）' },
+            { key: 'export-zip', label: '导出表格及所属期间附件（ZIP）' }
+          ]
+        }
+      : null,
+    can('voucher.import')
+      ? { key: 'import', label: '导入历史凭证', icon: <UploadOutlined /> }
+      : null
+  ].filter(Boolean) as MenuProps['items'];
 
   const handleMoreMenuClick: MenuProps['onClick'] = ({ key }) => {
     if (key === 'export-csv') {
@@ -307,9 +315,11 @@ export default function VoucherList() {
         <Title level={2} style={{ margin: 0 }}>
           凭证管理
         </Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/vouchers/new')}>
-          新建凭证
-        </Button>
+        {can('voucher.create') ? (
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/vouchers/new')}>
+            新建凭证
+          </Button>
+        ) : null}
       </div>
 
       <div className="page-table-toolbar voucher-list-toolbar">
@@ -344,23 +354,29 @@ export default function VoucherList() {
         </div>
 
         <Space wrap className="voucher-list-toolbar__actions">
-          <Dropdown.Button
-            onClick={handleBatchApprove}
-            menu={{
-              items: [{ key: 'unapprove', label: '反审核' }],
-              onClick: ({ key }) => {
-                if (key === 'unapprove') handleBatchUnapprove();
-              }
-            }}
-          >
-            审核
-          </Dropdown.Button>
-          <Button danger icon={<DeleteOutlined />} onClick={handleBatchDelete}>
-            删除
-          </Button>
-          <Dropdown menu={{ items: moreMenuItems, onClick: handleMoreMenuClick }}>
-            <Button icon={<MoreOutlined />}>更多</Button>
-          </Dropdown>
+          {can('voucher.approve') ? (
+            <Dropdown.Button
+              onClick={handleBatchApprove}
+              menu={{
+                items: [{ key: 'unapprove', label: '反审核' }],
+                onClick: ({ key }) => {
+                  if (key === 'unapprove') handleBatchUnapprove();
+                }
+              }}
+            >
+              审核
+            </Dropdown.Button>
+          ) : null}
+          {can('voucher.create') ? (
+            <Button danger icon={<DeleteOutlined />} onClick={handleBatchDelete}>
+              删除
+            </Button>
+          ) : null}
+          {moreMenuItems && moreMenuItems.length > 0 ? (
+            <Dropdown menu={{ items: moreMenuItems, onClick: handleMoreMenuClick }}>
+              <Button icon={<MoreOutlined />}>更多</Button>
+            </Dropdown>
+          ) : null}
         </Space>
       </div>
 

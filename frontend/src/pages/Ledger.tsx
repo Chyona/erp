@@ -8,6 +8,7 @@ import { Voucher } from '../services/voucher';
 import { Accounts } from '../services/accounts';
 import { ExportUtil } from '../services/export';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import ScrollTable from '../components/ScrollTable';
 
 const { Title } = Typography;
@@ -16,6 +17,7 @@ const { RangePicker } = DatePicker;
 export default function Ledger() {
   const { message } = App.useApp();
   const { refreshKey } = useApp();
+  const { can } = useAuth();
   const [accountList, setAccountList] = useState<Account[]>([]);
   const [accountId, setAccountId] = useState('');
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([dayjs().startOf('year'), dayjs()]);
@@ -95,9 +97,11 @@ export default function Ledger() {
           <Button type="primary" icon={<SearchOutlined />} onClick={handleQuery}>
             查询
           </Button>
-          <Button icon={<DownloadOutlined />} onClick={handleExport}>
-            导出
-          </Button>
+          {can('export') ? (
+            <Button icon={<DownloadOutlined />} onClick={handleExport}>
+              导出
+            </Button>
+          ) : null}
         </Space>
       </div>
 

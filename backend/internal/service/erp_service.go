@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"erp/internal/model"
+	"erp/internal/pkg/rbac"
 	"erp/internal/pkg/storage"
 	"erp/internal/repository"
 	"github.com/google/uuid"
@@ -177,6 +178,9 @@ func (s *erpService) SaveVoucher(ctx context.Context, voucher *model.Voucher) (*
 	if len(voucher.Entries) == 0 {
 		voucher.Entries = datatypes.JSON("[]")
 	}
+	if err := s.applyVoucherWritePolicy(ctx, voucher); err != nil {
+		return nil, err
+	}
 	if err := s.repo.SaveVoucher(ctx, voucher); err != nil {
 		return nil, err
 	}
@@ -188,18 +192,71 @@ func (s *erpService) SaveVouchersBatch(ctx context.Context, vouchers []model.Vou
 	if len(vouchers) == 0 {
 		return []model.Voucher{}, nil
 	}
-	for i := range vouchers {
-		if vouchers[i].ID == "" {
-			return nil, errors.New("凭证 ID 不能为空")
+	actor := rbac.ActorFrom(ctx)
+	if actor != nil && !actor.IsAdmin() {
+		// 普通用户仅允许批量保存「自己的草稿 / 新建归属自己」的凭证；导入/结转等走管理员。
+		for i := range vouchers {
+			if err := s.applyVoucherWritePolicy(ctx, &vouchers[i]); err != nil {
+				return nil, err
+			}
 		}
-		if len(vouchers[i].Entries) == 0 {
-			vouchers[i].Entries = datatypes.JSON("[]")
+	} else {
+		for i := range vouchers {
+			if vouchers[i].ID == "" {
+				return nil, errors.New("凭证 ID 不能为空")
+			}
+			if len(vouchers[i].Entries) == 0 {
+				vouchers[i].Entries = datatypes.JSON("[]")
+			}
+			if actor != nil && actor.IsAdmin() {
+				existing, err := s.repo.GetVoucher(ctx, vouchers[i].ID)
+				if err != nil {
+					if errors.Is(err, gorm.ErrRecordNotFound) {
+						if vouchers[i].CreatedByAccountID == 0 {
+							vouchers[i].CreatedByAccountID = actor.AccountID
+						}
+					} else {
+						return nil, err
+					}
+				} else if vouchers[i].CreatedByAccountID == 0 {
+					vouchers[i].CreatedByAccountID = existing.CreatedByAccountID
+				}
+			}
 		}
 	}
 	if err := s.repo.SaveVouchersBatch(ctx, vouchers); err != nil {
 		return nil, err
 	}
 	return vouchers, nil
+}
+
+func (s *erpService) applyVoucherWritePolicy(ctx context.Context, voucher *model.Voucher) error {
+	if voucher.ID == "" {
+		return errors.New("凭证 ID 不能为空")
+	}
+	if len(voucher.Entries) == 0 {
+		voucher.Entries = datatypes.JSON("[]")
+	}
+	actor := rbac.ActorFrom(ctx)
+	if actor == nil {
+		return nil
+	}
+	existing, err := s.repo.GetVoucher(ctx, voucher.ID)
+	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		if !actor.CanCreateVoucher() {
+			return errors.New("无权新建凭证")
+		}
+		voucher.CreatedByAccountID = actor.AccountID
+		return nil
+	}
+	if !actor.CanMutateVoucher(existing.CreatedByAccountID, existing.Status) {
+		return errors.New("无权修改该凭证")
+	}
+	voucher.CreatedByAccountID = existing.CreatedByAccountID
+	return nil
 }
 
 func boolPtrTrue(v *bool) bool {
@@ -229,6 +286,9 @@ func uniqueIDs(ids []string) []string {
 
 // ApproveVouchersBatch 批量草稿→已审核（一次查询 + 一次批量保存）。
 func (s *erpService) ApproveVouchersBatch(ctx context.Context, ids []string) (*VoucherBatchOpResult, error) {
+	if actor := rbac.ActorFrom(ctx); actor != nil && !actor.CanApprove() {
+		return nil, errors.New("无权审核凭证")
+	}
 	ids = uniqueIDs(ids)
 	result := &VoucherBatchOpResult{Failed: []VoucherBatchFailItem{}}
 	if len(ids) == 0 {
@@ -272,6 +332,9 @@ func (s *erpService) ApproveVouchersBatch(ctx context.Context, ids []string) (*V
 
 // UnapproveVouchersBatch 批量已审核→草稿；已结项/结转凭证记入 failed。
 func (s *erpService) UnapproveVouchersBatch(ctx context.Context, ids []string) (*VoucherBatchOpResult, error) {
+	if actor := rbac.ActorFrom(ctx); actor != nil && !actor.CanApprove() {
+		return nil, errors.New("无权反审核凭证")
+	}
 	ids = uniqueIDs(ids)
 	result := &VoucherBatchOpResult{Failed: []VoucherBatchFailItem{}}
 	if len(ids) == 0 {
@@ -353,12 +416,19 @@ func (s *erpService) DeleteVouchersBatch(ctx context.Context, ids []string) (*Vo
 		byID[item.ID] = item
 	}
 
+	actor := rbac.ActorFrom(ctx)
 	toDelete := make([]string, 0, len(ids))
 	attachmentIDs := make([]string, 0)
 	for _, id := range ids {
 		item, ok := byID[id]
 		if !ok {
 			result.Skipped++
+			continue
+		}
+		if actor != nil && !actor.CanMutateVoucher(item.CreatedByAccountID, item.Status) {
+			result.Failed = append(result.Failed, VoucherBatchFailItem{
+				ID: id, VoucherNo: item.VoucherNo, Message: "无权删除该凭证",
+			})
 			continue
 		}
 		if item.Status == "locked" {
@@ -392,7 +462,17 @@ func (s *erpService) DeleteVouchersBatch(ctx context.Context, ids []string) (*Vo
 }
 
 func (s *erpService) DeleteVoucher(ctx context.Context, id string) error {
-	return s.repo.DeleteVoucher(ctx, id)
+	result, err := s.DeleteVouchersBatch(ctx, []string{id})
+	if err != nil {
+		return err
+	}
+	if result.Deleted == 1 {
+		return nil
+	}
+	if len(result.Failed) > 0 {
+		return errors.New(result.Failed[0].Message)
+	}
+	return errors.New("凭证不存在或不可删除")
 }
 
 func (s *erpService) ClearVouchers(ctx context.Context) error {

@@ -65,7 +65,7 @@ const previewColumns: ColumnsType<any> = [
   }
 ];
 
-export default function MonthEndClosingPanel() {
+export default function MonthEndClosingPanel({ readOnly = false }: { readOnly?: boolean }) {
   const { message, modal } = App.useApp();
   const { refreshKey, refresh } = useApp();
   const [period, setPeriod] = useState(defaultProfitLossClosingPeriod);
@@ -277,7 +277,13 @@ export default function MonthEndClosingPanel() {
 
   return (
     <div className="tax-exemption-panel">
-      <WorkbenchPanelIntro message="一键完成当季普票减免结转与损益结转。结转完成后可手动标记已申报（确认已向税务机关申报后，该季度数据不可删改、不可反结转）。" />
+      <WorkbenchPanelIntro
+        message={
+          readOnly
+            ? '查看当季普票减免结转与损益结转进度（只读，操作请联系管理员）。'
+            : '一键完成当季普票减免结转与损益结转。结转完成后可手动标记已申报（确认已向税务机关申报后，该季度数据不可删改、不可反结转）。'
+        }
+      />
 
       <div className="closing-prerequisites" style={{ marginBottom: 16 }}>
         <Text strong style={{ display: 'block', marginBottom: 8 }}>
@@ -335,23 +341,27 @@ export default function MonthEndClosingPanel() {
           loading={loading}
           typeOptions={CLOSING_TYPE_OPTIONS}
         />
-        <Button
-          type="primary"
-          onClick={handleCreate}
-          loading={submitting}
-          disabled={generateDisabled}
-        >
-          生成{closingLabel}凭证
-        </Button>
-        {(summary?.profitLossVoucher || summary?.taxVoucher) && (
-          <Button danger loading={reversing} disabled={declared} onClick={handleReverse}>
-            反结转
-          </Button>
-        )}
-        {fullyClosed && !declared ? (
-          <Button type="primary" ghost loading={markingDeclared} onClick={handleMarkDeclared}>
-            标记已申报
-          </Button>
+        {!readOnly ? (
+          <>
+            <Button
+              type="primary"
+              onClick={handleCreate}
+              loading={submitting}
+              disabled={generateDisabled}
+            >
+              生成{closingLabel}凭证
+            </Button>
+            {(summary?.profitLossVoucher || summary?.taxVoucher) && (
+              <Button danger loading={reversing} disabled={declared} onClick={handleReverse}>
+                反结转
+              </Button>
+            )}
+            {fullyClosed && !declared ? (
+              <Button type="primary" ghost loading={markingDeclared} onClick={handleMarkDeclared}>
+                标记已申报
+              </Button>
+            ) : null}
+          </>
         ) : null}
         {declared ? (
           <Button disabled>已申报</Button>
@@ -468,13 +478,17 @@ export default function MonthEndClosingPanel() {
 
       {!loading && fullyClosed && !declared && (
         <Text type="secondary" style={{ display: 'block', marginTop: 12 }}>
-          该期间{closingLabel}已完成。确认已向税务机关申报后，请点击「标记已申报」；如需调整请先在标记前使用「反结转」。
+          {readOnly
+            ? `该期间${closingLabel}已完成，待管理员标记已申报。`
+            : `该期间${closingLabel}已完成。确认已向税务机关申报后，请点击「标记已申报」；如需调整请先在标记前使用「反结转」。`}
         </Text>
       )}
 
       {!loading && declared && (
         <Text type="secondary" style={{ display: 'block', marginTop: 12 }}>
-          该季度已申报。如需修改，请先在系统设置中取消申报标记。
+          {readOnly
+            ? '该季度已申报。'
+            : '该季度已申报。如需修改，请先在系统设置中取消申报标记。'}
         </Text>
       )}
 

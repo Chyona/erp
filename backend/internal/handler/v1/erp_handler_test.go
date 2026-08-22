@@ -221,7 +221,7 @@ func TestErpHandler_ChartAccounts(t *testing.T) {
 		accounts: []model.ChartAccount{{ID: "a1", Code: "1002", Name: "银行存款"}},
 		account:  &model.ChartAccount{ID: "a1", Code: "1002", Name: "银行存款"},
 	}
-	h := NewErpHandler(stub)
+	h := NewErpHandler(stub, nil)
 	r := gin.New()
 	r.GET("/accounts", h.ListChartAccounts)
 	r.GET("/accounts/:id", h.GetChartAccount)
@@ -277,7 +277,7 @@ func TestErpHandler_Vouchers(t *testing.T) {
 		vouchers: []model.Voucher{{ID: "v1", VoucherNo: "记-1"}},
 		voucher:  &model.Voucher{ID: "v1", VoucherNo: "记-1"},
 	}
-	h := NewErpHandler(stub)
+	h := NewErpHandler(stub, nil)
 	r := gin.New()
 	r.GET("/vouchers", h.ListVouchers)
 	r.GET("/vouchers/:id", h.GetVoucher)
@@ -323,7 +323,7 @@ func TestErpHandler_Attachments(t *testing.T) {
 		attachments: []model.Attachment{{ID: "att1", Name: "a.pdf"}},
 		attachment:  &model.Attachment{ID: "att1", Name: "a.pdf"},
 	}
-	h := NewErpHandler(stub)
+	h := NewErpHandler(stub, nil)
 	r := gin.New()
 	r.GET("/attachments", h.ListAttachments)
 	r.GET("/attachments/:id", h.GetAttachment)
@@ -358,7 +358,7 @@ func TestErpHandler_AuditLogs(t *testing.T) {
 		auditLogs: []model.AuditLog{{ID: "l1", Action: "create"}},
 		auditLog:  &model.AuditLog{ID: "l1", Action: "create"},
 	}
-	h := NewErpHandler(stub)
+	h := NewErpHandler(stub, nil)
 	r := gin.New()
 	r.GET("/audit-logs", h.ListAuditLogs)
 	r.GET("/audit-logs/:id", h.GetAuditLog)
@@ -399,7 +399,7 @@ func TestErpHandler_Settings(t *testing.T) {
 		settings:   []model.Setting{{Key: "companyName", Value: datatypes.JSON(`"ACME"`)}},
 		settingVal: json.RawMessage(`"ACME"`),
 	}
-	h := NewErpHandler(stub)
+	h := NewErpHandler(stub, nil)
 	r := gin.New()
 	r.GET("/settings", h.ListSettings)
 	r.GET("/settings/:key", h.GetSetting)
@@ -454,7 +454,7 @@ func TestErpHandler_ExportImport(t *testing.T) {
 	stub := &stubErpService{
 		exportData: &model.ExportData{Version: 1, ExportedAt: "2026-01-01T00:00:00Z"},
 	}
-	h := NewErpHandler(stub)
+	h := NewErpHandler(stub, nil)
 	r := gin.New()
 	r.GET("/data/export", h.ExportAll)
 	r.POST("/data/import", h.ImportAll)

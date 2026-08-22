@@ -82,12 +82,13 @@ go run ./cmd/envinit schema   # 建表
 go run ./cmd/envinit seed     # 填充种子数据
 ```
 
-初始化完成后会创建默认账号（密码均为 `123456`）：
+初始化完成后（或每次启动 webserver）会确保内置管理员存在：
 
-| 用户名 | 邮箱 |
-|--------|------|
-| admin | admin@example.com |
-| demo | demo@example.com |
+| 用户名 | 密码 | 说明 |
+|--------|------|------|
+| admin | admin | 系统内置管理员，不强制首次改密 |
+
+若不存在会自动创建；已存在则只保证角色为管理员且启用，**不会覆盖已修改的密码**。
 
 ### 4. 使用自定义配置初始化
 
@@ -143,14 +144,24 @@ http://localhost:30000/swagger/index.html
 
 ### 鉴权说明
 
-部分写操作接口需要 Bearer Token，示例：
+登录接口（无需 Token）：
+
+```bash
+curl -X POST http://localhost:30000/openapi/base/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"admin"}'
+```
+
+返回的 `token` 用于访问 ERP 与账号管理接口，示例：
 
 ```bash
 curl -X PUT http://localhost:30000/openapi/base/v1/accounts/1 \
-  -H "Authorization: Bearer demo-token" \
+  -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"nickname":"新昵称"}'
 ```
+
+默认内置账号：`admin` / `admin`（启动时自动确保存在）。
 
 ### 日志
 

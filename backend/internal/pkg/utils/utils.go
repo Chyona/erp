@@ -13,6 +13,15 @@ func HashPassword(password string) (string, error) {
 	return hex.EncodeToString(sum[:]), nil
 }
 
+// CheckPassword 校验明文密码是否与哈希一致。
+func CheckPassword(password, hashed string) bool {
+	got, err := HashPassword(password)
+	if err != nil {
+		return false
+	}
+	return got == hashed
+}
+
 // FormatTime 格式化时间为标准字符串。
 func FormatTime(t time.Time) string {
 	return t.Format("2006-01-02 15:04:05")

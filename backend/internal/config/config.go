@@ -21,6 +21,7 @@ type Config struct {
 	Logger   LoggerConfig   `mapstructure:"logger"`
 	Storage  StorageConfig  `mapstructure:"storage"`
 	LLM      LLMConfig      `mapstructure:"llm"`
+	Auth     AuthConfig     `mapstructure:"auth"`
 }
 
 // ServerConfig HTTP 服务相关配置。
@@ -28,6 +29,12 @@ type ServerConfig struct {
 	Host string `mapstructure:"host"`
 	Port int    `mapstructure:"port"`
 	Mode string `mapstructure:"mode"`
+}
+
+// AuthConfig 登录 JWT 配置。
+type AuthConfig struct {
+	JWTSecret   string `mapstructure:"jwt_secret"`
+	ExpireHours int    `mapstructure:"expire_hours"`
 }
 
 // DatabaseConfig PostgreSQL 数据库连接配置。
@@ -275,5 +282,14 @@ func applyEnvOverrides(cfg *Config) {
 	}
 	if val, ok := os.LookupEnv("APP_LLM_VISION_MODEL"); ok {
 		cfg.LLM.VisionModel = val
+	}
+
+	if val, ok := os.LookupEnv("APP_AUTH_JWT_SECRET"); ok {
+		cfg.Auth.JWTSecret = val
+	}
+	if val, ok := os.LookupEnv("APP_AUTH_EXPIRE_HOURS"); ok {
+		if n, err := strconv.Atoi(val); err == nil {
+			cfg.Auth.ExpireHours = n
+		}
 	}
 }

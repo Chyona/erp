@@ -179,7 +179,7 @@ function HintContent() {
         size="small"
         className="business-type-hint__tabs"
         items={tabItems}
-        destroyInactiveTabPane={false}
+        destroyOnHidden={false}
       />
       <div className="business-type-hint__footer">
         5000 元固定资产门槛以公司财务制度为准；研发项目相关支出也可记入 4301 研发支出。
@@ -195,7 +195,7 @@ export default function BusinessTypeHint() {
       title="业务类型说明"
       trigger="click"
       placement="rightTop"
-      overlayClassName="business-type-popover"
+      classNames={{ root: 'business-type-popover' }}
     >
       <InfoCircleOutlined className="field-hint-icon" aria-label="业务类型说明" />
     </Popover>

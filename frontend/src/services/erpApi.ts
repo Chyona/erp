@@ -152,11 +152,20 @@ async function vouchersBatch(input: {
   action: VoucherBatchAction;
   ids?: string | string[];
   items?: Voucher | Voucher[];
+  confirmPassword?: string;
 }): Promise<VoucherBatchOpResult> {
   await open();
-  const body: { action: VoucherBatchAction; ids?: string[]; items?: Voucher[] } = {
+  const body: {
+    action: VoucherBatchAction;
+    ids?: string[];
+    items?: Voucher[];
+    confirmPassword?: string;
+  } = {
     action: input.action
   };
+  if (input.confirmPassword) {
+    body.confirmPassword = input.confirmPassword;
+  }
   if (input.action === 'upsert') {
     body.items = normalizeItems(input.items ?? []);
     if (!body.items.length) {
@@ -204,7 +213,8 @@ async function putMany<K extends BatchStore>(
 /** 批量删除；凭证删除会附带清关联附件。 */
 async function removeMany(
   storeName: BatchStore,
-  ids: string | string[]
+  ids: string | string[],
+  options?: { confirmPassword?: string }
 ): Promise<VoucherBatchOpResult | void> {
   const unique = normalizeIds(ids);
   if (!unique.length) {
@@ -214,7 +224,11 @@ async function removeMany(
   }
   await open();
   if (storeName === 'vouchers') {
-    return vouchersBatch({ action: 'delete', ids: unique });
+    return vouchersBatch({
+      action: 'delete',
+      ids: unique,
+      confirmPassword: options?.confirmPassword
+    });
   }
   await apiRequest('POST', `${STORE_PATHS[storeName]}/batch`, {
     action: 'delete',

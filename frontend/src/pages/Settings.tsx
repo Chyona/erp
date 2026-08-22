@@ -5,6 +5,8 @@ import { Voucher } from '../services/voucher';
 import { TaxDeclaration } from '../services/taxDeclaration';
 import { formatQuarterLabel } from '../utils/reportPeriod';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
+import { Navigate } from 'react-router-dom';
 
 const { Title } = Typography;
 
@@ -19,21 +21,25 @@ const FIELDS = [
 export default function Settings() {
   const { message } = App.useApp();
   const { setCompanyName, refresh, refreshKey } = useApp();
+  const { can } = useAuth();
   const [form] = Form.useForm();
   const [deleteVoucherNo, setDeleteVoucherNo] = useState('');
   const [declaredQuarters, setDeclaredQuarters] = useState<
     Awaited<ReturnType<typeof TaxDeclaration.getDeclaredQuarters>>
   >([]);
+  const allowed = can('settings');
 
   const loadDeclaredQuarters = async () => {
     setDeclaredQuarters(await TaxDeclaration.getDeclaredQuarters());
   };
 
   useEffect(() => {
+    if (!allowed) return;
     loadDeclaredQuarters();
-  }, [refreshKey]);
+  }, [refreshKey, allowed]);
 
   useEffect(() => {
+    if (!allowed) return;
     (async () => {
       const all = await ErpApi.getAll('settings');
       const map = new Map(all.map((s) => [s.key, s.value]));
@@ -49,7 +55,11 @@ export default function Settings() {
       }
       form.setFieldsValue(values);
     })();
-  }, [form]);
+  }, [form, allowed]);
+
+  if (!allowed) {
+    return <Navigate to="/" replace />;
+  }
 
   const handleSave = async (values) => {
     const signatory = (values.defaultSignatory || '').trim();

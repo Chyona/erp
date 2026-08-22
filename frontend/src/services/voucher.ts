@@ -539,7 +539,7 @@ async function removeByVoucherNo(voucherNo) {
 }
 
 /** 批量删除未结项凭证（草稿、已审核） */
-async function removeMany(ids: string[]) {
+async function removeMany(ids: string[], options?: { confirmPassword?: string }) {
   const uniqueIds = [...new Set(ids)];
   const result = {
     deleted: 0,
@@ -589,7 +589,9 @@ async function removeMany(ids: string[]) {
   }
 
   if (eligible.length) {
-    const batch = (await ErpApi.removeMany('vouchers', eligible)) as {
+    const batch = (await ErpApi.removeMany('vouchers', eligible, {
+      confirmPassword: options?.confirmPassword
+    })) as {
       deleted?: number;
       skipped?: number;
       failed?: Array<{ id: string; voucherNo?: string; message: string }>;

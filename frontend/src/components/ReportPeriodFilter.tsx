@@ -119,7 +119,7 @@ export default function ReportPeriodFilter({
         open={open}
         onOpenChange={handleOpenChange}
         placement="bottomLeft"
-        overlayClassName="report-period-picker-popover"
+        classNames={{ root: 'report-period-picker-popover' }}
         content={
           <PeriodPickerPanel
             period={value}

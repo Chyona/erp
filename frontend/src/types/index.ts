@@ -47,6 +47,8 @@ export interface Voucher {
   reviewedBy?: string;
   postedBy?: string;
   cashierBy?: string;
+  /** 创建人账号 ID（鉴权归属） */
+  createdByAccountId?: number;
   reversedFromId?: string;
   reversedFromNo?: string;
   isTaxExemptionCarryForward?: boolean;

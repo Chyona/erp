@@ -51,3 +51,8 @@ llm:
   flash_model: ""
   # 截图识别需视觉模型；未配置时代码默认 qwen-vl-max
   vision_model: "qwen-vl-max"
+
+# 登录 JWT（可用环境变量 APP_AUTH_JWT_SECRET / APP_AUTH_EXPIRE_HOURS 覆盖）
+auth:
+  jwt_secret: "erp-dev-jwt-secret-change-me"
+  expire_hours: 72

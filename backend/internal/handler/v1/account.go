@@ -4,9 +4,9 @@ package v1
 import (
 	"strconv"
 
-	"erp/internal/service"
 	"erp/internal/pkg/response"
 	"erp/internal/pkg/utils"
+	"erp/internal/service"
 	"github.com/gin-gonic/gin"
 )
 
@@ -26,12 +26,19 @@ type CreateAccountRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,min=6"`
 	Nickname string `json:"nickname"`
+	Role     string `json:"role"`
 }
 
 // UpdateAccountRequest 更新账号请求体。
 type UpdateAccountRequest struct {
-	Nickname string `json:"nickname"`
-	Status   *int8  `json:"status"`
+	Nickname string  `json:"nickname"`
+	Role     *string `json:"role"`
+	Status   *int8   `json:"status"`
+}
+
+// ResetPasswordRequest 管理员重置密码。
+type ResetPasswordRequest struct {
+	Password string `json:"password" binding:"required,min=6"`
 }
 
 // CreateAccount 创建账号
@@ -51,7 +58,9 @@ func (h *AccountHandler) CreateAccount(c *gin.Context) {
 		return
 	}
 
-	account, err := h.accountService.CreateAccount(c.Request.Context(), req.Username, req.Email, req.Password, req.Nickname)
+	account, err := h.accountService.CreateAccount(
+		c.Request.Context(), req.Username, req.Email, req.Password, req.Nickname, req.Role,
+	)
 	if err != nil {
 		response.BadRequest(c, err.Error())
 		return
@@ -133,12 +142,32 @@ func (h *AccountHandler) UpdateAccount(c *gin.Context) {
 		return
 	}
 
-	account, err := h.accountService.UpdateAccount(c.Request.Context(), id, req.Nickname, req.Status)
+	account, err := h.accountService.UpdateAccount(c.Request.Context(), id, req.Nickname, req.Role, req.Status)
 	if err != nil {
-		response.NotFound(c, err.Error())
+		response.BadRequest(c, err.Error())
 		return
 	}
 	response.Success(c, account)
+}
+
+// ResetPassword 管理员重置密码
+func (h *AccountHandler) ResetPassword(c *gin.Context) {
+	id, err := parseUintParam(c, "id")
+	if err != nil {
+		response.BadRequest(c, "无效的账号 ID")
+		return
+	}
+	var req ResetPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "请输入至少 6 位的新密码")
+		return
+	}
+	account, err := h.accountService.ResetPassword(c.Request.Context(), id, req.Password)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	response.SuccessWithMessage(c, "密码已重置，用户下次登录需重新设置密码", account)
 }
 
 // DeleteAccount 删除账号
@@ -157,7 +186,7 @@ func (h *AccountHandler) DeleteAccount(c *gin.Context) {
 	}
 
 	if err := h.accountService.DeleteAccount(c.Request.Context(), id); err != nil {
-		response.InternalError(c, err.Error())
+		response.BadRequest(c, err.Error())
 		return
 	}
 	response.SuccessWithMessage(c, "删除成功", nil)

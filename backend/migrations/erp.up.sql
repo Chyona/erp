@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS account (
     remark      VARCHAR(256),
     phone       VARCHAR(32),
     ext         VARCHAR(1024),
+    role        VARCHAR(16)  NOT NULL DEFAULT 'user',
+    must_change_password BOOLEAN NOT NULL DEFAULT TRUE,
     status      SMALLINT     NOT NULL DEFAULT 1,
     created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
@@ -18,6 +20,7 @@ CREATE TABLE IF NOT EXISTS account (
 
 CREATE INDEX IF NOT EXISTS idx_account_deleted_at ON account (deleted_at);
 CREATE INDEX IF NOT EXISTS idx_account_open_id ON account (open_id);
+CREATE INDEX IF NOT EXISTS idx_account_role ON account (role);
 
 -- 会计科目（前端 accounts store → /openapi/erp/v1/accounts）
 CREATE TABLE IF NOT EXISTS chart_accounts (
@@ -55,6 +58,7 @@ CREATE TABLE IF NOT EXISTS vouchers (
     reviewed_by                     VARCHAR(64),
     posted_by                       VARCHAR(64),
     cashier_by                      VARCHAR(64),
+    created_by_account_id           BIGINT       NOT NULL DEFAULT 0,
     reversed_from_id                VARCHAR(64),
     reversed_from_no                VARCHAR(64),
     is_tax_exemption_carry_forward  BOOLEAN,
@@ -78,6 +82,7 @@ CREATE INDEX IF NOT EXISTS idx_vouchers_voucher_number ON vouchers (voucher_numb
 CREATE INDEX IF NOT EXISTS idx_vouchers_voucher_no ON vouchers (voucher_no);
 CREATE INDEX IF NOT EXISTS idx_vouchers_date ON vouchers (date);
 CREATE INDEX IF NOT EXISTS idx_vouchers_status ON vouchers (status);
+CREATE INDEX IF NOT EXISTS idx_vouchers_created_by_account_id ON vouchers (created_by_account_id);
 
 -- 凭证附件（文件存 COS 等对象存储，库内仅保存未签名 URL；前端经 ErpApi 读写元数据）
 CREATE TABLE IF NOT EXISTS attachments (

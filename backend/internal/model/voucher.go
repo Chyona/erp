@@ -25,6 +25,7 @@ type Voucher struct {
 	ReviewedBy                 string         `gorm:"size:64" json:"reviewedBy,omitempty"`
 	PostedBy                   string         `gorm:"size:64" json:"postedBy,omitempty"`
 	CashierBy                  string         `gorm:"size:64" json:"cashierBy,omitempty"`
+	CreatedByAccountID         uint           `gorm:"index;default:0" json:"createdByAccountId,omitempty"`
 	ReversedFromId             string         `gorm:"size:64" json:"reversedFromId,omitempty"`
 	ReversedFromNo             string         `gorm:"size:64" json:"reversedFromNo,omitempty"`
 	IsTaxExemptionCarryForward *bool          `json:"isTaxExemptionCarryForward,omitempty"`

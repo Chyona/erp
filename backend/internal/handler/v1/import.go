@@ -28,6 +28,9 @@ type parseImportImageJSONRequest struct {
 // ParseImportImage POST /vouchers/parse-import-image
 // 支持 multipart file，或 JSON { imageBase64, mimeType }。
 func (h *ImportHandler) ParseImportImage(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	if h.llm == nil || !h.llm.Enabled() {
 		response.Fail(c, http.StatusServiceUnavailable, 503, "未配置大模型（APP_LLM_API_KEY），无法识别截图")
 		return

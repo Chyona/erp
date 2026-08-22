@@ -2,6 +2,13 @@
  * 将 Connect/Vite 请求路由到 ErpMockStore，响应格式与后端 { code, message, data } 一致。
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import {
+  mockUsers,
+  parseBearer,
+  publicAccount,
+  tokenFor,
+  type MockRole
+} from './authUsers';
 import { erpMockStore, mockId, type MockAttachment, type MockVoucher } from './erpStore';
 
 type Json = Record<string, unknown> | unknown[] | string | number | boolean | null;
@@ -106,12 +113,236 @@ export async function handleErpMockRequest(
     return true;
   }
 
+  // —— 认证 ——
+  if (pathname === '/openapi/base/v1/auth/login' && method === 'POST') {
+    const raw = await readBody(req);
+    let body: { username?: string; password?: string } = {};
+    try {
+      body = JSON.parse(raw || '{}') as { username?: string; password?: string };
+    } catch {
+      fail(res, 400, '请输入用户名和密码');
+      return true;
+    }
+    const found = mockUsers.find(
+      (u) => u.username === body.username && u.password === body.password && u.status === 1
+    );
+    if (!found) {
+      fail(res, 401, '用户名或密码错误');
+      return true;
+    }
+    ok(res, {
+      token: tokenFor(found),
+      expires_at: '2099-12-31 23:59:59',
+      account_id: found.id,
+      username: found.username,
+      nickname: found.nickname,
+      role: found.role,
+      must_change_password: found.mustChangePassword
+    });
+    return true;
+  }
+
+  if (pathname === '/openapi/base/v1/auth/confirm-password' && method === 'POST') {
+    const auth = parseBearer(req);
+    if (!auth) {
+      fail(res, 401, '请先登录');
+      return true;
+    }
+    const raw = await readBody(req);
+    let body: { password?: string } = {};
+    try {
+      body = JSON.parse(raw || '{}') as { password?: string };
+    } catch {
+      fail(res, 400, '请输入密码');
+      return true;
+    }
+    const me = mockUsers.find((u) => u.id === auth.accountId);
+    if (!me || me.password !== body.password) {
+      fail(res, 403, '密码不正确');
+      return true;
+    }
+    ok(res, null, '密码校验通过');
+    return true;
+  }
+
+  if (pathname === '/openapi/base/v1/auth/setup-password' && method === 'POST') {
+    const auth = parseBearer(req);
+    if (!auth) {
+      fail(res, 401, '请先登录');
+      return true;
+    }
+    const body = (await parseJSON<{ password?: string }>(req)) || {};
+    if (!body.password || body.password.length < 6) {
+      fail(res, 400, '请输入至少 6 位的新密码');
+      return true;
+    }
+    const me = mockUsers.find((u) => u.id === auth.accountId);
+    if (!me) {
+      fail(res, 401, '请先登录');
+      return true;
+    }
+    if (!me.mustChangePassword) {
+      fail(res, 400, '当前账号无需设置密码，如需修改请联系管理员');
+      return true;
+    }
+    me.password = body.password;
+    me.mustChangePassword = false;
+    ok(res, {
+      token: tokenFor(me),
+      expires_at: '2099-12-31 23:59:59',
+      account_id: me.id,
+      username: me.username,
+      nickname: me.nickname,
+      role: me.role,
+      must_change_password: false
+    });
+    return true;
+  }
+
+  // —— 账号管理（仅管理员）——
+  if (pathname === '/openapi/base/v1/accounts' || pathname.startsWith('/openapi/base/v1/accounts/')) {
+    const auth = parseBearer(req);
+    if (!auth) {
+      fail(res, 401, '请先登录');
+      return true;
+    }
+    if (auth.role !== 'admin') {
+      fail(res, 403, '当前账号无权限执行此操作');
+      return true;
+    }
+
+    if (pathname === '/openapi/base/v1/accounts' && method === 'GET') {
+      ok(res, {
+        list: mockUsers.map(publicAccount),
+        total: mockUsers.length,
+        page: 1,
+        page_size: 100
+      });
+      return true;
+    }
+
+    if (pathname === '/openapi/base/v1/accounts' && method === 'POST') {
+      const body =
+        (await parseJSON<{
+          username?: string;
+          email?: string;
+          password?: string;
+          nickname?: string;
+          role?: MockRole;
+        }>(req)) || {};
+      if (!body.username || !body.email || !body.password) {
+        fail(res, 400, '请填写用户名、邮箱和密码');
+        return true;
+      }
+      if (mockUsers.some((u) => u.username === body.username)) {
+        fail(res, 400, '账号名已存在');
+        return true;
+      }
+      const nextId = Math.max(0, ...mockUsers.map((u) => u.id)) + 1;
+      const created = {
+        id: nextId,
+        username: body.username,
+        email: body.email,
+        password: body.password,
+        nickname: body.nickname || body.username,
+        role: (body.role === 'admin' || body.role === 'readonly' ? body.role : 'user') as MockRole,
+        status: 1,
+        mustChangePassword: true
+      };
+      mockUsers.push(created);
+      ok(res, publicAccount(created));
+      return true;
+    }
+
+    const resetMatch = pathname.match(/^\/openapi\/base\/v1\/accounts\/(\d+)\/reset-password$/);
+    if (resetMatch && method === 'POST') {
+      const id = Number(resetMatch[1]);
+      const idx = mockUsers.findIndex((u) => u.id === id);
+      if (idx < 0) {
+        fail(res, 404, '账号不存在');
+        return true;
+      }
+      const body = (await parseJSON<{ password?: string }>(req)) || {};
+      if (!body.password || body.password.length < 6) {
+        fail(res, 400, '请输入至少 6 位的新密码');
+        return true;
+      }
+      mockUsers[idx].password = body.password;
+      mockUsers[idx].mustChangePassword = true;
+      ok(res, publicAccount(mockUsers[idx]), '密码已重置，用户下次登录需重新设置密码');
+      return true;
+    }
+
+    const idMatch = pathname.match(/^\/openapi\/base\/v1\/accounts\/(\d+)$/);
+    if (idMatch) {
+      const id = Number(idMatch[1]);
+      const idx = mockUsers.findIndex((u) => u.id === id);
+      if (idx < 0) {
+        fail(res, 404, '账号不存在');
+        return true;
+      }
+      if (method === 'GET') {
+        ok(res, publicAccount(mockUsers[idx]));
+        return true;
+      }
+      if (method === 'PUT') {
+        const body =
+          (await parseJSON<{ nickname?: string; role?: MockRole; status?: number }>(req)) || {};
+        const target = mockUsers[idx];
+        if (body.nickname) target.nickname = body.nickname;
+        if (body.role === 'admin' || body.role === 'user' || body.role === 'readonly') {
+          if (target.role === 'admin' && body.role !== 'admin') {
+            if (mockUsers.filter((u) => u.role === 'admin').length <= 1) {
+              fail(res, 400, '至少保留一个管理员账号');
+              return true;
+            }
+          }
+          target.role = body.role;
+        }
+        if (typeof body.status === 'number') target.status = body.status;
+        ok(res, publicAccount(target));
+        return true;
+      }
+      if (method === 'DELETE') {
+        if (mockUsers[idx].role === 'admin' && mockUsers.filter((u) => u.role === 'admin').length <= 1) {
+          fail(res, 400, '不能删除最后一个管理员');
+          return true;
+        }
+        mockUsers.splice(idx, 1);
+        ok(res, null, '删除成功');
+        return true;
+      }
+    }
+
+    fail(res, 404, '未找到接口');
+    return true;
+  }
+
   if (!pathname.startsWith('/openapi/erp/v1')) {
     return false;
   }
 
   const path = stripBase(pathname);
   const store = erpMockStore;
+  const auth = parseBearer(req);
+
+  if (auth) {
+    const me = mockUsers.find((u) => u.id === auth.accountId);
+    if (me?.mustChangePassword) {
+      fail(res, 403, '请先设置登录密码');
+      return true;
+    }
+  }
+
+  // 只读：禁止写与导出备份
+  if (auth?.role === 'readonly') {
+    const isInit = method === 'POST' && path === '/app/init';
+    const isSafeRead = method === 'GET' || method === 'HEAD' || method === 'OPTIONS' || isInit;
+    if (!isSafeRead || path === '/data/export') {
+      fail(res, 403, '只读账号无权修改或导出数据');
+      return true;
+    }
+  }
 
   try {
     // POST /app/init
@@ -122,6 +353,10 @@ export async function handleErpMockRequest(
 
     // GET|POST /data/export|import
     if (method === 'GET' && path === '/data/export') {
+      if (auth?.role === 'readonly') {
+        fail(res, 403, '当前账号无权导出或备份');
+        return true;
+      }
       res.setHeader('Content-Disposition', 'attachment; filename=erp-backup.json');
       ok(res, store.exportAll());
       return true;

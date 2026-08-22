@@ -4,6 +4,36 @@ body {
   font-family: 'Microsoft YaHei', 'PingFang SC', -apple-system, sans-serif;
 }
 
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background:
+    radial-gradient(ellipse at 20% 20%, rgba(26, 86, 219, 0.12), transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(14, 116, 144, 0.1), transparent 45%),
+    linear-gradient(160deg, #eef2ff 0%, #f8fafc 45%, #e2e8f0 100%);
+}
+
+.login-card {
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.08);
+  border-radius: 12px;
+}
+
+.login-brand {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.login-brand-icon {
+  display: inline-block;
+  font-size: 36px;
+  margin-bottom: 8px;
+}
+
 :root {
   --app-table-header-bg: #f0f2f5;
   --app-table-header-color: #374151;

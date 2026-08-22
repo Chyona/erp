@@ -18,10 +18,12 @@ type Account struct {
 	Remark    string         `gorm:"size:256" json:"remark"`                       // 备注
 	Phone     string         `gorm:"size:32" json:"phone"`                         // 手机号码
 	Ext       string         `gorm:"size:1024" json:"ext"`                         // 扩展字段
-	Status    int8           `gorm:"default:1;comment:1正常 0禁用" json:"status"`
-	CreatedAt time.Time      `json:"created_at"`
-	UpdatedAt time.Time      `json:"updated_at"`
-	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	Role               string         `gorm:"size:16;index;default:user;comment:admin|user|readonly" json:"role"`
+	MustChangePassword bool           `gorm:"default:true;comment:首次登录需设置密码" json:"must_change_password"`
+	Status             int8           `gorm:"default:1;comment:1正常 0禁用" json:"status"`
+	CreatedAt          time.Time      `json:"created_at"`
+	UpdatedAt          time.Time      `json:"updated_at"`
+	DeletedAt          gorm.DeletedAt `gorm:"index" json:"-"`
 }
 
 // TableName 指定账号表名。

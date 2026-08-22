@@ -24,7 +24,7 @@ import {
 
 const { Text } = Typography;
 
-export default function MonthEndReimbursementPanel() {
+export default function MonthEndReimbursementPanel({ readOnly = false }: { readOnly?: boolean }) {
   const { message, modal } = App.useApp();
   const { refreshKey, refresh } = useApp();
   const navigate = useNavigate();
@@ -152,6 +152,8 @@ export default function MonthEndReimbursementPanel() {
           >
             查看 {record.reimbursementVoucher.voucherNo}
           </Button>
+        ) : readOnly ? (
+          <Text type="secondary">待管理员处理</Text>
         ) : (
           <Button
             type="link"
@@ -189,7 +191,13 @@ export default function MonthEndReimbursementPanel() {
 
   return (
     <div className="month-end-reimbursement-panel">
-      <WorkbenchPanelIntro message="摘要末尾写（xx垫付），月底按人汇总生成还垫付凭证。" />
+      <WorkbenchPanelIntro
+        message={
+          readOnly
+            ? '查看本月垫付汇总与归还进度（只读，生成凭证请联系管理员）。'
+            : '摘要末尾写（xx垫付），月底按人汇总生成还垫付凭证。'
+        }
+      />
 
       <Space wrap style={{ marginBottom: 16 }} align="start">
         <ReportPeriodFilter

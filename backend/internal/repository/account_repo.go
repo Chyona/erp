@@ -16,6 +16,7 @@ type AccountRepository interface {
 	List(ctx context.Context, offset, limit int) ([]model.Account, int64, error)
 	Update(ctx context.Context, account *model.Account) error
 	Delete(ctx context.Context, id uint) error
+	CountByRole(ctx context.Context, role string) (int64, error)
 }
 
 type accountRepository struct {
@@ -69,4 +70,10 @@ func (r *accountRepository) Update(ctx context.Context, account *model.Account) 
 
 func (r *accountRepository) Delete(ctx context.Context, id uint) error {
 	return r.db.WithContext(ctx).Delete(&model.Account{}, id).Error
+}
+
+func (r *accountRepository) CountByRole(ctx context.Context, role string) (int64, error) {
+	var total int64
+	err := r.db.WithContext(ctx).Model(&model.Account{}).Where("role = ?", role).Count(&total).Error
+	return total, err
 }

@@ -25,6 +25,7 @@ import {
   reportPeriodToDateRange
 } from '../utils/reportPeriod';
 import { mergeBalanceSheetRows } from '../utils/balanceSheetRows';
+import { useAuth } from '../context/AuthContext';
 
 const { Title, Text } = Typography;
 
@@ -238,9 +239,14 @@ function TrialBalanceTab({ period, dateRange, refreshToken, onHeaderAlertChange 
       return () => onHeaderAlertChange?.(null);
     }
 
+    const periodDebit = Number(data.totals?.periodDebit) || 0;
+    const periodCredit = Number(data.totals?.periodCredit) || 0;
+    const hasPeriodActivity = Math.abs(periodDebit) > 0.005 || Math.abs(periodCredit) > 0.005;
+
     if (!data.periodOccurrenceBalanced || !data.ytdOccurrenceBalanced) {
       onHeaderAlertChange?.({ kind: 'imbalance', data, period });
-    } else if (!data.periodProfitLossClosed) {
+    } else if (!data.periodProfitLossClosed && hasPeriodActivity) {
+      // 本期无发生额时不提示「未结转」，避免空报表误导
       onHeaderAlertChange?.({ kind: 'unclosed', data, period });
     } else {
       onHeaderAlertChange?.(null);
@@ -373,6 +379,7 @@ function BalanceSheetTab({ dateRange, refreshToken }) {
 
 export default function Reports() {
   const { message } = App.useApp();
+  const { can } = useAuth();
   const [period, setPeriod] = useState(defaultReportsPeriod);
   const [refreshToken, setRefreshToken] = useState(0);
   const [activeTab, setActiveTab] = useState('trial');
@@ -489,7 +496,7 @@ export default function Reports() {
               }
               placement="bottomRight"
               color="#fff"
-              overlayClassName="report-trial-imbalance-tooltip"
+              classNames={{ root: 'report-trial-imbalance-tooltip' }}
             >
               <span
                 className="report-trial-imbalance-icon"
@@ -509,22 +516,24 @@ export default function Reports() {
             onChange={setPeriod}
             onRefresh={() => setRefreshToken((token) => token + 1)}
             beforeRefresh={
-              <Dropdown
-                menu={{ items: exportMenuItems, onClick: handleExportMenuClick }}
-                placement="bottomRight"
-                disabled={exporting}
-              >
-                <Button icon={<DownloadOutlined />} loading={exporting}>
-                  导出 <DownOutlined />
-                </Button>
-              </Dropdown>
+              can('export') ? (
+                <Dropdown
+                  menu={{ items: exportMenuItems, onClick: handleExportMenuClick }}
+                  placement="bottomRight"
+                  disabled={exporting}
+                >
+                  <Button icon={<DownloadOutlined />} loading={exporting}>
+                    导出 <DownOutlined />
+                  </Button>
+                </Dropdown>
+              ) : null
             }
           />
         </div>
       </div>
       <Tabs
         className="report-tabs"
-        destroyInactiveTabPane
+        destroyOnHidden
         activeKey={activeTab}
         onChange={setActiveTab}
         items={items}

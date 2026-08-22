@@ -3,6 +3,7 @@ import { Button, Modal, Form, Input, Select, Typography, App } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { Accounts } from '../services/accounts';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import ScrollTable from '../components/ScrollTable';
 import { confirmDanger } from '../utils/confirmAction';
 
@@ -13,6 +14,8 @@ const CATEGORIES = ['资产', '负债', '所有者权益', '成本', '损益'];
 export default function AccountsPage() {
   const { message, modal } = App.useApp();
   const { accounts, setAccounts, refreshKey, refresh } = useApp();
+  const { can } = useAuth();
+  const canWrite = can('accounts.write');
   const [list, setList] = useState([]);
   const [categoryFilter, setCategoryFilter] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
@@ -78,21 +81,25 @@ export default function AccountsPage() {
       width: 100,
       render: (d) => (d === 'debit' ? '借方' : '贷方')
     },
-    {
-      title: '操作',
-      key: 'actions',
-      width: 160,
-      render: (_, record) => (
-        <>
-          <Button size="small" onClick={() => openModal(record)} style={{ marginRight: 8 }}>
-            编辑
-          </Button>
-          <Button size="small" danger onClick={() => handleDelete(record)}>
-            删除
-          </Button>
-        </>
-      )
-    }
+    ...(canWrite
+      ? [
+          {
+            title: '操作',
+            key: 'actions',
+            width: 160,
+            render: (_, record) => (
+              <>
+                <Button size="small" onClick={() => openModal(record)} style={{ marginRight: 8 }}>
+                  编辑
+                </Button>
+                <Button size="small" danger onClick={() => handleDelete(record)}>
+                  删除
+                </Button>
+              </>
+            )
+          }
+        ]
+      : [])
   ];
 
   return (
@@ -101,9 +108,11 @@ export default function AccountsPage() {
         <Title level={2} style={{ margin: 0 }}>
           会计科目
         </Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()}>
-          新增科目
-        </Button>
+        {canWrite ? (
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()}>
+            新增科目
+          </Button>
+        ) : null}
       </div>
 
       <div className="page-table-toolbar">

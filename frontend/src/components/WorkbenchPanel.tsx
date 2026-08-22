@@ -2,7 +2,7 @@ import { Card, Tabs } from 'antd';
 import MonthEndClosingPanel from './MonthEndClosingPanel';
 import MonthEndReimbursementPanel from './MonthEndReimbursementPanel';
 
-export default function WorkbenchPanel() {
+export default function WorkbenchPanel({ readOnly = false }: { readOnly?: boolean }) {
   return (
     <Card className="workbench-panel" style={{ marginBottom: 20 }}>
       <Tabs
@@ -11,12 +11,12 @@ export default function WorkbenchPanel() {
           {
             key: 'month-end-closing',
             label: '季末结转',
-            children: <MonthEndClosingPanel />
+            children: <MonthEndClosingPanel readOnly={readOnly} />
           },
           {
             key: 'reimbursement',
             label: '月底报销',
-            children: <MonthEndReimbursementPanel />
+            children: <MonthEndReimbursementPanel readOnly={readOnly} />
           }
         ]}
       />

@@ -1,4 +1,4 @@
-import { Layout, Menu, Button, Typography, App } from 'antd';
+import { Layout, Menu, Button, Typography, App, Space } from 'antd';
 import {
   DashboardOutlined,
   FileTextOutlined,
@@ -7,40 +7,62 @@ import {
   ReadOutlined,
   FundOutlined,
   AuditOutlined,
-  SettingOutlined
+  SettingOutlined,
+  LogoutOutlined,
+  TeamOutlined
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
+import { useMemo } from 'react';
 import { ErpApi } from '../services/erpApi';
 import { ExportUtil } from '../services/export';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { confirmWarning } from '../utils/confirmAction';
 import { APP_CONFIG } from '../config/app';
+import { ROLE_LABEL } from '../utils/permissions';
 
 const { Sider, Header, Content } = Layout;
-
-const NAV_ITEMS = [
-  { key: '/', icon: <DashboardOutlined />, label: '工作台' },
-  { key: '/vouchers', icon: <FileTextOutlined />, label: '凭证管理' },
-  { key: '/vouchers/new', icon: <PlusOutlined />, label: '新建凭证' },
-  { key: '/accounts', icon: <BookOutlined />, label: '会计科目' },
-  { key: '/ledger', icon: <ReadOutlined />, label: '明细账' },
-  { key: '/reports', icon: <FundOutlined />, label: '财务报表' },
-  { key: '/audit', icon: <AuditOutlined />, label: '审计日志' },
-  { key: '/settings', icon: <SettingOutlined />, label: '系统设置' }
-];
 
 export default function MainLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { message, modal } = App.useApp();
   const { companyName, refresh } = useApp();
+  const { user, logout, can } = useAuth();
+
+  const navItems = useMemo(() => {
+    const items = [
+      { key: '/', icon: <DashboardOutlined />, label: '工作台' },
+      { key: '/vouchers', icon: <FileTextOutlined />, label: '凭证管理' }
+    ];
+    if (can('voucher.create')) {
+      items.push({ key: '/vouchers/new', icon: <PlusOutlined />, label: '新建凭证' });
+    }
+    items.push(
+      { key: '/accounts', icon: <BookOutlined />, label: '会计科目' },
+      { key: '/ledger', icon: <ReadOutlined />, label: '明细账' },
+      { key: '/reports', icon: <FundOutlined />, label: '财务报表' },
+      { key: '/audit', icon: <AuditOutlined />, label: '审计日志' }
+    );
+    if (can('users')) {
+      items.push({ key: '/users', icon: <TeamOutlined />, label: '用户管理' });
+    }
+    if (can('settings')) {
+      items.push({ key: '/settings', icon: <SettingOutlined />, label: '系统设置' });
+    }
+    return items;
+  }, [can]);
 
   const menuKey = location.pathname.includes('/edit') || location.pathname.startsWith('/vouchers/new')
     ? '/vouchers/new'
-    : NAV_ITEMS.find((item) => item.key !== '/' && location.pathname.startsWith(item.key))?.key ||
+    : navItems.find((item) => item.key !== '/' && location.pathname.startsWith(item.key))?.key ||
       (location.pathname === '/' ? '/' : location.pathname);
 
   const handleBackup = async () => {
+    if (!can('backup')) {
+      message.warning('当前账号无权备份');
+      return;
+    }
     const data = await ErpApi.exportAll();
     const json = JSON.stringify(data, null, 2);
     ExportUtil.downloadBlob(
@@ -53,6 +75,10 @@ export default function MainLayout() {
   };
 
   const handleRestore = async () => {
+    if (!can('restore')) {
+      message.warning('当前账号无权恢复数据');
+      return;
+    }
     const ok = await confirmWarning(modal, {
       title: '确定恢复数据？',
       content: '恢复备份将覆盖现有全部数据（凭证、科目、设置等），此操作不可撤销。',
@@ -76,7 +102,7 @@ export default function MainLayout() {
         refresh();
         navigate('/');
       } catch (err) {
-        message.error('恢复失败：' + err.message);
+        message.error('恢复失败：' + (err as Error).message);
       }
     };
     input.click();
@@ -95,7 +121,7 @@ export default function MainLayout() {
           theme="dark"
           mode="inline"
           selectedKeys={[menuKey]}
-          items={NAV_ITEMS}
+          items={navItems}
           onClick={({ key }) => navigate(key)}
           className="sidebar-menu"
         />
@@ -108,12 +134,23 @@ export default function MainLayout() {
           <Typography.Text strong>
             {companyName || '请先在设置中填写企业信息'}
           </Typography.Text>
-          <div>
-            <Button onClick={handleBackup} style={{ marginRight: 8 }}>
-              备份数据
+          <Space>
+            <Typography.Text type="secondary">
+              {user?.nickname || user?.username || ''}
+              {user?.role ? `（${ROLE_LABEL[user.role] || user.role}）` : ''}
+            </Typography.Text>
+            {can('backup') ? <Button onClick={handleBackup}>备份数据</Button> : null}
+            {can('restore') ? <Button onClick={handleRestore}>恢复数据</Button> : null}
+            <Button
+              icon={<LogoutOutlined />}
+              onClick={() => {
+                logout();
+                navigate('/login', { replace: true });
+              }}
+            >
+              退出
             </Button>
-            <Button onClick={handleRestore}>恢复数据</Button>
-          </div>
+          </Space>
         </Header>
         <Content className="main-content">
           <Outlet />

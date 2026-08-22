@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"erp/internal/middleware"
 	"erp/internal/model"
 	"erp/internal/pkg/response"
 	"erp/internal/service"
@@ -14,11 +15,60 @@ import (
 
 // ErpHandler ERP HTTP 处理器，对应前端 ErpApi（services/erpApi.ts）。
 type ErpHandler struct {
-	erpService service.ErpService
+	erpService     service.ErpService
+	accountService service.AccountService
 }
 
-func NewErpHandler(erpService service.ErpService) *ErpHandler {
-	return &ErpHandler{erpService: erpService}
+func NewErpHandler(erpService service.ErpService, accountService service.AccountService) *ErpHandler {
+	return &ErpHandler{erpService: erpService, accountService: accountService}
+}
+
+func requireAdmin(c *gin.Context) bool {
+	actor := middleware.GetActor(c)
+	if actor == nil {
+		return true
+	}
+	if !actor.IsAdmin() {
+		response.Forbidden(c, "需要管理员权限")
+		return false
+	}
+	return true
+}
+
+func requireExport(c *gin.Context) bool {
+	actor := middleware.GetActor(c)
+	if actor == nil {
+		return true
+	}
+	if !actor.CanExport() {
+		response.Forbidden(c, "当前账号无权导出或备份")
+		return false
+	}
+	return true
+}
+
+func (h *ErpHandler) requireAdminDeletePassword(c *gin.Context, password string) bool {
+	actor := middleware.GetActor(c)
+	if actor == nil || !actor.IsAdmin() {
+		return true
+	}
+	if strings.TrimSpace(password) == "" {
+		response.BadRequest(c, "删除操作请输入登录密码确认")
+		return false
+	}
+	if h.accountService == nil {
+		response.InternalError(c, "账号服务未就绪")
+		return false
+	}
+	if err := h.accountService.VerifyPassword(c.Request.Context(), actor.AccountID, password); err != nil {
+		response.Forbidden(c, err.Error())
+		return false
+	}
+	return true
+}
+
+func (h *ErpHandler) writeAudit(c *gin.Context, action, target, details string) {
+	_, _ = h.erpService.AddAuditLog(c.Request.Context(), action, target, details, c.GetHeader("User-Agent"))
 }
 
 type setSettingRequest struct {
@@ -32,14 +82,16 @@ type addAuditLogRequest struct {
 }
 
 type batchIDsRequest struct {
-	IDs []string `json:"ids" binding:"required"`
+	IDs             []string `json:"ids" binding:"required"`
+	ConfirmPassword string   `json:"confirmPassword"`
 }
 
 // voucherBatchRequest 凭证统一批量入口：action 区分操作，ids/items 均为数组（1 条即单条）。
 type voucherBatchRequest struct {
-	Action string          `json:"action" binding:"required"`
-	IDs    []string        `json:"ids"`
-	Items  []model.Voucher `json:"items"`
+	Action          string          `json:"action" binding:"required"`
+	IDs             []string        `json:"ids"`
+	Items           []model.Voucher `json:"items"`
+	ConfirmPassword string          `json:"confirmPassword"`
 }
 
 type batchAttachmentsRequest struct {
@@ -80,6 +132,9 @@ func (h *ErpHandler) GetChartAccount(c *gin.Context) {
 
 // SaveChartAccount PUT /accounts/:id — 新增或更新科目（路径 ID 覆盖 body）。
 func (h *ErpHandler) SaveChartAccount(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	var item model.ChartAccount
 	if err := c.ShouldBindJSON(&item); err != nil {
 		response.BadRequest(c, err.Error())
@@ -91,29 +146,41 @@ func (h *ErpHandler) SaveChartAccount(c *gin.Context) {
 		response.BadRequest(c, err.Error())
 		return
 	}
+	h.writeAudit(c, "保存科目", item.ID, item.Code+" "+item.Name)
 	response.Success(c, saved)
 }
 
 // DeleteChartAccount DELETE /accounts/:id — 删除单条科目。
 func (h *ErpHandler) DeleteChartAccount(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	if err := h.erpService.DeleteChartAccount(c.Request.Context(), c.Param("id")); err != nil {
 		response.InternalError(c, err.Error())
 		return
 	}
+	h.writeAudit(c, "删除科目", c.Param("id"), "")
 	response.SuccessWithMessage(c, "删除成功", nil)
 }
 
 // ClearChartAccounts DELETE /accounts — 清空全部科目。
 func (h *ErpHandler) ClearChartAccounts(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	if err := h.erpService.ClearChartAccounts(c.Request.Context()); err != nil {
 		response.InternalError(c, err.Error())
 		return
 	}
+	h.writeAudit(c, "清空科目", "全部", "")
 	response.SuccessWithMessage(c, "已清空科目", nil)
 }
 
 // SaveChartAccountsBatch POST|PUT /accounts/batch — action=upsert|delete（缺省时有 items 则 upsert）。
 func (h *ErpHandler) SaveChartAccountsBatch(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	var req batchAccountsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
@@ -138,12 +205,14 @@ func (h *ErpHandler) SaveChartAccountsBatch(c *gin.Context) {
 			response.BadRequest(c, err.Error())
 			return
 		}
+		h.writeAudit(c, "批量保存科目", "batch", strconv.Itoa(len(saved))+" 条")
 		response.Success(c, gin.H{"action": "upsert", "count": len(saved), "items": saved})
 	case "delete":
 		if err := h.erpService.DeleteChartAccountsBatch(c.Request.Context(), req.IDs); err != nil {
 			response.InternalError(c, err.Error())
 			return
 		}
+		h.writeAudit(c, "批量删除科目", "batch", strconv.Itoa(len(req.IDs))+" 条")
 		response.Success(c, gin.H{"action": "delete", "count": len(req.IDs), "ids": req.IDs})
 	default:
 		response.BadRequest(c, "action 仅支持 upsert 或 delete")
@@ -152,6 +221,9 @@ func (h *ErpHandler) SaveChartAccountsBatch(c *gin.Context) {
 
 // DeleteChartAccountsBatch 兼容旧 DELETE /accounts/batch。
 func (h *ErpHandler) DeleteChartAccountsBatch(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	var req batchIDsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
@@ -161,6 +233,7 @@ func (h *ErpHandler) DeleteChartAccountsBatch(c *gin.Context) {
 		response.InternalError(c, err.Error())
 		return
 	}
+	h.writeAudit(c, "批量删除科目", "batch", strconv.Itoa(len(req.IDs))+" 条")
 	response.Success(c, gin.H{"action": "delete", "count": len(req.IDs), "ids": req.IDs})
 }
 
@@ -197,28 +270,40 @@ func (h *ErpHandler) VouchersBatch(c *gin.Context) {
 		}
 		response.Success(c, gin.H{"action": "upsert", "count": len(saved), "items": saved})
 	case "approve":
+		if !requireAdmin(c) {
+			return
+		}
 		result, err := h.erpService.ApproveVouchersBatch(ctx, req.IDs)
 		if err != nil {
 			response.InternalError(c, err.Error())
 			return
 		}
 		result.Action = "approve"
+		h.writeAudit(c, "审核凭证", "batch", "批准 "+strconv.Itoa(result.Approved)+" 张")
 		response.Success(c, result)
 	case "unapprove":
+		if !requireAdmin(c) {
+			return
+		}
 		result, err := h.erpService.UnapproveVouchersBatch(ctx, req.IDs)
 		if err != nil {
 			response.InternalError(c, err.Error())
 			return
 		}
 		result.Action = "unapprove"
+		h.writeAudit(c, "反审核凭证", "batch", "反审核 "+strconv.Itoa(result.Unapproved)+" 张")
 		response.Success(c, result)
 	case "delete":
+		if !h.requireAdminDeletePassword(c, req.ConfirmPassword) {
+			return
+		}
 		result, err := h.erpService.DeleteVouchersBatch(ctx, req.IDs)
 		if err != nil {
 			response.InternalError(c, err.Error())
 			return
 		}
 		result.Action = "delete"
+		h.writeAudit(c, "删除凭证", "batch", "删除 "+strconv.Itoa(result.Deleted)+" 张")
 		response.Success(c, result)
 	default:
 		response.BadRequest(c, "action 仅支持 upsert、approve、unapprove、delete")
@@ -249,17 +334,24 @@ func (h *ErpHandler) DeleteVouchersBatch(c *gin.Context) {
 		response.BadRequest(c, err.Error())
 		return
 	}
+	if !h.requireAdminDeletePassword(c, req.ConfirmPassword) {
+		return
+	}
 	result, err := h.erpService.DeleteVouchersBatch(c.Request.Context(), req.IDs)
 	if err != nil {
 		response.InternalError(c, err.Error())
 		return
 	}
 	result.Action = "delete"
+	h.writeAudit(c, "删除凭证", "batch", "删除 "+strconv.Itoa(result.Deleted)+" 张")
 	response.Success(c, result)
 }
 
 // ApproveVouchersBatch 兼容旧路径 POST /vouchers/batch-approve。
 func (h *ErpHandler) ApproveVouchersBatch(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	var req batchIDsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
@@ -271,11 +363,15 @@ func (h *ErpHandler) ApproveVouchersBatch(c *gin.Context) {
 		return
 	}
 	result.Action = "approve"
+	h.writeAudit(c, "审核凭证", "batch", "批准 "+strconv.Itoa(result.Approved)+" 张")
 	response.Success(c, result)
 }
 
 // UnapproveVouchersBatch 兼容旧路径 POST /vouchers/batch-unapprove。
 func (h *ErpHandler) UnapproveVouchersBatch(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	var req batchIDsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
@@ -287,6 +383,7 @@ func (h *ErpHandler) UnapproveVouchersBatch(c *gin.Context) {
 		return
 	}
 	result.Action = "unapprove"
+	h.writeAudit(c, "反审核凭证", "batch", "反审核 "+strconv.Itoa(result.Unapproved)+" 张")
 	response.Success(c, result)
 }
 
@@ -318,19 +415,34 @@ func (h *ErpHandler) SaveVoucher(c *gin.Context) {
 
 // DeleteVoucher DELETE /vouchers/:id — 删除单条凭证。
 func (h *ErpHandler) DeleteVoucher(c *gin.Context) {
-	if err := h.erpService.DeleteVoucher(c.Request.Context(), c.Param("id")); err != nil {
-		response.InternalError(c, err.Error())
+	var req struct {
+		ConfirmPassword string `json:"confirmPassword"`
+	}
+	_ = c.ShouldBindJSON(&req)
+	if req.ConfirmPassword == "" {
+		req.ConfirmPassword = c.Query("confirmPassword")
+	}
+	if !h.requireAdminDeletePassword(c, req.ConfirmPassword) {
 		return
 	}
+	if err := h.erpService.DeleteVoucher(c.Request.Context(), c.Param("id")); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	h.writeAudit(c, "删除凭证", c.Param("id"), "")
 	response.SuccessWithMessage(c, "删除成功", nil)
 }
 
 // ClearVouchers DELETE /vouchers — 清空全部凭证。
 func (h *ErpHandler) ClearVouchers(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	if err := h.erpService.ClearVouchers(c.Request.Context()); err != nil {
 		response.InternalError(c, err.Error())
 		return
 	}
+	h.writeAudit(c, "清空凭证", "全部", "")
 	response.SuccessWithMessage(c, "已清空凭证", nil)
 }
 
@@ -542,6 +654,9 @@ func (h *ErpHandler) ListSettings(c *gin.Context) {
 
 // SetSettingsBatch PUT /settings/batch — 批量写入设置。
 func (h *ErpHandler) SetSettingsBatch(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	var req batchSettingsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
@@ -552,6 +667,7 @@ func (h *ErpHandler) SetSettingsBatch(c *gin.Context) {
 		response.BadRequest(c, err.Error())
 		return
 	}
+	h.writeAudit(c, "批量保存设置", "settings", strconv.Itoa(len(saved))+" 项")
 	out := make([]gin.H, 0, len(saved))
 	for _, item := range saved {
 		var decoded interface{}
@@ -582,6 +698,9 @@ func (h *ErpHandler) GetSetting(c *gin.Context) {
 
 // SetSetting PUT /settings/:key — 写入设置值。
 func (h *ErpHandler) SetSetting(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	var req setSettingRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
@@ -592,6 +711,7 @@ func (h *ErpHandler) SetSetting(c *gin.Context) {
 		response.BadRequest(c, err.Error())
 		return
 	}
+	h.writeAudit(c, "保存设置", c.Param("key"), "")
 	var decoded interface{}
 	_ = json.Unmarshal(saved.Value, &decoded)
 	response.Success(c, gin.H{"key": saved.Key, "value": decoded})
@@ -599,29 +719,41 @@ func (h *ErpHandler) SetSetting(c *gin.Context) {
 
 // DeleteSetting DELETE /settings/:key — 删除单条设置。
 func (h *ErpHandler) DeleteSetting(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	if err := h.erpService.DeleteSetting(c.Request.Context(), c.Param("key")); err != nil {
 		response.InternalError(c, err.Error())
 		return
 	}
+	h.writeAudit(c, "删除设置", c.Param("key"), "")
 	response.SuccessWithMessage(c, "删除成功", nil)
 }
 
 // ClearSettings DELETE /settings — 清空全部设置。
 func (h *ErpHandler) ClearSettings(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	if err := h.erpService.ClearSettings(c.Request.Context()); err != nil {
 		response.InternalError(c, err.Error())
 		return
 	}
+	h.writeAudit(c, "清空设置", "全部", "")
 	response.SuccessWithMessage(c, "已清空设置", nil)
 }
 
 // ExportAll GET /data/export — 导出全库备份。
 func (h *ErpHandler) ExportAll(c *gin.Context) {
+	if !requireExport(c) {
+		return
+	}
 	data, err := h.erpService.ExportAll(c.Request.Context())
 	if err != nil {
 		response.InternalError(c, err.Error())
 		return
 	}
+	h.writeAudit(c, "备份导出", "全库", "")
 	c.Header("Content-Disposition", "attachment; filename=erp-backup.json")
 	c.JSON(http.StatusOK, response.Body{
 		Code:    0,
@@ -632,6 +764,9 @@ func (h *ErpHandler) ExportAll(c *gin.Context) {
 
 // ImportAll POST /data/import — 导入全库（先清空再写入）。
 func (h *ErpHandler) ImportAll(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	var data model.ExportData
 	if err := c.ShouldBindJSON(&data); err != nil {
 		response.BadRequest(c, err.Error())
@@ -641,5 +776,6 @@ func (h *ErpHandler) ImportAll(c *gin.Context) {
 		response.InternalError(c, err.Error())
 		return
 	}
+	h.writeAudit(c, "恢复导入", "全库", "")
 	response.SuccessWithMessage(c, "导入成功", nil)
 }

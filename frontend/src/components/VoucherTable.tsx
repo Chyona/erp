@@ -475,7 +475,7 @@ export default function VoucherTable({
             arrow={{ pointAtCenter: true }}
             getPopupContainer={() => document.body}
             zIndex={1100}
-            overlayClassName="voucher-list-attach-popover"
+            classNames={{ root: 'voucher-list-attach-popover' }}
             content={renderAttachPanelContent(voucher)}
           >
             <Button
