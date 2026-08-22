@@ -230,11 +230,6 @@ export default function VoucherDetailModal({
         wrapClassName="voucher-detail-modal-wrap"
         footer={
           <Space>
-            {voucher && canPrintVoucher(voucher) ? (
-              <Button onClick={handlePrint}>
-                打印凭证
-              </Button>
-            ) : null}
             {voucher && canMutateVoucher(voucher) && !carryForward && voucher.status === Voucher.STATUS.APPROVED && (
               <Button danger onClick={handleUnapprove} disabled={!voucher}>
                 反审核
@@ -280,6 +275,11 @@ export default function VoucherDetailModal({
                       删除凭证
                     </Button>
                   </Popconfirm>
+                  {voucher && canPrintVoucher(voucher) ? (
+                    <Button onClick={handlePrint}>
+                      打印凭证
+                    </Button>
+                  ) : null}
                   <Button onClick={handleLock} disabled={!voucher}>
                     凭证结项
                   </Button>

@@ -267,11 +267,11 @@ function VoucherEntrySheet({
         <div className="voucher-sheet__footer-left">
           <Space size={32} wrap>
             <Space size={4}>
-              <span className="voucher-sheet__meta-label">制单人</span>
+              <span className="voucher-sheet__meta-label">制单人：</span>
               <span className="voucher-sheet__footer-value">{signatory || '—'}</span>
             </Space>
             <Space size={4}>
-              <span className="voucher-sheet__meta-label">审核人</span>
+              <span className="voucher-sheet__meta-label">审核人：</span>
               <span className="voucher-sheet__footer-value">{reviewedBy || '—'}</span>
             </Space>
           </Space>

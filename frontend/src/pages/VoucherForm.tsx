@@ -26,7 +26,7 @@ import VoucherSheetTools from '../components/VoucherSheetTools';
 import VoucherFormActions from '../components/VoucherFormActions';
 import VoucherExamples from '../components/VoucherExamples';
 import { buildAttachmentFileName } from '../utils/attachmentName';
-import { INVOICE_TYPE, INVOICE_TYPE_OPTIONS } from '../constants/invoice';
+import { syncSalesVoucherMeta } from '../utils/salesInvoiceTax';
 import { isCarryForwardVoucher, CARRY_FORWARD_VOUCHER_READONLY_TIP } from '../utils/carryForwardVoucher';
 import {
   expectedCarryForwardDate,
@@ -108,7 +108,6 @@ export default function VoucherForm() {
 
   const voucherDate = Form.useWatch('voucherDate', form);
   const businessType = Form.useWatch('businessType', form);
-  const invoiceType = Form.useWatch('invoiceType', form);
   const signatory = Form.useWatch('signatory', form);
 
   const totals = useMemo(() => Voucher.calcTotals(entries), [entries]);
@@ -134,8 +133,6 @@ export default function VoucherForm() {
           voucherDate: isInsert && insertDate ? dayjs(insertDate) : presetDate || dayjs(),
           attachmentCount: 0,
           businessType: '日常费用',
-          invoiceType: INVOICE_TYPE.NONE,
-          taxAmount: undefined,
           signatory
         });
       })();
@@ -163,8 +160,6 @@ export default function VoucherForm() {
         ),
         attachmentCount: v.attachmentCount || 0,
         businessType: v.businessType || '其他',
-        invoiceType: v.invoiceType || INVOICE_TYPE.NONE,
-        taxAmount: v.taxAmount || undefined,
         invoiceNumbers: v.invoiceNumbers || '',
         remark: v.remark || '',
         signatory: v.preparedBy || v.reviewedBy || v.postedBy || v.cashierBy || ''
@@ -286,9 +281,7 @@ export default function VoucherForm() {
       attachments.length > 0 ||
       values.invoiceNumbers ||
       values.remark ||
-      values.taxAmount ||
-      (values.businessType && values.businessType !== '日常费用') ||
-      (values.invoiceType && values.invoiceType !== INVOICE_TYPE.NONE);
+      (values.businessType && values.businessType !== '日常费用');
 
     if (hasForm) {
       const ok = await confirmDanger(modal, {
@@ -309,8 +302,6 @@ export default function VoucherForm() {
     const signatory = await loadDefaultSignatory();
     form.setFieldsValue({
       businessType: '日常费用',
-      invoiceType: INVOICE_TYPE.NONE,
-      taxAmount: undefined,
       invoiceNumbers: '',
       remark: '',
       attachmentCount: 0,
@@ -480,8 +471,6 @@ export default function VoucherForm() {
     form.setFieldsValue({
       voucherDate: currentDate,
       businessType: '日常费用',
-      invoiceType: INVOICE_TYPE.NONE,
-      taxAmount: undefined,
       invoiceNumbers: '',
       remark: '',
       attachmentCount: 0,
@@ -521,6 +510,7 @@ export default function VoucherForm() {
         existingPreparedBy = existing?.preparedBy || '';
       }
 
+      const taxMeta = syncSalesVoucherMeta({ businessType: values.businessType, entries });
       const voucherData = {
         id: isEdit ? id : null,
         voucherType: VOUCHER_TYPE,
@@ -539,16 +529,8 @@ export default function VoucherForm() {
             : values.voucherDate.format('YYYY-MM-DD'),
         attachmentCount: attachments.length,
         businessType: values.businessType,
-        invoiceType:
-          values.businessType === '销售收入'
-            ? values.invoiceType || INVOICE_TYPE.NONE
-            : INVOICE_TYPE.NONE,
-        taxAmount:
-          values.businessType === '销售收入' &&
-            (values.invoiceType === INVOICE_TYPE.ORDINARY ||
-              values.invoiceType === INVOICE_TYPE.SPECIAL)
-            ? roundMoney(values.taxAmount)
-            : 0,
+        invoiceType: taxMeta.invoiceType,
+        taxAmount: taxMeta.taxAmount,
         taxExemptionDone,
         taxExemptionVoucherId,
         isTaxExemptionCarryForward,
@@ -607,8 +589,6 @@ export default function VoucherForm() {
   const applyExample = (example) => {
     form.setFieldsValue({
       businessType: example.businessType,
-      invoiceType: example.invoiceType || INVOICE_TYPE.NONE,
-      taxAmount: example.taxAmount,
       remark: example.remark || '',
       invoiceNumbers: example.invoiceNumbers || ''
     });
@@ -632,8 +612,6 @@ export default function VoucherForm() {
     const values = form.getFieldsValue();
     return {
       businessType: values.businessType,
-      invoiceType: values.invoiceType,
-      taxAmount: values.taxAmount,
       remark: values.remark || '',
       invoiceNumbers: values.invoiceNumbers || '',
       entries: entries.map((e) => ({
@@ -801,33 +779,6 @@ export default function VoucherForm() {
             )}
 
             <div className="voucher-form__extra">
-              {businessType === '销售收入' && (
-                <>
-                  <Form.Item
-                    name="invoiceType"
-                    label="开票类型"
-                    initialValue={INVOICE_TYPE.NONE}
-                  >
-                    <Select options={INVOICE_TYPE_OPTIONS} disabled={readOnly} />
-                  </Form.Item>
-                  {(invoiceType === INVOICE_TYPE.ORDINARY ||
-                    invoiceType === INVOICE_TYPE.SPECIAL) && (
-                    <Form.Item
-                      name="taxAmount"
-                      label="增值税额"
-                      rules={[{ required: true, message: '请填写增值税额' }]}
-                    >
-                      <InputNumber
-                        min={0}
-                        precision={2}
-                        style={{ width: '100%' }}
-                        placeholder="0.00"
-                        disabled={readOnly}
-                      />
-                    </Form.Item>
-                  )}
-                </>
-              )}
               <Form.Item name="invoiceNumbers" label="发票/单据号码">
                 <Input placeholder="多个号码用逗号分隔" readOnly={readOnly} />
               </Form.Item>

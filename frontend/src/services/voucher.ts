@@ -22,6 +22,7 @@ import {
   taxExemptionPeriodKey
 } from '../utils/reportPeriod';
 import { formatVoucherAuditDetail, formatVoucherBatchAuditDetail } from '../utils/auditDetail';
+import { syncSalesVoucherMeta } from '../utils/salesInvoiceTax';
 import type {
   Attachment,
   LedgerResult,
@@ -280,6 +281,10 @@ async function save(voucherData: VoucherInput, approve = false): Promise<Voucher
       // ignore
     }
   }
+
+  const taxMeta = syncSalesVoucherMeta(normalized);
+  normalized.invoiceType = taxMeta.invoiceType;
+  normalized.taxAmount = taxMeta.taxAmount;
 
   await ErpApi.put('vouchers', normalized as VoucherRecord);
 

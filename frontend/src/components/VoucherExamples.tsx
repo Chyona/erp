@@ -24,57 +24,83 @@ export const VOUCHER_EXAMPLES = [
   {
     key: 'advance-payment',
     category: '报销与日常',
-    title: '个人垫付',
+    title: '个人垫付（成本类）',
     businessType: '日常费用',
     remark:
-      '摘要末尾写（垫付人垫付），如（thm垫付），月底报销会按此人汇总；借 5602、贷 2241，贷方摘要可与借方相同',
+      '摘要末尾标注垫付人姓名，格式如“（姓名垫付）”，便于月底按垫付人汇总统计。',
     entries: [
-      { summary: '【办公费】腾讯云代码助手（thm垫付）', accountCode: '5602', debit: 140, credit: 0 },
+      { summary: '【办公费】腾讯云代码助手（thm垫付）', accountCode: '5401', debit: 140, credit: 0 },
       { summary: '【办公费】腾讯云代码助手（thm垫付）', accountCode: '2241', debit: 0, credit: 140 }
     ]
   },
   {
     key: 'advance-payment-other-person',
     category: '报销与日常',
-    title: '个人垫付（换人示例）',
+    title: '个人垫付（费用类）',
     businessType: '日常费用',
-    remark: '只需改括号内姓名，其余格式不变',
+    remark: '替换括号内姓名即可，其余字段与格式保持不变。',
     entries: [
-      { summary: '【福利费】晚餐（zqn垫付）', accountCode: '5602', debit: 259, credit: 0 },
-      { summary: '【福利费】晚餐（zqn垫付）', accountCode: '2241', debit: 0, credit: 259 }
+      { summary: '【福利费】加班聚餐（zqn垫付）', accountCode: '5602', debit: 259, credit: 0 },
+      { summary: '【福利费】加班聚餐（zqn垫付）', accountCode: '2241', debit: 0, credit: 259 }
+    ]
+  },
+  {
+    key: 'housing-fund-pay',
+    category: '工资与劳务',
+    title: '当月公积金自动扣款',
+    businessType: '工资薪酬',
+    remark: '公积金系统当月从对公账户自动划扣，无需计提。单位部分直接计入成本（5401），个人部分冲减发薪时代扣的应付职工薪酬（2211）',
+    entries: [
+      { summary: '本月住房公积金（单位部分）', accountCode: '5401', debit: 500, credit: 0 },
+      { summary: '本月住房公积金（个人部分）', accountCode: '2211', debit: 500, credit: 0 },
+      { summary: '公积金系统自动扣款', accountCode: '1002', debit: 0, credit: 1000 }
+    ]
+  },
+  {
+    key: 'social-security-pay',
+    category: '工资与劳务',
+    title: '当月社保自动扣款',
+    businessType: '工资薪酬',
+    remark: '社保系统当月从对公账户自动划扣，无需计提。单位部分直接计入成本（5401），个人部分冲减发薪时代扣的应付职工薪酬（2211）。',
+    entries: [
+      { summary: '本月社会保险费（单位部分）', accountCode: '5401', debit: 800, credit: 0 },
+      { summary: '本月社会保险费（个人部分）', accountCode: '2211', debit: 400, credit: 0 },
+      { summary: '社保系统自动扣款', accountCode: '1002', debit: 0, credit: 1200 }
     ]
   },
   {
     key: 'salary-accrual',
     category: '工资与劳务',
-    title: '计提当月工资（次月发放）',
+    title: '计提当月工资',
     businessType: '工资薪酬',
-    remark: '当月月底计提，次月5日发放',
+    remark: '当月月底计提，次月5日前发放',
     entries: [
-      { summary: '计提3月工资', accountCode: '5602', debit: 50000, credit: 0 },
-      { summary: '应付职工薪酬', accountCode: '2211', debit: 0, credit: 50000 }
+      { summary: '计提当月工资', accountCode: '5401', debit: 5000, credit: 0 },
+      { summary: '应付职工薪酬', accountCode: '2211', debit: 0, credit: 5000 }
     ]
   },
   {
-    key: 'salary-pay',
+    key: 'salary-pay-with-ss-hf',
     category: '工资与劳务',
-    title: '次月发放工资（代扣个税）',
+    title: '次月发放工资（代扣社保、公积金、个税）',
     businessType: '工资薪酬',
-    remark: '发放上月已计提工资，代扣个税2000元',
+    remark: '发放时代扣个人社保、公积金；',
     entries: [
-      { summary: '发放3月工资', accountCode: '2211', debit: 50000, credit: 0 },
-      { summary: '银行转账（实发）', accountCode: '1002', debit: 0, credit: 48000 },
-      { summary: '代扣个人所得税', accountCode: '2221', debit: 0, credit: 2000 }
+      { summary: '发放3月工资', accountCode: '2211', debit: 5000, credit: 0 },
+      { summary: '银行转账（实发）', accountCode: '1002', debit: 0, credit: 4100 },
+      { summary: '代扣社会保险费（个人）', accountCode: '2211', debit: 0, credit: 400 },
+      { summary: '代扣住房公积金（个人）', accountCode: '2211', debit: 0, credit: 300 },
+      { summary: '代扣个人所得税', accountCode: '2221', debit: 0, credit: 200 }
     ]
   },
   {
     key: 'labor-accrual',
     category: '工资与劳务',
-    title: '计提当月劳务费（次月支付）',
+    title: '计提当月劳务费',
     businessType: '日常费用',
     remark: '当月月底计提外包劳务费',
     entries: [
-      { summary: '计提3月项目劳务费', accountCode: '5602', debit: 10000, credit: 0 },
+      { summary: '计提3月项目劳务费', accountCode: '5401', debit: 10000, credit: 0 },
       { summary: '应付劳务费', accountCode: '2241', debit: 0, credit: 10000 }
     ]
   },
@@ -83,9 +109,9 @@ export const VOUCHER_EXAMPLES = [
     category: '工资与劳务',
     title: '次月支付劳务费（代扣个税）',
     businessType: '日常费用',
-    remark: '支付上月计提劳务费，代扣个税800元',
+    remark: '支付上月计提劳务费及代扣个税',
     entries: [
-      { summary: '支付3月劳务费', accountCode: '2241', debit: 10000, credit: 0 },
+      { summary: '支付上月劳务费', accountCode: '2241', debit: 10000, credit: 0 },
       { summary: '银行转账（实付）', accountCode: '1002', debit: 0, credit: 9200 },
       { summary: '代扣代缴个人所得税', accountCode: '2221', debit: 0, credit: 800 }
     ]
@@ -112,7 +138,7 @@ export const VOUCHER_EXAMPLES = [
     entries: [
       { summary: '收到XX项目开发款（含税）', accountCode: '1002', debit: 103000, credit: 0 },
       { summary: '确认主营业务收入', accountCode: '5001', debit: 0, credit: 100000 },
-      { summary: '销项税额', accountCode: '2221', debit: 0, credit: 3000 }
+      { summary: '销项税额（普票）', accountCode: '2221', debit: 0, credit: 3000 }
     ]
   },
   {
@@ -126,7 +152,7 @@ export const VOUCHER_EXAMPLES = [
     entries: [
       { summary: '收到XX项目开发款（专票含税）', accountCode: '1002', debit: 103000, credit: 0 },
       { summary: '确认主营业务收入', accountCode: '5001', debit: 0, credit: 100000 },
-      { summary: '销项税额', accountCode: '2221', debit: 0, credit: 3000 }
+      { summary: '销项税额（专票）', accountCode: '2221', debit: 0, credit: 3000 }
     ]
   },
   {
@@ -162,26 +188,48 @@ export const VOUCHER_EXAMPLES = [
     ]
   },
   {
+    key: 'iit-pay',
+    category: '税务',
+    title: '缴纳代扣个人所得税',
+    businessType: '税费缴纳',
+    remark: '发放工资或支付劳务费时代扣的个人所得税汇总缴至税务局',
+    entries: [
+      { summary: '缴纳代扣个人所得税', accountCode: '2221', debit: 800, credit: 0 },
+      { summary: '银行转账', accountCode: '1002', debit: 0, credit: 800 }
+    ]
+  },
+  {
+    key: 'surcharge-accrual',
+    category: '税务',
+    title: '计提附加税（季度）',
+    businessType: '税费缴纳',
+    remark: '根据季度末申报表计算的当期应纳附加税额进行计提。建议在企业所得税计提前完成，以使当期利润更为准确。',
+    entries: [
+      { summary: '计提2026年Q1附加税', accountCode: '5403', debit: 36, credit: 0 },
+      { summary: '应交附加税', accountCode: '2221', debit: 0, credit: 36 }
+    ]
+  },
+  {
     key: 'vat-surcharge-pay',
     category: '税务',
     title: '缴纳增值税及附加税（季度）',
     businessType: '税费缴纳',
-    remark: '增值税与城建税、教育费附加等通常一并缴纳，金额以申报表为准',
+    remark: '附加税已于季末计提；申报缴纳时冲减计提的 2221 应交税费，与增值税一并从银行账户划扣',
     entries: [
-      { summary: '缴纳2026年Q1增值税', accountCode: '2221', debit: 3000, credit: 0 },
-      { summary: '缴纳2026年Q1附加税', accountCode: '5403', debit: 360, credit: 0 },
-      { summary: '银行转账（税合计）', accountCode: '1002', debit: 0, credit: 3360 }
+      { summary: '缴纳2026年Q1增值税', accountCode: '2221', debit: 300, credit: 0 },
+      { summary: '缴纳2026年Q1附加税', accountCode: '2221', debit: 36, credit: 0 },
+      { summary: '银行转账（税合计）', accountCode: '1002', debit: 0, credit: 336 }
     ]
   },
   {
     key: 'cit-accrual',
     category: '税务',
-    title: '计提企业所得税',
+    title: '计提企业所得税（季度）',
     businessType: '税费缴纳',
-    remark: '按季预缴或年终汇算补提前计提',
+    remark: '按季预缴或年终汇算补提前计提企业所得税',
     entries: [
-      { summary: '计提2026年Q1企业所得税', accountCode: '5801', debit: 5000, credit: 0 },
-      { summary: '应交企业所得税', accountCode: '2221', debit: 0, credit: 5000 }
+      { summary: '计提本期应交企业所得税', accountCode: '5801', debit: 500, credit: 0 },
+      { summary: '应交企业所得税', accountCode: '2221', debit: 0, credit: 500 }
     ]
   },
   {
@@ -195,21 +243,10 @@ export const VOUCHER_EXAMPLES = [
       { summary: '银行转账', accountCode: '1002', debit: 0, credit: 5000 }
     ]
   },
-  {
-    key: 'iit-pay',
-    category: '税务',
-    title: '缴纳代扣个人所得税',
-    businessType: '税费缴纳',
-    remark: '工资/劳务代扣个税汇总缴至税务局',
-    entries: [
-      { summary: '缴纳代扣个人所得税', accountCode: '2221', debit: 2800, credit: 0 },
-      { summary: '银行转账', accountCode: '1002', debit: 0, credit: 2800 }
-    ]
-  }
 ];
 
 const CATEGORY_ORDER = ['主营收入', '报销与日常', '工资与劳务', '税务'];
-const DRAWER_WIDTH = 620;
+const DRAWER_WIDTH = 720;
 
 function ExampleCard({ example, accounts, onApply, applyLabel = '套用此模板' }) {
   const columns: ColumnsType<{ summary: string; accountCode: string; debit?: number; credit?: number }> = [
@@ -472,7 +509,7 @@ export default function VoucherExamples({ accounts, onApply, getSnapshot }) {
         <div className="voucher-examples-drawer__section">
           <div className="voucher-examples-drawer__section-title">系统示例</div>
           <Collapse
-            defaultActiveKey={CATEGORY_ORDER}
+            defaultActiveKey={[CATEGORY_ORDER[0]]}
             ghost
             items={systemCollapseItems}
             className="voucher-examples-drawer__list"

@@ -1,4 +1,5 @@
 import { INVOICE_TYPE } from '../constants/invoice';
+import { normalizeSalesTaxEntrySummaries } from '../utils/salesInvoiceTax';
 import * as XLSX from 'xlsx';
 import { normalizeVoucherFinanceInterestEntries } from '../utils/financeExpenseEntry';
 
@@ -454,6 +455,7 @@ function inferVoucherMeta(voucher) {
     if (taxCreditTotal > 0) {
       voucher.taxAmount = taxCreditTotal;
     }
+    voucher.entries = normalizeSalesTaxEntrySummaries(voucher.entries, voucher.invoiceType);
   } else if (codes.has('2211')) {
     voucher.businessType = '工资薪酬';
   } else if (codes.has('5301') && codes.has('2221')) {

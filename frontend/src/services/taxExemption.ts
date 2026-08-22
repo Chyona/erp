@@ -3,6 +3,7 @@ import { Accounts } from './accounts';
 import { Voucher } from './voucher';
 import { TaxDeclaration } from './taxDeclaration';
 import { INVOICE_TYPE } from '../constants/invoice';
+import { syncSalesVoucherMeta } from '../utils/salesInvoiceTax';
 import { getCurrentOperatorName } from '../context/AuthContext';
 import type { TaxExemptionTaxLine, Voucher as VoucherRecord } from '../types';
 import {
@@ -221,13 +222,14 @@ export async function getPeriodSummary(period) {
 
   for (const v of inPeriod) {
     if (!isSalesVoucher(v)) continue;
+    const { invoiceType } = syncSalesVoucherMeta(v);
 
-    if (v.invoiceType === INVOICE_TYPE.SPECIAL) {
+    if (invoiceType === INVOICE_TYPE.SPECIAL) {
       specialInvoices.push(enrichSalesVoucher(v));
       continue;
     }
 
-    if (v.invoiceType === INVOICE_TYPE.ORDINARY) {
+    if (invoiceType === INVOICE_TYPE.ORDINARY) {
       const taxLines = expandSalesTaxLines(v);
       if (!taxLines.length) {
         ordinaryWithoutTax.push(enrichSalesVoucher(v));

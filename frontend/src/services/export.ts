@@ -1,6 +1,5 @@
 import { Voucher } from './voucher';
 import { ErpApi } from './erpApi';
-import { INVOICE_TYPE_LABEL } from '../constants/invoice';
 import { mergeBalanceSheetRows } from '../utils/balanceSheetRows';
 import { formatStoredTaxExemptionPeriod } from '../utils/reportPeriod';
 
@@ -24,7 +23,6 @@ const VOUCHER_EXPORT_HEADERS = [
   '借方金额',
   '贷方金额',
   '附件数',
-  '开票类型',
   '发票/单据号码',
   '校验码',
   '状态',
@@ -34,7 +32,7 @@ const VOUCHER_EXPORT_HEADERS = [
 ] as const;
 
 /** Excel 列宽（字符宽度），避免打开后日期变成 ####、摘要被截断 */
-const VOUCHER_EXPORT_COL_WIDTHS = [12, 12, 12, 28, 10, 18, 14, 14, 10, 10, 20, 22, 10, 12, 12, 28];
+const VOUCHER_EXPORT_COL_WIDTHS = [12, 12, 12, 28, 10, 18, 14, 14, 10, 20, 22, 10, 12, 12, 28];
 
 function compareVouchersAsc(a, b) {
   const dateCmp = String(a?.date || '').localeCompare(String(b?.date || ''));
@@ -52,10 +50,6 @@ function buildVoucherExportRows(vouchers) {
     const attachmentCount = v.attachmentCount ?? (v.attachmentIds || []).length;
     const preparedBy = v.preparedBy || '';
     const reviewedBy = v.reviewedBy || '';
-    const invoiceTypeLabel =
-      v.businessType === '销售收入'
-        ? INVOICE_TYPE_LABEL[v.invoiceType] || INVOICE_TYPE_LABEL['']
-        : '';
     for (const e of v.entries) {
       rows.push([
         v.voucherNo,
@@ -67,7 +61,6 @@ function buildVoucherExportRows(vouchers) {
         Number(e.debit) || 0,
         Number(e.credit) || 0,
         attachmentCount,
-        invoiceTypeLabel,
         v.invoiceNumbers || '',
         v.checksum || '',
         Voucher.STATUS_LABEL[v.status] || v.status,
@@ -788,15 +781,9 @@ function balanceSheetToCSV(data) {
 }
 
 function renderPrintVoucher(voucher, company, attachments) {
-  const INVOICE_LABELS = { ordinary: '普票', special: '专票' };
-  const invoiceMeta =
-    voucher.businessType === '销售收入' && voucher.invoiceType
-      ? `<div style="margin-top:8px;font-size:12px">开票类型：${INVOICE_LABELS[voucher.invoiceType] || voucher.invoiceType}${
-          voucher.taxAmount ? `，增值税额：${parseFloat(voucher.taxAmount).toFixed(2)}` : ''
-        }${voucher.taxExemptionDone ? '（已减免结转）' : ''}</div>`
-      : voucher.isTaxExemptionCarryForward
-        ? `<div style="margin-top:8px;font-size:12px">普票增值税减免结转 · ${formatStoredTaxExemptionPeriod(voucher)}</div>`
-        : '';
+  const invoiceMeta = voucher.isTaxExemptionCarryForward
+    ? `<div style="margin-top:8px;font-size:12px">普票增值税减免结转 · ${formatStoredTaxExemptionPeriod(voucher)}</div>`
+    : '';
 
   const entriesHtml = voucher.entries
     .map(

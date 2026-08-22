@@ -5,10 +5,10 @@ import type { VoucherFilters } from '../types';
 
 const UNLIMITED = '';
 
-const STATUS_OPTIONS = [  { value: UNLIMITED, label: '不限' },
-  { value: 'draft', label: '草稿' },
-  { value: 'approved', label: '已审核' },
-  { value: 'locked', label: '已结项' }
+const STATUS_OPTIONS = [{ value: UNLIMITED, label: '不限' },
+{ value: 'draft', label: '草稿' },
+{ value: 'approved', label: '已审核' },
+{ value: 'locked', label: '已结项' }
 ];
 
 const BUSINESS_TYPE_OPTIONS = [
