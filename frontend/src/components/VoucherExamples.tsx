@@ -49,7 +49,7 @@ export const VOUCHER_EXAMPLES = [
     category: '工资与劳务',
     title: '当月公积金自动扣款',
     businessType: '工资薪酬',
-    remark: '公积金系统当月从对公账户自动划扣，无需计提。单位部分直接计入成本（5401），个人部分冲减发薪时代扣的应付职工薪酬（2211）',
+    remark: '公积金系统当月从对公账户自动划扣。单位部分直接计入 5401 主营业务成本，个人部分冲减发薪时代扣的 2211 应付职工薪酬。',
     entries: [
       { summary: '本月住房公积金（单位部分）', accountCode: '5401', debit: 500, credit: 0 },
       { summary: '本月住房公积金（个人部分）', accountCode: '2211', debit: 500, credit: 0 },
@@ -61,7 +61,7 @@ export const VOUCHER_EXAMPLES = [
     category: '工资与劳务',
     title: '当月社保自动扣款',
     businessType: '工资薪酬',
-    remark: '社保系统当月从对公账户自动划扣，无需计提。单位部分直接计入成本（5401），个人部分冲减发薪时代扣的应付职工薪酬（2211）。',
+    remark: '社保系统当月从对公账户自动划扣。单位部分直接计入 5401 主营业务成本，个人部分冲减发薪时代扣的 2211 应付职工薪酬。',
     entries: [
       { summary: '本月社会保险费（单位部分）', accountCode: '5401', debit: 800, credit: 0 },
       { summary: '本月社会保险费（个人部分）', accountCode: '2211', debit: 400, credit: 0 },
@@ -84,13 +84,13 @@ export const VOUCHER_EXAMPLES = [
     category: '工资与劳务',
     title: '次月发放工资（代扣社保、公积金、个税）',
     businessType: '工资薪酬',
-    remark: '发放时代扣个人社保、公积金；',
+    remark: '发放上月计提工资，其中个人社保及公积金贷记 2211 应付职工薪酬，冲减系统自动扣款时已确认的负债；个税贷记 2221 应交税费，待缴纳时冲减。',
     entries: [
-      { summary: '发放3月工资', accountCode: '2211', debit: 5000, credit: 0 },
-      { summary: '银行转账（实发）', accountCode: '1002', debit: 0, credit: 4100 },
-      { summary: '代扣社会保险费（个人）', accountCode: '2211', debit: 0, credit: 400 },
-      { summary: '代扣住房公积金（个人）', accountCode: '2211', debit: 0, credit: 300 },
-      { summary: '代扣个人所得税', accountCode: '2221', debit: 0, credit: 200 }
+      { summary: '发放张三上月工资', accountCode: '2211', debit: 5000, credit: 0 },
+      { summary: '银行转账（实发工资）', accountCode: '1002', debit: 0, credit: 4100 },
+      { summary: '代扣社会保险费（冲减个人部分）', accountCode: '2211', debit: 0, credit: 400 },
+      { summary: '代扣住房公积金（冲减个人部分）', accountCode: '2211', debit: 0, credit: 300 },
+      { summary: '代扣个人所得税（代缴时冲减）', accountCode: '2221', debit: 0, credit: 200 }
     ]
   },
   {
@@ -111,9 +111,9 @@ export const VOUCHER_EXAMPLES = [
     businessType: '日常费用',
     remark: '支付上月计提劳务费及代扣个税',
     entries: [
-      { summary: '支付上月劳务费', accountCode: '2241', debit: 10000, credit: 0 },
-      { summary: '银行转账（实付）', accountCode: '1002', debit: 0, credit: 9200 },
-      { summary: '代扣代缴个人所得税', accountCode: '2221', debit: 0, credit: 800 }
+      { summary: '支付陶工上月劳务费', accountCode: '2241', debit: 10000, credit: 0 },
+      { summary: '银行转账（实付劳务费）', accountCode: '1002', debit: 0, credit: 9200 },
+      { summary: '代扣劳务报酬个人所得税（代缴时冲减）', accountCode: '2221', debit: 0, credit: 800 }
     ]
   },
   {
@@ -163,28 +163,28 @@ export const VOUCHER_EXAMPLES = [
     invoiceType: 'ordinary',
     taxAmount: 9.11,
     remark:
-      '商户提现回流公账：借 1002，贷 5001 + 多笔 2221（按发票拆分税额）；金额仅为演示，请按实际对账单修改',
+      '企业微信提现至对公账户。提现总额中，对已知客户开票的部分按发票金额拆分确认主营业务收入并计提销项税额；未知客户（匿名充值）的部分全额确认主营业务收入，不计提销项税。',
     entries: [
       { summary: '【提现】企业微信提现到公账', accountCode: '1002', debit: 2994, credit: 0 },
-      { summary: '确认收入（微信提现）', accountCode: '5001', debit: 0, credit: 2984.89 },
-      { summary: '应交增值税（有明确客户，开票 20）', accountCode: '2221', debit: 0, credit: 0.2 },
-      { summary: '应交增值税（有明确客户，开票 900）', accountCode: '2221', debit: 0, credit: 8.91 }
+      { summary: '确认主营业务收入（企业微信提现）', accountCode: '5001', debit: 0, credit: 2984.89 },
+      { summary: '销项税额（普票，发票号xxx，金额20）', accountCode: '2221', debit: 0, credit: 0.2 },
+      { summary: '销项税额（普票，发票号xxx，金额900）', accountCode: '2221', debit: 0, credit: 8.91 }
     ]
   },
   {
     key: 'wechat-pay-withdraw',
     category: '主营收入',
-    title: '微信支付商户提现到公账',
+    title: '微信商户平台提现到公账',
     businessType: '销售收入',
     invoiceType: 'ordinary',
     taxAmount: 1.16,
     remark:
-      '微信支付商户平台提现：借 1002，贷 5001 + 多笔 2221；金额仅为演示，请按实际对账单与发票修改',
+      '微信商户平台提现至对公账户。提现总额中，对已知客户开票的部分按发票金额拆分确认主营业务收入并计提销项税额；未知客户（匿名充值）的部分全额确认主营业务收入，不计提销项税。',
     entries: [
-      { summary: '【提现】微信支付商户平台提现到公账', accountCode: '1002', debit: 1558, credit: 0 },
-      { summary: '确认收入（微信提现）', accountCode: '5001', debit: 0, credit: 1556.84 },
-      { summary: '应交增值税（有明确客户，开票 58.42）', accountCode: '2221', debit: 0, credit: 0.58 },
-      { summary: '应交增值税（有明确客户，开票 58）', accountCode: '2221', debit: 0, credit: 0.58 }
+      { summary: '【提现】微信商户平台提现到公账', accountCode: '1002', debit: 1558, credit: 0 },
+      { summary: '确认主营业务收入（微信商户平台提现）', accountCode: '5001', debit: 0, credit: 1556.84 },
+      { summary: '销项税额（普票，发票号xxx，金额58）', accountCode: '2221', debit: 0, credit: 0.58 },
+      { summary: '销项税额（普票，发票号xxx，金额58）', accountCode: '2221', debit: 0, credit: 0.58 }
     ]
   },
   {
@@ -192,10 +192,10 @@ export const VOUCHER_EXAMPLES = [
     category: '税务',
     title: '缴纳代扣个人所得税',
     businessType: '税费缴纳',
-    remark: '发放工资或支付劳务费时代扣的个人所得税汇总缴至税务局',
+    remark: '汇总缴纳上一期间发放工资/劳务费时代扣的个人所得税',
     entries: [
-      { summary: '缴纳代扣个人所得税', accountCode: '2221', debit: 800, credit: 0 },
-      { summary: '银行转账', accountCode: '1002', debit: 0, credit: 800 }
+      { summary: '缴纳上月代扣个人所得税', accountCode: '2221', debit: 800, credit: 0 },
+      { summary: '银行转账（缴纳税款）', accountCode: '1002', debit: 0, credit: 800 }
     ]
   },
   {
@@ -205,8 +205,8 @@ export const VOUCHER_EXAMPLES = [
     businessType: '税费缴纳',
     remark: '根据季度末申报表计算的当期应纳附加税额进行计提。建议在企业所得税计提前完成，以使当期利润更为准确。',
     entries: [
-      { summary: '计提2026年Q1附加税', accountCode: '5403', debit: 36, credit: 0 },
-      { summary: '应交附加税', accountCode: '2221', debit: 0, credit: 36 }
+      { summary: '计提2026年Q1附加税（预估数）', accountCode: '5403', debit: 36, credit: 0 },
+      { summary: '应交附加税（预估数）', accountCode: '2221', debit: 0, credit: 36 }
     ]
   },
   {
@@ -218,7 +218,7 @@ export const VOUCHER_EXAMPLES = [
     entries: [
       { summary: '缴纳2026年Q1增值税', accountCode: '2221', debit: 300, credit: 0 },
       { summary: '缴纳2026年Q1附加税', accountCode: '2221', debit: 36, credit: 0 },
-      { summary: '银行转账（税合计）', accountCode: '1002', debit: 0, credit: 336 }
+      { summary: '银行转账（增值税及附加税合计）', accountCode: '1002', debit: 0, credit: 336 }
     ]
   },
   {
@@ -228,8 +228,8 @@ export const VOUCHER_EXAMPLES = [
     businessType: '税费缴纳',
     remark: '按季预缴或年终汇算补提前计提企业所得税',
     entries: [
-      { summary: '计提本期应交企业所得税', accountCode: '5801', debit: 500, credit: 0 },
-      { summary: '应交企业所得税', accountCode: '2221', debit: 0, credit: 500 }
+      { summary: '计提本期应交企业所得税（预估数）', accountCode: '5801', debit: 500, credit: 0 },
+      { summary: '应交企业所得税（预估数）', accountCode: '2221', debit: 0, credit: 500 }
     ]
   },
   {
@@ -240,7 +240,7 @@ export const VOUCHER_EXAMPLES = [
     remark: '公账缴纳已计提的企业所得税',
     entries: [
       { summary: '缴纳2026年Q1企业所得税', accountCode: '2221', debit: 5000, credit: 0 },
-      { summary: '银行转账', accountCode: '1002', debit: 0, credit: 5000 }
+      { summary: '银行转账（缴纳企业所得税）', accountCode: '1002', debit: 0, credit: 5000 }
     ]
   },
 ];
