@@ -10,6 +10,9 @@ RUN go mod download
 
 COPY . .
 
+# config.yaml 不入库；构建前用示例配置满足 //go:embed
+RUN cp internal/config/config.example.yaml internal/config/config.yaml
+
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o webserver ./cmd/webserver
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o envinit ./cmd/envinit
 
