@@ -1,7 +1,7 @@
 services:
-  base:
-    container_name: base
-    image: gogoshine/base:latest
+  erp:
+    container_name: erp
+    image: gogoshine/erp:latest
     platform: linux/amd64
     restart: unless-stopped
     ports:
@@ -11,7 +11,7 @@ services:
     env_file:
       - .env
     environment:
-      # 非敏感配置：直接在 compose 中声明
+      # 非敏感配置：直接在 compose 中声明（与 config.applyEnvOverrides 变量名一致）
       SERVER_HOST: "0.0.0.0"
       SERVER_PORT: 30000
       SERVER_MODE: release
@@ -27,8 +27,8 @@ services:
       # 敏感配置（DATABASE_* / COS_*）由 .env 注入
       TZ: Asia/Shanghai
     networks:
-      - base-net
+      - erp-net
 
 networks:
-  base-net:
+  erp-net:
     driver: bridge

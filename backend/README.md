@@ -168,6 +168,9 @@ cp .env.example .env   # 编辑 .env 填入数据库信息
 docker compose up -d --build
 ```
 
+本地构建上下文为 `backend/`（`go.mod` 所在目录），Dockerfile 为 `backend/docker/Dockerfile`。  
+CI 在推送 `v*` tag 时按同样路径打包并推送到 Docker Hub：`{DOCKERHUB_USERNAME}/erp`。
+
 详细配置说明见 `docker/docker-compose.yaml` 与 `docker/.env.example`。
 
 ## 常用 API 路径

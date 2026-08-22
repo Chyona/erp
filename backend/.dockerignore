@@ -1,0 +1,14 @@
+# 构建无关文件，减小 context、加快 CI/本地构建
+.git
+.gitignore
+**/*_test.go
+**/testdata/
+logs/
+*.log
+docker/.env
+docker/logs/
+README.md
+docs/ERP_API.md
+.env
+.env.*
+!.env.example
