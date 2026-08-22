@@ -28,7 +28,7 @@ jobs:
       uses: docker/metadata-action@v5
       with:
         images: |
-          ${{ secrets.DOCKERHUB_USERNAME }}/live-mixer
+          ${{ secrets.DOCKERHUB_USERNAME }}/erp
         tags: |
           type=semver,pattern={{version}}
           type=semver,pattern=v{{version}}
