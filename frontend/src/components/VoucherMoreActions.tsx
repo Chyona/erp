@@ -9,7 +9,7 @@ import { isCarryForwardVoucher } from '../utils/carryForwardVoucher';
 
 const { Text } = Typography;
 
-export default function VoucherMoreActions({ voucher, onRefresh }) {
+export default function VoucherMoreActions({ voucher }) {
   const navigate = useNavigate();
   const { message, modal } = App.useApp();
   const { refresh } = useApp();
@@ -28,7 +28,6 @@ export default function VoucherMoreActions({ voucher, onRefresh }) {
 
   const notifyDataChanged = () => {
     refresh();
-    onRefresh?.();
   };
 
   const handleReverse = () => {
@@ -82,7 +81,7 @@ export default function VoucherMoreActions({ voucher, onRefresh }) {
       }
       setReorderOpen(false);
       setTargetNumber(null);
-      notifyDataChanged();
+      await notifyDataChanged();
     } catch (err) {
       message.error(err.message || '调整顺序失败');
     } finally {
@@ -104,7 +103,7 @@ export default function VoucherMoreActions({ voucher, onRefresh }) {
       );
       setInsertOpen(false);
       setTargetNumber(null);
-      notifyDataChanged();
+      await notifyDataChanged();
       navigate(`/vouchers/new?date=${voucher.date}&number=${reservedNumber}`);
     } catch (err) {
       message.error(err.message || '插入凭证失败');

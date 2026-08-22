@@ -4,6 +4,7 @@ import { PlusOutlined } from '@ant-design/icons';
 import { Accounts } from '../services/accounts';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
+import { useAsyncLoading } from '../hooks/useAsyncLoading';
 import ScrollTable from '../components/ScrollTable';
 import { confirmDanger } from '../utils/confirmAction';
 
@@ -21,14 +22,16 @@ export default function AccountsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form] = Form.useForm();
+  const { loading: listLoading, run: runListLoad } = useAsyncLoading(true);
+  const { loading: saving, run: runSave } = useAsyncLoading();
 
   useEffect(() => {
-    (async () => {
+    void runListLoad(async () => {
       const accs = await Accounts.getAll();
       setAccounts(accs);
       setList(categoryFilter ? accs.filter((a) => a.category === categoryFilter) : accs);
-    })();
-  }, [refreshKey, categoryFilter, setAccounts]);
+    });
+  }, [refreshKey, categoryFilter, setAccounts, runListLoad]);
 
   const openModal = (account = null) => {
     setEditing(account);
@@ -41,18 +44,22 @@ export default function AccountsPage() {
   const handleSave = async () => {
     try {
       const values = await form.validateFields();
-      await Accounts.save({
-        id: editing?.id || null,
-        code: values.code.trim(),
-        name: values.name.trim(),
-        category: values.category,
-        direction: values.direction
+      await runSave(async () => {
+        await Accounts.save({
+          id: editing?.id || null,
+          code: values.code.trim(),
+          name: values.name.trim(),
+          category: values.category,
+          direction: values.direction
+        });
+        message.success('科目保存成功');
+        setModalOpen(false);
+        refresh();
       });
-      message.success('科目保存成功');
-      setModalOpen(false);
-      refresh();
     } catch (err) {
-      message.error(err.message || '保存失败');
+      if (err instanceof Error && err.message) {
+        message.error(err.message || '保存失败');
+      }
     }
   };
 
@@ -62,12 +69,15 @@ export default function AccountsPage() {
       content: `科目「${record.code} ${record.name}」删除后不可恢复。若已有凭证引用该科目，请勿删除。`
     });
     if (!ok) return;
+    const hide = message.loading('正在删除…', 0);
     try {
       await Accounts.remove(record.id);
       message.success('科目已删除');
       refresh();
     } catch (err) {
       message.error(err.message || '删除失败');
+    } finally {
+      hide();
     }
   };
 
@@ -130,6 +140,7 @@ export default function AccountsPage() {
         rowKey="id"
         columns={columns}
         dataSource={list}
+        loading={listLoading}
         pagination={{
           pageSize: 100,
           showSizeChanger: true,
@@ -144,6 +155,7 @@ export default function AccountsPage() {
         open={modalOpen}
         onCancel={() => setModalOpen(false)}
         onOk={handleSave}
+        confirmLoading={saving}
         destroyOnHidden
       >
         <Form form={form} layout="vertical">

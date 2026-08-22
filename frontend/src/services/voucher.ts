@@ -2,7 +2,7 @@ import { ErpApi } from './erpApi';
 import { apiUploadForm } from './apiClient';
 import { Accounts } from './accounts';
 import { getCurrentOperatorName } from '../context/AuthContext';
-import { buildAttachmentFileName } from '../utils/attachmentName';
+import { buildAttachmentDisplayName } from '../utils/attachmentName';
 import {
   matchSignatory,
   matchVoucherAmount,
@@ -48,6 +48,7 @@ function canEditVoucher(status: VoucherStatus) {
 
 type VoucherMutationOptions = {
   allowCarryForwardBypass?: boolean;
+  confirmPassword?: string;
 };
 
 function assertCarryForwardMutable(
@@ -134,16 +135,43 @@ async function findNumberConflict(voucherType, yearMonth, voucherNumber, exclude
   );
 }
 
+async function applyVoucherNumberChange(voucher: VoucherRecord, voucherNumber: string, pad: number) {
+  voucher.voucherNumber = formatVoucherNum(parseVoucherNum(voucherNumber), pad);
+  voucher.voucherNo = `${voucher.voucherType}-${voucher.voucherNumber}`;
+  voucher.updatedAt = new Date().toISOString();
+  voucher.checksum = generateChecksum(voucher);
+}
+
 async function persistVoucherNumbers(vouchers, pad) {
-  const now = new Date().toISOString();
-  const items = vouchers.map((voucher) => {
-    voucher.voucherNumber = formatVoucherNum(parseVoucherNum(voucher.voucherNumber), pad);
-    voucher.voucherNo = `${voucher.voucherType}-${voucher.voucherNumber}`;
-    voucher.updatedAt = now;
-    voucher.checksum = generateChecksum(voucher);
-    return voucher;
+  for (const voucher of vouchers) {
+    await applyVoucherNumberChange(
+      voucher,
+      formatVoucherNum(parseVoucherNum(voucher.voucherNumber), pad),
+      pad
+    );
+  }
+  await ErpApi.putMany('vouchers', vouchers);
+}
+
+/** 同期凭证按当前顺序重编为 1…n，消除断号 */
+async function compactPeriodNumbers(voucherType, yearMonth) {
+  const periodVouchers = await getPeriodVouchers(voucherType, yearMonth);
+  if (!periodVouchers.length) return { changed: false, vouchers: periodVouchers };
+
+  const pad = getNumberPad(periodVouchers);
+  let changed = false;
+  periodVouchers.forEach((voucher, index) => {
+    const next = formatVoucherNum(index + 1, pad);
+    if (voucher.voucherNumber !== next) {
+      changed = true;
+    }
+    voucher.voucherNumber = next;
   });
-  await ErpApi.putMany('vouchers', items);
+
+  if (changed) {
+    await persistVoucherNumbers(periodVouchers, pad);
+  }
+  return { changed, vouchers: periodVouchers };
 }
 
 function assertVouchersUnlocked(vouchers) {
@@ -154,16 +182,10 @@ function assertVouchersUnlocked(vouchers) {
 }
 
 async function getNextNumber(type, date) {
-  const vouchers = await ErpApi.getAll('vouchers');
   const yearMonth = date.slice(0, 7);
-  const sameMonth = vouchers.filter(
-    (v) => v.voucherType === type && v.date.startsWith(yearMonth)
-  );
-  const maxNum = sameMonth.reduce((max, v) => {
-    const num = parseInt(v.voucherNumber, 10) || 0;
-    return num > max ? num : max;
-  }, 0);
-  return String(maxNum + 1).padStart(3, '0');
+  const period = await getPeriodVouchers(type, yearMonth);
+  const pad = getNumberPad(period);
+  return formatVoucherNum(period.length + 1, pad);
 }
 
 function calcTotals(entries: VoucherEntry[]): TotalsResult {
@@ -287,6 +309,19 @@ async function save(voucherData: VoucherInput, approve = false): Promise<Voucher
   normalized.taxAmount = taxMeta.taxAmount;
 
   await ErpApi.put('vouchers', normalized as VoucherRecord);
+
+  if (isNew) {
+    await compactPeriodNumbers(normalized.voucherType, getYearMonth(normalized.date));
+    const refreshed = await ErpApi.get('vouchers', normalized.id);
+    if (refreshed) {
+      await ErpApi.addAuditLog(
+        approve ? '新建并审核' : '新建草稿',
+        '凭证',
+        formatVoucherAuditDetail(refreshed)
+      );
+      return refreshed;
+    }
+  }
 
   await ErpApi.addAuditLog(
     isNew ? (approve ? '新建并审核' : '新建草稿') : approve ? '修改并审核' : '修改草稿',
@@ -558,14 +593,16 @@ async function clearTaxExemptionLinksForCarryForward(carryForwardId) {
   await ErpApi.putMany('vouchers', toSave);
 }
 
-async function removeVoucherData(voucher) {
+async function removeVoucherData(voucher, options: VoucherMutationOptions = {}) {
   if (voucher.isTaxExemptionCarryForward) {
     await clearTaxExemptionLinksForCarryForward(voucher.id);
   }
   if (voucher.attachmentIds?.length) {
     await ErpApi.removeMany('attachments', voucher.attachmentIds);
   }
-  await ErpApi.remove('vouchers', voucher.id);
+  await ErpApi.remove('vouchers', voucher.id, {
+    confirmPassword: options.confirmPassword
+  });
 }
 
 async function remove(id, options: VoucherMutationOptions = {}) {
@@ -576,7 +613,10 @@ async function remove(id, options: VoucherMutationOptions = {}) {
   if (voucher.status === STATUS.LOCKED) {
     throw new Error('已结项的凭证不可删除');
   }
-  await removeVoucherData(voucher);
+  const yearMonth = getYearMonth(voucher.date);
+  const voucherType = voucher.voucherType;
+  await removeVoucherData(voucher, options);
+  await compactPeriodNumbers(voucherType, yearMonth);
   await ErpApi.addAuditLog('删除', '凭证', formatVoucherAuditDetail(voucher));
 }
 
@@ -585,138 +625,24 @@ async function forceRemove(id, options: VoucherMutationOptions = {}) {
   if (!voucher) return;
   assertCarryForwardMutable(voucher, options);
   await assertVoucherDateMutable(voucher.date);
-  await removeVoucherData(voucher);
+  const yearMonth = getYearMonth(voucher.date);
+  const voucherType = voucher.voucherType;
+  await removeVoucherData(voucher, options);
+  await compactPeriodNumbers(voucherType, yearMonth);
   await ErpApi.addAuditLog('强制删除', '凭证', formatVoucherAuditDetail(voucher));
 }
 
-async function removeByVoucherNo(voucherNo) {
+async function removeByVoucherNo(voucherNo, options: VoucherMutationOptions = {}) {
   const vouchers = await ErpApi.getAll('vouchers');
   const voucher = vouchers.find((v) => v.voucherNo === voucherNo);
   if (!voucher) {
     throw new Error(`未找到凭证 ${voucherNo}`);
   }
-  await forceRemove(voucher.id);
-}
-
-/** 批量删除未结项凭证（草稿、已审核） */
-async function removeMany(ids: string[], options?: { confirmPassword?: string }) {
-  const uniqueIds = [...new Set(ids)];
-  const result = {
-    deleted: 0,
-    skipped: 0,
-    failed: [] as Array<{ id: string; voucherNo?: string; message: string }>
-  };
-
-  if (!uniqueIds.length) return result;
-
-  const all = await ErpApi.getAll('vouchers');
-  const byId = new Map(all.map((v) => [v.id, v]));
-  const declared = await TaxDeclaration.getDeclaredQuarters();
-  const eligible: string[] = [];
-  const eligibleVouchers: VoucherRecord[] = [];
-
-  for (const id of uniqueIds) {
-    const voucher = byId.get(id);
-    if (!voucher) {
-      result.skipped++;
-      continue;
-    }
-    if (voucher.status === STATUS.LOCKED) {
-      result.failed.push({
-        id,
-        voucherNo: voucher.voucherNo,
-        message: '已结项，不可删除'
-      });
-      continue;
-    }
-    if (isCarryForwardVoucher(voucher)) {
-      result.failed.push({
-        id,
-        voucherNo: voucher.voucherNo,
-        message: '系统结转凭证不可删除'
-      });
-      continue;
-    }
-    try {
-      assertDateMutableWithDeclared(voucher.date, declared);
-      eligible.push(id);
-      eligibleVouchers.push(voucher);
-    } catch (err) {
-      result.failed.push({
-        id,
-        voucherNo: voucher.voucherNo,
-        message: (err as Error).message || '删除失败'
-      });
-    }
-  }
-
-  if (eligible.length) {
-    const batch = (await ErpApi.removeMany('vouchers', eligible, {
-      confirmPassword: options?.confirmPassword
-    })) as {
-      deleted?: number;
-      skipped?: number;
-      failed?: Array<{ id: string; voucherNo?: string; message: string }>;
-    };
-    result.deleted += batch.deleted ?? 0;
-    result.skipped += batch.skipped ?? 0;
-    result.failed.push(...(batch.failed ?? []));
-  }
-
-  if (result.deleted > 0) {
-    await ErpApi.addAuditLog(
-      '批量删除',
-      '凭证',
-      formatVoucherBatchAuditDetail(eligibleVouchers, `成功删除 ${result.deleted} 张`)
-    );
-  }
-  return result;
-}
-
-/** 批量删除所有未结项凭证（草稿、已审核） */
-async function removeAllUnlocked() {
-  const vouchers = await ErpApi.getAll('vouchers');
-  const declared = await TaxDeclaration.getDeclaredQuarters();
-  const targets: VoucherRecord[] = [];
-  let lockedCount = 0;
-  let declaredCount = 0;
-
-  for (const voucher of vouchers) {
-    if (voucher.status === STATUS.LOCKED) {
-      lockedCount++;
-      continue;
-    }
-    if (isCarryForwardVoucher(voucher)) {
-      continue;
-    }
-    try {
-      assertDateMutableWithDeclared(voucher.date, declared);
-      targets.push(voucher);
-    } catch {
-      declaredCount++;
-    }
-  }
-
-  if (!targets.length) {
-    return { deleted: 0, locked: lockedCount, declared: declaredCount };
-  }
-
-  const batch = (await ErpApi.removeMany(
-    'vouchers',
-    targets.map((v) => v.id)
-  )) as { deleted?: number };
-  const deleted = batch.deleted ?? targets.length;
-
-  await ErpApi.addAuditLog(
-    '批量删除',
-    '凭证',
-    formatVoucherBatchAuditDetail(targets, `删除 ${deleted} 张未结项凭证`)
-  );
-  return { deleted, locked: lockedCount, declared: declaredCount };
+  await forceRemove(voucher.id, options);
 }
 
 async function getAll(filters: VoucherFilters = {}) {
-  let vouchers = await ErpApi.getAll('vouchers');
+  let vouchers = [...(await ErpApi.getAll('vouchers'))];
   vouchers.sort(compareVouchersDesc);
 
   if (filters.startDate) vouchers = vouchers.filter((v) => v.date >= filters.startDate!);
@@ -793,7 +719,7 @@ async function getAdjacentVoucher(
 ) {
   let ids = orderedIds?.filter(Boolean) ?? [];
   if (!ids.length) {
-    const vouchers = await ErpApi.getAll('vouchers');
+    const vouchers = [...(await ErpApi.getAll('vouchers'))];
     vouchers.sort(compareVouchersDesc);
     ids = vouchers.map((v) => v.id);
   }
@@ -874,7 +800,7 @@ async function addAttachmentToVoucher(voucherId, file) {
 
   const totals = calcTotals(voucher.entries || []);
   const index = (voucher.attachmentIds || []).length;
-  const fileName = buildAttachmentFileName({
+  const fileName = buildAttachmentDisplayName({
     voucherNo: voucher.voucherNo,
     entries: voucher.entries,
     totals,
@@ -1064,10 +990,11 @@ async function prepareInsertSlot(voucherType, date, beforeNumber) {
   }
 
   for (const voucher of toShift) {
-    voucher.voucherNumber = formatVoucherNum(parseVoucherNum(voucher.voucherNumber) + 1, pad);
-    voucher.voucherNo = `${voucher.voucherType}-${voucher.voucherNumber}`;
-    voucher.updatedAt = new Date().toISOString();
-    voucher.checksum = generateChecksum(voucher);
+    await applyVoucherNumberChange(
+      voucher,
+      formatVoucherNum(parseVoucherNum(voucher.voucherNumber) + 1, pad),
+      pad
+    );
   }
   await ErpApi.putMany('vouchers', toShift);
 
@@ -1149,6 +1076,7 @@ export const Voucher = {
   ATTACHMENT_READONLY_TIP,
   CARRY_FORWARD_VOUCHER_READONLY_TIP,
   DECLARED_QUARTER_READONLY_TIP: TaxDeclaration.DECLARED_QUARTER_READONLY_TIP,
+  compareVouchersDesc,
   canModifyAttachments,
   canEditVoucher,
   isRedLetterVoucher,
@@ -1162,8 +1090,6 @@ export const Voucher = {
   remove,
   forceRemove,
   removeByVoucherNo,
-  removeMany,
-  removeAllUnlocked,
   getAll,
   getById,
   getAdjacentVoucher,

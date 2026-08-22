@@ -1,20 +1,10 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Alert, Spin, Typography } from 'antd';
-import { ErpApi } from '../services/erpApi';
-import { apiRequest } from '../services/apiClient';
-import { repairFinanceInterestEntries } from '../services/financeExpenseRepair';
+import { Alert, Typography } from 'antd';
 import { useApp } from '../context/AppContext';
 import { sanitizeUserMessage } from '../utils/userMessage';
-import type { Account } from '../types';
+import AppSpin from './AppSpin';
 
 const { Paragraph, Text } = Typography;
-
-type AppInitResult = {
-  companyName: string;
-  accounts: Account[];
-  repaired: number;
-  syncedLocks: number;
-};
 
 function formatInitError(err: unknown): { summary: string; tips: string[] } {
   const raw = err instanceof Error ? err.message : '加载失败';
@@ -44,7 +34,7 @@ function formatInitError(err: unknown): { summary: string; tips: string[] } {
 }
 
 export default function AppInit({ children }: { children: ReactNode }) {
-  const { setCompanyName, setAccounts, refresh, refreshKey } = useApp();
+  const { reinitApp } = useApp();
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<{ summary: string; tips: string[] } | null>(null);
 
@@ -53,19 +43,9 @@ export default function AppInit({ children }: { children: ReactNode }) {
     (async () => {
       try {
         setError(null);
-        await ErpApi.open();
-
-        const result = await apiRequest<AppInitResult>('POST', '/app/init');
-        const repaired = await repairFinanceInterestEntries();
-        const syncedFromServer = (result.repaired || 0) + (result.syncedLocks || 0);
-
+        await reinitApp();
         if (!cancelled) {
-          setCompanyName(result.companyName || '');
-          setAccounts(result.accounts || []);
           setReady(true);
-          if (syncedFromServer > 0 || repaired > 0) {
-            refresh();
-          }
         }
       } catch (err) {
         if (!cancelled) {
@@ -76,7 +56,7 @@ export default function AppInit({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [refreshKey, setCompanyName, setAccounts, refresh]);
+  }, [reinitApp]);
 
   if (error) {
     return (
@@ -105,11 +85,9 @@ export default function AppInit({ children }: { children: ReactNode }) {
 
   if (!ready) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <Spin size="large" tip="加载中...">
-          <div style={{ minHeight: 48, minWidth: 48 }} />
-        </Spin>
-      </div>
+      <AppSpin fullscreen size="large" tip="加载中…">
+        <div style={{ minHeight: 48, minWidth: 96 }} />
+      </AppSpin>
     );
   }
 

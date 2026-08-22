@@ -30,7 +30,7 @@ export default function MainLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { message, modal } = App.useApp();
-  const { companyName, refresh } = useApp();
+  const { companyName, reinitApp } = useApp();
   const { user, logout, can } = useAuth();
   const [pwdOpen, setPwdOpen] = useState(false);
   const [pwdForm] = Form.useForm();
@@ -105,7 +105,7 @@ export default function MainLayout() {
         await ErpApi.importAll(data);
         await ErpApi.addAuditLog('恢复', '全库', `从备份恢复 ${data.vouchers.length} 条凭证`);
         message.success('数据恢复成功');
-        refresh();
+        await reinitApp();
         navigate('/');
       } catch (err) {
         message.error('恢复失败：' + toUserMessage(err));

@@ -196,6 +196,14 @@ export interface TotalsResult {
   balanced: boolean;
 }
 
+export interface AppInitResult {
+  companyName: string;
+  accounts: Account[];
+  repaired: number;
+  syncedLocks: number;
+  localRepaired: number;
+}
+
 export interface AppContextValue {
   companyName: string;
   setCompanyName: (name: string) => void;
@@ -203,6 +211,8 @@ export interface AppContextValue {
   setAccounts: (accounts: Account[]) => void;
   refreshKey: number;
   refresh: () => void;
+  /** 登录后或全库恢复后执行：POST /app/init，更新公司名与科目表 */
+  reinitApp: () => Promise<AppInitResult>;
 }
 
 export interface CompanyInfo {

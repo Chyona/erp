@@ -244,12 +244,20 @@ async function unapproveVouchersBatch(ids: string | string[]): Promise<VoucherBa
   return vouchersBatch({ action: 'unapprove', ids });
 }
 
-async function remove(storeName: StoreName, key: string): Promise<void> {
+async function remove(
+  storeName: StoreName,
+  key: string,
+  options?: { confirmPassword?: string }
+): Promise<void> {
   await open();
   const path =
     storeName === 'settings'
       ? `${STORE_PATHS.settings}/${encodeURIComponent(key)}`
       : `${STORE_PATHS[storeName]}/${encodeURIComponent(key)}`;
+  if (storeName === 'vouchers' && options?.confirmPassword) {
+    await apiRequest('DELETE', path, { confirmPassword: options.confirmPassword });
+    return;
+  }
   await apiRequest('DELETE', path);
 }
 

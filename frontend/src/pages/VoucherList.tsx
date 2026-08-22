@@ -4,7 +4,6 @@ import {
   PlusOutlined,
   DownloadOutlined,
   UploadOutlined,
-  DeleteOutlined,
   ReloadOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
@@ -21,7 +20,7 @@ import type { VoucherTimeFilterState } from '../utils/voucherTimeFilter';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { isCarryForwardVoucher } from '../utils/carryForwardVoucher';
-import { confirmDeleteWithPassword } from '../utils/confirmDeleteWithPassword';
+import { useAsyncLoading } from '../hooks/useAsyncLoading';
 import type { VoucherFilters } from '../types';
 
 const { Title } = Typography;
@@ -50,7 +49,7 @@ export default function VoucherList() {
   const navigate = useNavigate();
   const { message, modal } = App.useApp();
   const { refreshKey, accounts, refresh } = useApp();
-  const { can, canMutateVoucher, role } = useAuth();
+  const { can } = useAuth();
   const [vouchers, setVouchers] = useState([]);
   const [filters, setFilters] = useState<VoucherFilters>({
     ...EMPTY_VOUCHER_FILTERS,
@@ -68,13 +67,21 @@ export default function VoucherList() {
   const [showSubtotal, setShowSubtotal] = useState(true);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [filterOpen, setFilterOpen] = useState(false);
+  const { loading: listLoading, run: runListLoad } = useAsyncLoading(true);
 
   const activeFilterCount = useMemo(() => countActiveFilters(filters), [filters]);
 
+  const sortedVouchers = useMemo(
+    () => [...vouchers].sort(Voucher.compareVouchersDesc),
+    [vouchers]
+  );
+
   const loadList = async (nextFilters: VoucherFilters = filters) => {
-    const list = await Voucher.getAll(nextFilters);
-    setVouchers(list);
-    setSelectedIds((prev) => prev.filter((id) => list.some((v) => v.id === id)));
+    await runListLoad(async () => {
+      const list = await Voucher.getAll(nextFilters);
+      setVouchers(list);
+      setSelectedIds((prev) => prev.filter((id) => list.some((v) => v.id === id)));
+    });
   };
 
   useEffect(() => {
@@ -116,8 +123,7 @@ export default function VoucherList() {
   };
 
   const handleRefresh = () => {
-    loadList();
-    refresh();
+    void loadList();
   };
 
   const handleExport = async (withAttachments = false) => {
@@ -179,17 +185,6 @@ export default function VoucherList() {
     return voucher?.status === Voucher.STATUS.APPROVED && !isCarryForwardVoucher(voucher);
   }).length;
 
-  const selectedDeletableCount = selectedIds.filter((id) => {
-    const voucher = vouchers.find((v) => v.id === id);
-    return (
-      voucher &&
-      canMutateVoucher(voucher) &&
-      (voucher.status === Voucher.STATUS.DRAFT ||
-        (role === 'admin' && voucher.status === Voucher.STATUS.APPROVED)) &&
-      !isCarryForwardVoucher(voucher)
-    );
-  }).length;
-
   const finishBatchAction = (
     result: { skipped: number; failed: { id: string; voucherNo?: string }[];[key: string]: unknown },
     { successKey, successLabel, skippedHint }: { successKey: string; successLabel: string; skippedHint: string }
@@ -206,7 +201,6 @@ export default function VoucherList() {
     }
     setSelectedIds(result.failed.map((item) => item.id));
     refresh();
-    loadList();
   };
 
   const handleBatchApprove = () => {
@@ -248,28 +242,6 @@ export default function VoucherList() {
           successKey: 'unapproved',
           successLabel: '反审核',
           skippedHint: '所选凭证中没有可反审核的已审核凭证'
-        });
-      }
-    });
-  };
-
-  const handleBatchDelete = () => {
-    if (!selectedDeletableCount) {
-      message.warning('请先勾选要删除的凭证');
-      return;
-    }
-
-    confirmDeleteWithPassword({
-      isAdmin: role === 'admin',
-      title: '批量删除',
-      content: `确定删除选中的 ${selectedDeletableCount} 张凭证及其附件？此操作不可恢复。`,
-      okText: `删除 ${selectedDeletableCount} 张`,
-      onConfirm: async (confirmPassword) => {
-        const result = await Voucher.removeMany(selectedIds, { confirmPassword });
-        finishBatchAction(result, {
-          successKey: 'deleted',
-          successLabel: '删除',
-          skippedHint: '所选凭证中没有可删除的凭证'
         });
       }
     });
@@ -319,11 +291,6 @@ export default function VoucherList() {
           <Space>
           </Space>
           <Space wrap>
-            {can('voucher.create') ? (
-              <Button icon={<DeleteOutlined />} onClick={handleBatchDelete}>
-                删除
-              </Button>
-            ) : null}
             {can('voucher.approve') ? (
               <Dropdown.Button
                 onClick={handleBatchApprove}
@@ -360,7 +327,12 @@ export default function VoucherList() {
                 导入历史凭证
               </Button>
             ) : null}
-            <Button className="voucher-list-toolbar__refresh" icon={<ReloadOutlined />} onClick={handleRefresh}>
+            <Button
+              className="voucher-list-toolbar__refresh"
+              icon={<ReloadOutlined />}
+              loading={listLoading}
+              onClick={handleRefresh}
+            >
               刷新
             </Button>
           </Space>
@@ -370,22 +342,20 @@ export default function VoucherList() {
       <VoucherTable
         scrollable
         selectable
-        vouchers={vouchers}
+        loading={listLoading}
+        vouchers={sortedVouchers}
         showSubtotal={showSubtotal}
         selectedIds={selectedIds}
         onSelectedIdsChange={setSelectedIds}
         onView={setViewId}
-        onRefresh={loadList}
       />
 
       <VoucherDetailModal
         voucherId={viewId}
         open={!!viewId}
         onClose={() => setViewId(null)}
-        onLocked={loadList}
-        onDeleted={loadList}
         onVoucherChange={setViewId}
-        navigationIds={vouchers.map((v) => v.id)}
+        navigationIds={sortedVouchers.map((v) => v.id)}
       />
 
       <VoucherImportModal
@@ -394,7 +364,6 @@ export default function VoucherList() {
         onClose={() => setImportOpen(false)}
         onSuccess={() => {
           refresh();
-          loadList();
         }}
       />
     </div>

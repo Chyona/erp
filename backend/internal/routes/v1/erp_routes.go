@@ -36,6 +36,7 @@ func RegisterErpRoutes(rg *gin.RouterGroup, erpHandler *v1handler.ErpHandler, ap
 		if importHandler != nil {
 			vouchers.GET("/import-llm-status", importHandler.LLMStatus)
 			vouchers.POST("/parse-import-image", importHandler.ParseImportImage)
+			vouchers.POST("/parse-invoice-number", importHandler.ParseInvoiceNumber)
 		}
 		vouchers.GET("/:id", erpHandler.GetVoucher)
 		vouchers.PUT("/:id", erpHandler.SaveVoucher)

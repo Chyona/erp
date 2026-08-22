@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button, Popconfirm, Upload, Tooltip } from 'antd';
+import { Button, Popconfirm, Upload, Tooltip, Spin } from 'antd';
 import {
   ClearOutlined,
   CloseOutlined,
@@ -8,7 +8,7 @@ import {
   PaperClipOutlined
 } from '@ant-design/icons';
 import { Voucher } from '../services/voucher';
-import AttachmentPreviewModal, { isPdfAttachment } from './AttachmentPreviewModal';
+import AttachmentPreviewModal, { isPdfAttachment, type AttachmentLike } from './AttachmentPreviewModal';
 
 /** 凭证表格右侧附件列（可展开/收起） */
 export default function VoucherAttachmentColumn({
@@ -19,20 +19,48 @@ export default function VoucherAttachmentColumn({
   onRemoveMany,
   onUpload,
   canModify = true
+}: {
+  attachments: AttachmentLike[];
+  open: boolean;
+  onClose: () => void;
+  onRemove?: (index: number) => void | Promise<void>;
+  onRemoveMany?: (indices: number[]) => void | Promise<void>;
+  onUpload?: import('antd/es/upload/interface').UploadProps['customRequest'];
+  canModify?: boolean;
 }) {
-  const [preview, setPreview] = useState(null);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  const removeAll = () => {
-    const indices = (attachments || []).map((_, index) => index);
-    if (!indices.length) return;
-    if (onRemoveMany) {
-      onRemoveMany(indices);
-    } else {
-      [...indices].sort((a, b) => b - a).forEach((index) => onRemove?.(index));
+  const runRemoveMany = async (indices: number[]) => {
+    if (!indices.length || busy) return;
+    setBusy(true);
+    try {
+      if (onRemoveMany) {
+        await onRemoveMany(indices);
+      } else if (onRemove) {
+        const sorted = [...indices].sort((a, b) => b - a);
+        for (const index of sorted) {
+          await onRemove(index);
+        }
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const runRemoveOne = async (index: number) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await onRemove?.(index);
+    } finally {
+      setBusy(false);
     }
   };
 
   if (!attachments.length || !open) return null;
+
+  const removeAll = () => runRemoveMany(attachments.map((_, index) => index));
 
   return (
     <>
@@ -52,6 +80,8 @@ export default function VoucherAttachmentColumn({
                   type="link"
                   size="small"
                   danger
+                  loading={busy}
+                  disabled={busy}
                   icon={<ClearOutlined />}
                   className="voucher-sheet__attach-col-clear"
                 >
@@ -69,52 +99,59 @@ export default function VoucherAttachmentColumn({
             </button>
           </div>
         </div>
-        <div className="voucher-sheet__attach-col-body">
-          {attachments.map((att, index) => {
-            const isPdf = isPdfAttachment(att);
-            return (
-              <div key={att.id} className="voucher-attach-panel__item">
-                <div className="voucher-attach-panel__item-head">
-                  <span className="voucher-attach-panel__name" title={att.name}>
-                    {att.name}
-                  </span>
-                  {canModify ? (
-                    <Popconfirm
-                      title="确定删除该附件？"
-                      okText="删除"
-                      cancelText="取消"
-                      okButtonProps={{ danger: true }}
-                      onConfirm={() => onRemove?.(index)}
-                    >
-                      <button
-                        type="button"
-                        className="voucher-attach-panel__delete"
-                        aria-label="删除"
+        <Spin spinning={busy} tip="处理中…">
+          <div className="voucher-sheet__attach-col-body">
+            {attachments.map((att, index) => {
+              const isPdf = isPdfAttachment(att);
+              const label = att.displayName || att.name;
+              return (
+                <div key={att.id} className="voucher-attach-panel__item">
+                  <div className="voucher-attach-panel__item-head">
+                    <span className="voucher-attach-panel__name" title={label}>
+                      {label}
+                    </span>
+                    {canModify ? (
+                      <Popconfirm
+                        title="确定删除该附件？"
+                        okText="删除"
+                        cancelText="取消"
+                        okButtonProps={{ danger: true }}
+                        onConfirm={() => runRemoveOne(index)}
                       >
-                        <DeleteOutlined />
-                      </button>
-                    </Popconfirm>
-                  ) : null}
+                        <button
+                          type="button"
+                          className="voucher-attach-panel__delete"
+                          aria-label="删除"
+                          disabled={busy}
+                        >
+                          <DeleteOutlined />
+                        </button>
+                      </Popconfirm>
+                    ) : null}
+                  </div>
+                  <button
+                    type="button"
+                    className="voucher-attach-panel__preview"
+                    onClick={() => {
+                      setPreviewIndex(index);
+                    }}
+                    title="点击预览"
+                    disabled={busy}
+                  >
+                    {isPdf ? (
+                      <div className="voucher-attach-panel__pdf">
+                        <FilePdfOutlined />
+                        <span>PDF</span>
+                      </div>
+                    ) : (
+                      <img src={att.url} alt={label} />
+                    )}
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  className="voucher-attach-panel__preview"
-                  onClick={() => setPreview(att)}
-                  title="点击预览"
-                >
-                  {isPdf ? (
-                    <div className="voucher-attach-panel__pdf">
-                      <FilePdfOutlined />
-                      <span>PDF</span>
-                    </div>
-                  ) : (
-                    <img src={att.url} alt={att.name} />
-                  )}
-                </button>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        </Spin>
         {onUpload && (
           <div className="voucher-sheet__attach-col-footer">
             {canModify ? (
@@ -152,9 +189,10 @@ export default function VoucherAttachmentColumn({
       </div>
 
       <AttachmentPreviewModal
-        attachment={preview}
-        open={Boolean(preview)}
-        onClose={() => setPreview(null)}
+        attachments={attachments}
+        initialIndex={previewIndex ?? 0}
+        open={previewIndex !== null}
+        onClose={() => setPreviewIndex(null)}
       />
     </>
   );

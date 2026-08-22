@@ -569,6 +569,10 @@ export async function handleErpMockRequest(
       fail(res, 503, 'Mock 模式未接入大模型，请关闭 Mock 或改用 Excel/CSV');
       return true;
     }
+    if (method === 'POST' && path === '/vouchers/parse-invoice-number') {
+      fail(res, 503, 'Mock 模式未接入大模型，请配置 APP_LLM_API_KEY 后使用发票识别');
+      return true;
+    }
     if (method === 'PUT' && path === '/vouchers/batch') {
       const body = (await parseJSON<{ items?: MockVoucher[] }>(req)) ?? {};
       const items = body.items ?? [];

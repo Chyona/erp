@@ -10,6 +10,7 @@ import { Accounts } from '../services/accounts';
 import { ExportUtil } from '../services/export';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
+import { useAsyncLoading } from '../hooks/useAsyncLoading';
 import ScrollTable from '../components/ScrollTable';
 
 const { Title } = Typography;
@@ -23,21 +24,25 @@ export default function Ledger() {
   const [accountId, setAccountId] = useState('');
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([dayjs().startOf('year'), dayjs()]);
   const [ledger, setLedger] = useState<LedgerResult | null>(null);
+  const { loading: accountsLoading, run: runAccountsLoad } = useAsyncLoading(true);
+  const { loading: queryLoading, run: runQuery } = useAsyncLoading();
 
   useEffect(() => {
-    (async () => {
+    void runAccountsLoad(async () => {
       const accs = await Accounts.getAll();
       setAccountList(accs);
       if (accs.length) setAccountId(accs[0].id);
-    })();
-  }, [refreshKey]);
+    });
+  }, [refreshKey, runAccountsLoad]);
 
   const handleQuery = async () => {
     if (!accountId) return;
     const start = dateRange[0].format('YYYY-MM-DD');
     const end = dateRange[1].format('YYYY-MM-DD');
-    const result = await Voucher.getLedger(accountId, start, end);
-    setLedger(result);
+    await runQuery(async () => {
+      const result = await Voucher.getLedger(accountId, start, end);
+      setLedger(result);
+    });
   };
 
   const handleExport = () => {
@@ -78,6 +83,8 @@ export default function Ledger() {
     }
   ];
 
+  const tableLoading = accountsLoading || queryLoading;
+
   return (
     <div className="page-table-layout">
       <div className="page-table-toolbar">
@@ -88,6 +95,7 @@ export default function Ledger() {
           <Select
             style={{ width: 240 }}
             value={accountId || undefined}
+            loading={accountsLoading}
             onChange={setAccountId}
             options={accountList.map((a) => ({
               value: a.id,
@@ -102,7 +110,7 @@ export default function Ledger() {
               if (next) setDateRange(next);
             }}
           />
-          <Button type="primary" icon={<SearchOutlined />} onClick={handleQuery}>
+          <Button type="primary" icon={<SearchOutlined />} loading={queryLoading} onClick={handleQuery}>
             查询
           </Button>
           {can('export') ? (
@@ -117,6 +125,7 @@ export default function Ledger() {
         rowKey={(r) => r.date + r.voucherNo + r.summary}
         columns={columns}
         dataSource={ledger?.rows || []}
+        loading={tableLoading}
         pagination={false}
         locale={{ emptyText: '该期间无发生额，请先查询' }}
         summary={() =>

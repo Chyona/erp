@@ -29,6 +29,7 @@ function VoucherEntrySheet({
   onCopyEntry,
   onRemoveEntry,
   onUpload,
+  uploadStatus = null,
   onRemoveAttachment,
   onRemoveAttachments,
   attachmentPanelOpen,
@@ -79,7 +80,6 @@ function VoucherEntrySheet({
                   className="voucher-sheet__date"
                 />
               </Space>
-              {businessTypeField}
             </Space>
           </div>
           <div className="voucher-sheet__meta-center">
@@ -87,10 +87,12 @@ function VoucherEntrySheet({
             {period && <div className="voucher-sheet__period">{period}</div>}
           </div>
           <div className="voucher-sheet__meta-right voucher-sheet__meta-right--compact">
+            {businessTypeField}
             <VoucherAttachmentControls
               attachmentsCount={attachmentsCount}
               onToggle={onAttachmentPanelToggle}
               onUpload={onUpload}
+              uploadStatus={uploadStatus}
               canModify={canModifyAttachments}
               className="voucher-sheet__attach-row--compact"
             />
@@ -131,6 +133,12 @@ function VoucherEntrySheet({
                 {Array.from({ length: rowCount }, (_, index) => {
                   const entry = entries[index];
                   const isPad = !entry;
+                  const showAmount = Boolean(entry);
+                  const amountValue = (side: 'debit' | 'credit') => {
+                    if (!entry) return '';
+                    const raw = entry[side];
+                    return raw === '' || raw === undefined || raw === null ? 0 : raw;
+                  };
                   return (
                     <tr key={entry?.key || `pad-${index}`} className={isPad ? 'voucher-sheet__row--pad' : ''}>
                       <td className="voucher-sheet__td-index">
@@ -208,24 +216,28 @@ function VoucherEntrySheet({
                           ))}
                       </td>
                       <td colSpan={11} className="voucher-sheet__td-amount">
-                        {!isPad && (
-                          <AmountGrid
-                            value={entry.debit}
-                            onChange={(v) => onUpdateEntry(index, 'debit', v)}
-                            readOnly={readOnly}
-                            redLetter={redLetter}
-                          />
-                        )}
+                        <AmountGrid
+                          value={showAmount ? amountValue('debit') : ''}
+                          onChange={
+                            showAmount && !readOnly
+                              ? (v) => onUpdateEntry(index, 'debit', v)
+                              : undefined
+                          }
+                          readOnly={readOnly || !showAmount}
+                          redLetter={redLetter}
+                        />
                       </td>
                       <td colSpan={11} className="voucher-sheet__td-amount">
-                        {!isPad && (
-                          <AmountGrid
-                            value={entry.credit}
-                            onChange={(v) => onUpdateEntry(index, 'credit', v)}
-                            readOnly={readOnly}
-                            redLetter={redLetter}
-                          />
-                        )}
+                        <AmountGrid
+                          value={showAmount ? amountValue('credit') : ''}
+                          onChange={
+                            showAmount && !readOnly
+                              ? (v) => onUpdateEntry(index, 'credit', v)
+                              : undefined
+                          }
+                          readOnly={readOnly || !showAmount}
+                          redLetter={redLetter}
+                        />
                       </td>
                     </tr>
                   );

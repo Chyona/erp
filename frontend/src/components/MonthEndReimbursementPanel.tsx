@@ -16,6 +16,7 @@ import { useApp } from '../context/AppContext';
 import { confirmDanger } from '../utils/confirmAction';
 import ReportPeriodFilter from './ReportPeriodFilter';
 import WorkbenchPanelIntro from './WorkbenchPanelIntro';
+import VoucherDetailModal from './VoucherDetailModal';
 import {
   defaultReportPeriod,
   formatTaxExemptionPeriod,
@@ -32,6 +33,7 @@ export default function MonthEndReimbursementPanel({ readOnly = false }: { readO
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(false);
   const [submittingPerson, setSubmittingPerson] = useState('');
+  const [viewId, setViewId] = useState<string | null>(null);
 
   const periodLabel = formatTaxExemptionPeriod(period);
   const periodKey = taxExemptionPeriodKey(period);
@@ -148,7 +150,7 @@ export default function MonthEndReimbursementPanel({ readOnly = false }: { readO
           <Button
             type="link"
             size="small"
-            onClick={() => navigate(`/vouchers/${record.reimbursementVoucher.id}/edit`)}
+            onClick={() => setViewId(record.reimbursementVoucher.id)}
           >
             查看 {record.reimbursementVoucher.voucherNo}
           </Button>
@@ -286,6 +288,15 @@ export default function MonthEndReimbursementPanel({ readOnly = false }: { readO
           )}
         </>
       ) : null}
+
+      <VoucherDetailModal
+        voucherId={viewId}
+        open={!!viewId}
+        onClose={() => setViewId(null)}
+        onDeleted={loadSummary}
+        onLocked={loadSummary}
+        onVoucherChange={setViewId}
+      />
     </div>
   );
 }

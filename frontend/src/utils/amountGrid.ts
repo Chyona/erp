@@ -2,7 +2,10 @@
 export const AMOUNT_UNITS = ['亿', '千', '百', '十', '万', '千', '百', '十', '元', '角', '分'];
 
 export function amountToDigits(amount) {
-  const n = Math.abs(parseFloat(amount) || 0);
+  const raw = String(amount ?? '').trim();
+  if (!raw) return new Array(11).fill('');
+  const n = Math.abs(parseFloat(raw));
+  if (!Number.isFinite(n)) return new Array(11).fill('');
   const fixed = n.toFixed(2);
   const combined = fixed.replace('.', '');
   const digits = new Array(11).fill('');
@@ -67,4 +70,18 @@ export function formatAccountingPeriod(date) {
   const d = typeof date.format === 'function' ? date : null;
   if (!d) return '';
   return `${d.year()}年第${d.month() + 1}期`;
+}
+
+/** 安全计算金额表达式，如 100+20.5*2 */
+export function evaluateAmountExpression(raw: string): number | null {
+  const expr = String(raw || '').trim();
+  if (!expr) return null;
+  if (!/^[\d+\-*/().\s]+$/.test(expr)) return null;
+  try {
+    const result = Function(`"use strict"; return (${expr})`)();
+    if (typeof result !== 'number' || !Number.isFinite(result) || result < 0) return null;
+    return Math.round(result * 100) / 100;
+  } catch {
+    return null;
+  }
 }

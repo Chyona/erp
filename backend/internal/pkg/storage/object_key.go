@@ -39,11 +39,13 @@ func JoinObjectKey(basePath, objectKey string) string {
 	return basePath + "/" + objectKey
 }
 
-// AttachmentObjectKey 按凭证所属年/月生成附件对象键：attachments/YYYY/MM/{fileName}（不加 ID 前缀）。
-func AttachmentObjectKey(year, month, id, fileName string) string {
+// AttachmentObjectKey 按凭证所属年/月生成附件对象键：attachments/YYYY/MM/{id}{ext}。
+// 对象键与凭证字号解耦，字号变更时无需迁移 COS 对象；展示/下载名由业务层按当前凭证动态生成。
+func AttachmentObjectKey(year, month, id, ext string) string {
 	year = strings.TrimSpace(year)
 	month = strings.TrimSpace(month)
-	fileName = strings.TrimLeft(strings.TrimSpace(fileName), "/")
+	id = strings.TrimSpace(id)
+	ext = strings.TrimSpace(ext)
 	if year == "" {
 		year = "unknown"
 	}
@@ -53,13 +55,17 @@ func AttachmentObjectKey(year, month, id, fileName string) string {
 	if len(month) == 1 {
 		month = "0" + month
 	}
-	if fileName == "" {
-		fileName = strings.TrimSpace(id)
+	if ext == "" {
+		ext = ".dat"
 	}
-	if fileName == "" {
-		fileName = "file"
+	if !strings.HasPrefix(ext, ".") {
+		ext = "." + ext
 	}
-	return JoinObjectKey(SubDirAttachments, year+"/"+month+"/"+fileName)
+	objectName := id
+	if objectName == "" {
+		objectName = "file"
+	}
+	return JoinObjectKey(SubDirAttachments, year+"/"+month+"/"+objectName+ext)
 }
 
 // ObjectKeyFromPublicURL 从公开访问 URL 解析桶内对象键；非 http(s) 或 data: 返回空。

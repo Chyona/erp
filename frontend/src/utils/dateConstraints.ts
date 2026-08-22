@@ -1,4 +1,4 @@
-import dayjs, { type Dayjs } from 'dayjs';
+import dayjs, { type Dayjs } from './dayjsSetup';
 
 export function todayDayjs(): Dayjs {
   return dayjs().startOf('day');

@@ -2,6 +2,7 @@ package v1
 
 import (
 	"encoding/base64"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -25,6 +26,48 @@ type parseImportImageJSONRequest struct {
 	MimeType    string `json:"mimeType"`
 }
 
+func readUploadImagePayload(c *gin.Context) (raw []byte, mimeType string, err error) {
+	if strings.HasPrefix(c.GetHeader("Content-Type"), "multipart/form-data") {
+		file, ferr := c.FormFile("file")
+		if ferr != nil {
+			return nil, "", fmt.Errorf("请上传图片文件（字段名 file）")
+		}
+		f, ferr := file.Open()
+		if ferr != nil {
+			return nil, "", fmt.Errorf("读取上传文件失败")
+		}
+		defer f.Close()
+		raw, ferr = io.ReadAll(io.LimitReader(f, 12<<20)) // 12MB
+		if ferr != nil {
+			return nil, "", fmt.Errorf("读取上传文件失败")
+		}
+		mimeType = file.Header.Get("Content-Type")
+		if mimeType == "" {
+			mimeType = http.DetectContentType(raw)
+		}
+		return raw, mimeType, nil
+	}
+
+	var req parseImportImageJSONRequest
+	if err = c.ShouldBindJSON(&req); err != nil {
+		return nil, "", fmt.Errorf("请求体无效，需 multipart file 或 JSON imageBase64")
+	}
+	b64 := strings.TrimSpace(req.ImageBase64)
+	if i := strings.Index(b64, ","); i >= 0 && strings.Contains(b64[:i], "base64") {
+		b64 = b64[i+1:]
+	}
+	decoded, derr := base64.StdEncoding.DecodeString(b64)
+	if derr != nil {
+		return nil, "", fmt.Errorf("imageBase64 解码失败")
+	}
+	raw = decoded
+	mimeType = strings.TrimSpace(req.MimeType)
+	if mimeType == "" {
+		mimeType = http.DetectContentType(raw)
+	}
+	return raw, mimeType, nil
+}
+
 // ParseImportImage POST /vouchers/parse-import-image
 // 支持 multipart file，或 JSON { imageBase64, mimeType }。
 func (h *ImportHandler) ParseImportImage(c *gin.Context) {
@@ -36,50 +79,10 @@ func (h *ImportHandler) ParseImportImage(c *gin.Context) {
 		return
 	}
 
-	mimeType := ""
-	var raw []byte
-
-	if strings.HasPrefix(c.GetHeader("Content-Type"), "multipart/form-data") {
-		file, err := c.FormFile("file")
-		if err != nil {
-			response.Fail(c, http.StatusBadRequest, 400, "请上传图片文件（字段名 file）")
-			return
-		}
-		f, err := file.Open()
-		if err != nil {
-			response.Fail(c, http.StatusBadRequest, 400, "读取上传文件失败")
-			return
-		}
-		defer f.Close()
-		raw, err = io.ReadAll(io.LimitReader(f, 12<<20)) // 12MB
-		if err != nil {
-			response.Fail(c, http.StatusBadRequest, 400, "读取上传文件失败")
-			return
-		}
-		mimeType = file.Header.Get("Content-Type")
-		if mimeType == "" {
-			mimeType = http.DetectContentType(raw)
-		}
-	} else {
-		var req parseImportImageJSONRequest
-		if err := c.ShouldBindJSON(&req); err != nil {
-			response.Fail(c, http.StatusBadRequest, 400, "请求体无效，需 multipart file 或 JSON imageBase64")
-			return
-		}
-		b64 := strings.TrimSpace(req.ImageBase64)
-		if i := strings.Index(b64, ","); i >= 0 && strings.Contains(b64[:i], "base64") {
-			b64 = b64[i+1:]
-		}
-		decoded, err := base64.StdEncoding.DecodeString(b64)
-		if err != nil {
-			response.Fail(c, http.StatusBadRequest, 400, "imageBase64 解码失败")
-			return
-		}
-		raw = decoded
-		mimeType = strings.TrimSpace(req.MimeType)
-		if mimeType == "" {
-			mimeType = http.DetectContentType(raw)
-		}
+	raw, mimeType, err := readUploadImagePayload(c)
+	if err != nil {
+		response.Fail(c, http.StatusBadRequest, 400, err.Error())
+		return
 	}
 
 	if len(raw) == 0 {
@@ -105,6 +108,48 @@ func (h *ImportHandler) ParseImportImage(c *gin.Context) {
 		"rows":   rows,
 		"engine": "llm",
 		"model":  h.llm.VisionModel(),
+	})
+}
+
+// ParseInvoiceNumber POST /vouchers/parse-invoice-number
+// 支持 multipart file，或 JSON { imageBase64, mimeType }。
+func (h *ImportHandler) ParseInvoiceNumber(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
+	if h.llm == nil || !h.llm.Enabled() {
+		response.Fail(c, http.StatusServiceUnavailable, 503, "未配置大模型（APP_LLM_API_KEY），无法识别发票")
+		return
+	}
+
+	raw, mimeType, err := readUploadImagePayload(c)
+	if err != nil {
+		response.Fail(c, http.StatusBadRequest, 400, err.Error())
+		return
+	}
+	if len(raw) == 0 {
+		response.Fail(c, http.StatusBadRequest, 400, "图片内容为空")
+		return
+	}
+	if !strings.HasPrefix(mimeType, "image/") {
+		mimeType = "image/png"
+	}
+
+	encoded := base64.StdEncoding.EncodeToString(raw)
+	numbers, err := h.llm.ExtractInvoiceNumbers(c.Request.Context(), mimeType, encoded)
+	if err != nil {
+		response.Fail(c, http.StatusBadGateway, 502, err.Error())
+		return
+	}
+	if len(numbers) == 0 {
+		response.Fail(c, http.StatusUnprocessableEntity, 422, "未能从图片识别出发票号码，请换更清晰的发票截图或 PDF")
+		return
+	}
+
+	response.Success(c, gin.H{
+		"invoiceNumbers": numbers,
+		"engine":         "llm",
+		"model":          h.llm.VisionModel(),
 	})
 }
 

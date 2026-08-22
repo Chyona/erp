@@ -1,24 +1,27 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Modal, Button, Space, App, Popconfirm, Alert, Tooltip } from 'antd';
+import { Modal, Button, Space, App, Alert, Tooltip } from 'antd';
 import { FilePdfOutlined, LeftOutlined, RightOutlined } from '@ant-design/icons';
 import { Voucher } from '../services/voucher';
 import { ExportUtil, getCompanyInfo } from '../services/export';
 import { confirmWarning } from '../utils/confirmAction';
+import { confirmDeleteWithPassword } from '../utils/confirmDeleteWithPassword';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { isCarryForwardVoucher, CARRY_FORWARD_VOUCHER_READONLY_TIP } from '../utils/carryForwardVoucher';
 import { CarryForwardBadge } from './StatusBadge';
+import { enrichAttachmentDisplayNames, attachmentNameContextFromVoucher } from '../utils/attachmentName';
 import AttachmentPreviewModal, { isPdfAttachment } from './AttachmentPreviewModal';
 
 function AttachmentThumbnail({ attachment, onClick }) {
   const isPdf = isPdfAttachment(attachment);
+  const label = attachment.displayName || attachment.name;
 
   return (
     <button
       type="button"
       className="attachment-thumb"
       onClick={() => onClick(attachment)}
-      title={attachment.name}
+      title={label}
     >
       <div className="attachment-thumb__visual">
         {isPdf ? (
@@ -27,7 +30,7 @@ function AttachmentThumbnail({ attachment, onClick }) {
           <img src={attachment.url} alt="" className="attachment-thumb__img" />
         )}
       </div>
-      <span className="attachment-thumb__name">{attachment.name}</span>
+      <span className="attachment-thumb__name">{label}</span>
     </button>
   );
 }
@@ -52,13 +55,13 @@ export default function VoucherDetailModal({
 }) {
   const { message, modal } = App.useApp();
   const { refresh } = useApp();
-  const { canMutateVoucher, canPrintVoucher } = useAuth();
+  const { canMutateVoucher, canPrintVoucher, role } = useAuth();
   const [activeId, setActiveId] = useState<string | null>(voucherId);
   const [voucher, setVoucher] = useState(null);
   const [attachments, setAttachments] = useState([]);
   const [company, setCompany] = useState({ name: '', taxId: '' });
   const [loading, setLoading] = useState(false);
-  const [previewAttachment, setPreviewAttachment] = useState(null);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const [adjacent, setAdjacent] = useState<{ older: { id: string } | null; newer: { id: string } | null }>({
     older: null,
     newer: null
@@ -91,7 +94,7 @@ export default function VoucherDetailModal({
       }
       if (!cancelled) {
         setVoucher(v);
-        setAttachments(atts);
+        setAttachments(enrichAttachmentDisplayNames(attachmentNameContextFromVoucher(v), atts));
         setAdjacent({ older, newer });
         setCompany({
           name: typeof comp.name === 'string' ? comp.name : '',
@@ -107,7 +110,7 @@ export default function VoucherDetailModal({
 
   useEffect(() => {
     if (!open) {
-      setPreviewAttachment(null);
+      setPreviewIndex(null);
       setAdjacent({ older: null, newer: null });
     }
   }, [open]);
@@ -149,30 +152,40 @@ export default function VoucherDetailModal({
     ExportUtil.printVoucher(html);
   };
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (!voucher || voucher.status === 'locked') return;
-    try {
-      await Voucher.remove(voucher.id);
-      message.success('凭证已删除');
-      refresh();
-      onDeleted?.();
-      onClose();
-    } catch (err) {
-      message.error(err.message);
-    }
+    confirmDeleteWithPassword({
+      modal,
+      isAdmin: role === 'admin',
+      title: '确定删除该凭证？',
+      content: `凭证 ${voucher.voucherNo} 及关联附件删除后不可恢复。`,
+      okText: '确定删除',
+      onConfirm: async (confirmPassword) => {
+        await Voucher.remove(voucher.id, { confirmPassword });
+        message.success('凭证已删除');
+        refresh();
+        onDeleted?.();
+        onClose();
+      }
+    });
   };
 
-  const handleForceDelete = async () => {
+  const handleForceDelete = () => {
     if (!voucher || voucher.status !== 'locked') return;
-    try {
-      await Voucher.forceRemove(voucher.id);
-      message.success('凭证已删除');
-      refresh();
-      onDeleted?.();
-      onClose();
-    } catch (err) {
-      message.error(err.message);
-    }
+    confirmDeleteWithPassword({
+      modal,
+      isAdmin: role === 'admin',
+      title: '确定强制删除已结项凭证？',
+      content: `凭证 ${voucher.voucherNo} 及关联附件删除后不可恢复。`,
+      okText: '强制删除',
+      onConfirm: async (confirmPassword) => {
+        await Voucher.forceRemove(voucher.id, { confirmPassword });
+        message.success('凭证已删除');
+        refresh();
+        onDeleted?.();
+        onClose();
+      }
+    });
   };
 
   const handleLock = async () => {
@@ -239,42 +252,14 @@ export default function VoucherDetailModal({
               canMutateVoucher(voucher) &&
               !carryForward &&
               (voucher.status === 'locked' ? (
-                <Popconfirm
-                  title="确定强制删除已结项凭证？"
-                  description={
-                    voucher
-                      ? `凭证 ${voucher.voucherNo} 及关联附件删除后不可恢复。`
-                      : undefined
-                  }
-                  okText="强制删除"
-                  cancelText="取消"
-                  okButtonProps={{ danger: true }}
-                  onConfirm={handleForceDelete}
-                  disabled={!voucher}
-                >
-                  <Button danger disabled={!voucher}>
-                    强制删除
-                  </Button>
-                </Popconfirm>
+                <Button danger disabled={!voucher} onClick={handleForceDelete}>
+                  强制删除
+                </Button>
               ) : (
                 <>
-                  <Popconfirm
-                    title="确定删除该凭证？"
-                    description={
-                      voucher
-                        ? `凭证 ${voucher.voucherNo} 及关联附件删除后不可恢复。`
-                        : undefined
-                    }
-                    okText="确定删除"
-                    cancelText="取消"
-                    okButtonProps={{ danger: true }}
-                    onConfirm={handleDelete}
-                    disabled={!voucher}
-                  >
-                    <Button danger disabled={!voucher}>
-                      删除凭证
-                    </Button>
-                  </Popconfirm>
+                  <Button danger disabled={!voucher} onClick={handleDelete}>
+                    删除凭证
+                  </Button>
                   {voucher && canPrintVoucher(voucher) ? (
                     <Button onClick={handlePrint}>
                       打印凭证
@@ -334,7 +319,10 @@ export default function VoucherDetailModal({
                         <AttachmentThumbnail
                           key={a.id}
                           attachment={a}
-                          onClick={setPreviewAttachment}
+                          onClick={(att) => {
+                            const idx = attachments.findIndex((item) => item.id === att.id);
+                            setPreviewIndex(idx >= 0 ? idx : 0);
+                          }}
                         />
                       ))}
                     </div>
@@ -362,9 +350,10 @@ export default function VoucherDetailModal({
       </Modal>
 
       <AttachmentPreviewModal
-        attachment={previewAttachment}
-        open={Boolean(previewAttachment)}
-        onClose={() => setPreviewAttachment(null)}
+        attachments={attachments}
+        initialIndex={previewIndex ?? 0}
+        open={previewIndex !== null}
+        onClose={() => setPreviewIndex(null)}
       />
     </>
   );

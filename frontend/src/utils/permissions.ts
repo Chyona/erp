@@ -39,7 +39,6 @@ export function can(role: Role | string | null | undefined, permission: Permissi
     case 'closing':
       return r === 'admin';
     case 'closing.view':
-      // 管理员可操作；普通用户与只读用户可查看汇总，不可生成/反结转
       return r === 'admin' || r === 'user' || r === 'readonly';
     case 'export':
     case 'backup':
@@ -71,19 +70,30 @@ export function canPrintVoucher(
   accountId: number | null | undefined,
   voucher: { createdByAccountId?: number } | null | undefined
 ): boolean {
+  const r = normalizeRole(role);
+  if (r === 'readonly') return false;
   return canAccessOwnVoucher(role, accountId, voucher);
 }
 
-/** 是否可打开凭证页（字号链接）：只读不可；管理员全部；普通用户仅自己创建的 */
+/** 是否可打开凭证查看：只读可查看全部；管理员全部；普通用户仅自己创建的 */
 export function canAccessOwnVoucher(
   role: Role | string | null | undefined,
   accountId: number | null | undefined,
   voucher: { createdByAccountId?: number } | null | undefined
 ): boolean {
   const r = normalizeRole(role);
-  if (r === 'readonly') return false;
+  if (r === 'readonly') return Boolean(voucher);
   if (r === 'admin') return true;
   if (!voucher || !accountId) return false;
   const owner = voucher.createdByAccountId || 0;
   return owner > 0 && owner === accountId;
+}
+
+/** @alias canAccessOwnVoucher */
+export function canViewVoucher(
+  role: Role | string | null | undefined,
+  accountId: number | null | undefined,
+  voucher: { createdByAccountId?: number } | null | undefined
+): boolean {
+  return canAccessOwnVoucher(role, accountId, voucher);
 }

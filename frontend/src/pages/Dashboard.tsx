@@ -4,6 +4,7 @@ import { Voucher } from '../services/voucher';
 import VoucherTable from '../components/VoucherTable';
 import VoucherDetailModal from '../components/VoucherDetailModal';
 import WorkbenchPanel from '../components/WorkbenchPanel';
+import { useAsyncLoading } from '../hooks/useAsyncLoading';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 
@@ -23,12 +24,15 @@ export default function Dashboard() {
   const [stats, setStats] = useState({ total: 0, month: 0, totalDebit: 0, totalAttachments: 0 });
   const [recent, setRecent] = useState([]);
   const [viewId, setViewId] = useState(null);
+  const { loading: pageLoading, run: runPageLoad } = useAsyncLoading(true);
 
   const loadDashboard = async () => {
-    const s = await Voucher.getStats();
-    const all = await Voucher.getAll();
-    setStats(s);
-    setRecent(all.slice(0, 8));
+    await runPageLoad(async () => {
+      const s = await Voucher.getStats();
+      const all = await Voucher.getAll();
+      setStats(s);
+      setRecent(all.slice(0, 8));
+    });
   };
 
   useEffect(() => {
@@ -40,22 +44,22 @@ export default function Dashboard() {
       <Title level={2}>工作台</Title>
       <Row gutter={16} style={{ marginBottom: 24 }}>
         <Col xs={12} sm={12} lg={6}>
-          <Card>
+          <Card loading={pageLoading}>
             <Statistic title="凭证总数" value={stats.total} />
           </Card>
         </Col>
         <Col xs={12} sm={12} lg={6}>
-          <Card>
+          <Card loading={pageLoading}>
             <Statistic title="本月凭证" value={stats.month} />
           </Card>
         </Col>
         <Col xs={12} sm={12} lg={6}>
-          <Card>
+          <Card loading={pageLoading}>
             <Statistic title="借方合计" value={stats.totalDebit} precision={2} prefix="¥" />
           </Card>
         </Col>
         <Col xs={12} sm={12} lg={6}>
-          <Card>
+          <Card loading={pageLoading}>
             <Statistic title="附件总数" value={stats.totalAttachments} />
           </Card>
         </Col>
@@ -63,13 +67,8 @@ export default function Dashboard() {
 
       {can('closing.view') ? <WorkbenchPanel readOnly={!can('closing')} /> : null}
 
-      <Card title="最近凭证" style={{ marginBottom: 20 }}>
-        <VoucherTable
-          vouchers={recent}
-          compact
-          onView={setViewId}
-          onRefresh={loadDashboard}
-        />
+      <Card title="最近凭证" style={{ marginBottom: 20 }} loading={pageLoading}>
+        <VoucherTable vouchers={recent} compact loading={pageLoading} onView={setViewId} />
       </Card>
 
       <Card title="税务查账合规提示" className="tips-panel">
@@ -84,7 +83,6 @@ export default function Dashboard() {
         voucherId={viewId}
         open={!!viewId}
         onClose={() => setViewId(null)}
-        onDeleted={loadDashboard}
         onVoucherChange={setViewId}
         navigationIds={recent.map((v) => v.id)}
       />

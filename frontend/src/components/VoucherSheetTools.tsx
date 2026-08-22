@@ -1,13 +1,30 @@
 import { Button, Space, Tooltip } from 'antd';
-import { EyeOutlined, LeftOutlined, RightOutlined } from '@ant-design/icons';
+import {
+  EyeOutlined,
+  FullscreenExitOutlined,
+  FullscreenOutlined,
+  LeftOutlined,
+  RightOutlined
+} from '@ant-design/icons';
 
 export default function VoucherSheetTools({
   eyeCare = false,
   onEyeCareToggle,
+  fullscreen = false,
+  onFullscreenToggle,
   onPrev,
   onNext,
   hasPrev = false,
   hasNext = false
+}: {
+  eyeCare?: boolean;
+  onEyeCareToggle?: () => void;
+  fullscreen?: boolean;
+  onFullscreenToggle?: () => void;
+  onPrev?: () => void;
+  onNext?: () => void;
+  hasPrev?: boolean;
+  hasNext?: boolean;
 }) {
   return (
     <Space size={4} className="voucher-sheet__tools">
@@ -44,6 +61,17 @@ export default function VoucherSheetTools({
           />
         </Tooltip>
       </Space>
+      <Tooltip title={fullscreen ? '退出全屏' : '全屏'}>
+        <Button
+          type="text"
+          size="small"
+          className={`voucher-sheet__tool-btn${fullscreen ? ' voucher-sheet__tool-btn--active' : ''}`}
+          icon={fullscreen ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
+          onClick={onFullscreenToggle}
+        >
+          全屏
+        </Button>
+      </Tooltip>
     </Space>
   );
 }

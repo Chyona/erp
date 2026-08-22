@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Table, Button, Space, Typography, App, Popconfirm, Upload, Tooltip, Checkbox, Popover } from 'antd';
+import { Table, Button, Space, Typography, App, Upload, Tooltip, Checkbox, Popover } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import ScrollTable from './ScrollTable';
 import { DeleteOutlined, EyeOutlined, PaperClipOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { enrichAttachmentDisplayNames, attachmentNameContextFromVoucher } from '../utils/attachmentName';
 import { Voucher } from '../services/voucher';
 import type { Attachment, Voucher as VoucherRecord } from '../types';
 import { useApp } from '../context/AppContext';
@@ -12,6 +13,7 @@ import { isCarryForwardVoucher } from '../utils/carryForwardVoucher';
 import StatusBadge from './StatusBadge';
 import VoucherMoreActions from './VoucherMoreActions';
 import VoucherAttachmentColumn from './VoucherAttachmentColumn';
+import { confirmDeleteWithPassword } from '../utils/confirmDeleteWithPassword';
 
 const { Link } = Typography;
 
@@ -61,6 +63,25 @@ function mergeCell(rowSpan) {
   return rowSpan > 0 ? { rowSpan } : { rowSpan: 0 };
 }
 
+function renderMultilineText(value: string | undefined, splitPattern = /[,，、;\s]+/) {
+  const parts = String(value || '')
+    .split(splitPattern)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (!parts.length) return '';
+  if (parts.length === 1) return parts[0];
+  return (
+    <span className="voucher-grouped-table__multiline">
+      {parts.map((part, index) => (
+        <span key={index}>
+          {index > 0 ? <br /> : null}
+          {part}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 export default function VoucherTable({
   vouchers,
   compact = false,
@@ -69,8 +90,8 @@ export default function VoucherTable({
   selectedIds = [],
   onSelectedIdsChange,
   onView,
-  onRefresh,
-  showSubtotal = true
+  showSubtotal = true,
+  loading = false
 }: {
   vouchers: VoucherRecord[];
   compact?: boolean;
@@ -79,13 +100,13 @@ export default function VoucherTable({
   selectedIds?: string[];
   onSelectedIdsChange?: (ids: string[]) => void;
   onView: (id: string) => void;
-  onRefresh: () => void | Promise<void>;
   showSubtotal?: boolean;
+  loading?: boolean;
 }) {
   const navigate = useNavigate();
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const { refresh } = useApp();
-  const { canMutateVoucher, canAccessOwnVoucher } = useAuth();
+  const { canMutateVoucher, canAccessOwnVoucher, role } = useAuth();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(100);
   const [uploadingId, setUploadingId] = useState('');
@@ -180,9 +201,26 @@ export default function VoucherTable({
 
   const notifyDataChanged = () => {
     refresh();
-    onRefresh?.();
   };
 
+  const requestDeleteVoucher = (voucher, force = false) => {
+    confirmDeleteWithPassword({
+      modal,
+      isAdmin: role === 'admin',
+      title: force ? '确定强制删除已结项凭证？' : '确定删除该凭证？',
+      content: `凭证 ${voucher.voucherNo} 及关联附件删除后不可恢复。`,
+      okText: force ? '强制删除' : '确定删除',
+      onConfirm: async (confirmPassword) => {
+        if (force) {
+          await Voucher.forceRemove(voucher.id, { confirmPassword });
+        } else {
+          await Voucher.remove(voucher.id, { confirmPassword });
+        }
+        message.success('凭证已删除');
+        notifyDataChanged();
+      }
+    });
+  };
   const openVoucherPage = (voucher) => {
     if (!canAccessOwnVoucher(voucher)) return;
     // 已结项只能看详情弹窗（编辑页会拦截）
@@ -208,46 +246,26 @@ export default function VoucherTable({
         />
         {mutable ? (
           voucher.status === 'locked' ? (
-            <Popconfirm
-              title="确定强制删除已结项凭证？"
-              description={`凭证 ${voucher.voucherNo} 及关联附件删除后不可恢复。`}
-              okText="强制删除"
-              cancelText="取消"
-              okButtonProps={{ danger: true }}
-              onConfirm={async () => {
-                try {
-                  await Voucher.forceRemove(voucher.id);
-                  message.success('凭证已删除');
-                  notifyDataChanged();
-                } catch (err) {
-                  message.error(err.message);
-                }
-              }}
-            >
-              <Button type="text" size="small" danger icon={<DeleteOutlined />} title="强制删除" />
-            </Popconfirm>
+            <Button
+              type="text"
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              title="强制删除"
+              onClick={() => requestDeleteVoucher(voucher, true)}
+            />
           ) : (
-            <Popconfirm
-              title="确定删除该凭证？"
-              description={`凭证 ${voucher.voucherNo} 及关联附件删除后不可恢复。`}
-              okText="确定删除"
-              cancelText="取消"
-              okButtonProps={{ danger: true }}
-              onConfirm={async () => {
-                try {
-                  await Voucher.remove(voucher.id);
-                  message.success('凭证已删除');
-                  notifyDataChanged();
-                } catch (err) {
-                  message.error(err.message);
-                }
-              }}
-            >
-              <Button type="text" size="small" danger icon={<DeleteOutlined />} title="删除" />
-            </Popconfirm>
+            <Button
+              type="text"
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              title="删除"
+              onClick={() => requestDeleteVoucher(voucher, false)}
+            />
           )
         ) : null}
-        {mutable ? <VoucherMoreActions voucher={voucher} onRefresh={onRefresh} /> : null}
+        {mutable ? <VoucherMoreActions voucher={voucher} /> : null}
       </Space>
     );
   };
@@ -306,7 +324,9 @@ export default function VoucherTable({
         }
       }
       setAttachPanelVoucher(latest);
-      setAttachPanelItems(atts);
+      setAttachPanelItems(
+        enrichAttachmentDisplayNames(attachmentNameContextFromVoucher(latest), atts)
+      );
       if (!atts.length) {
         message.warning('未找到附件文件，请重新上传');
         setAttachPanelVoucher(null);
@@ -546,7 +566,7 @@ export default function VoucherTable({
     {
       title: '凭证字号',
       key: 'voucherNo',
-      width: 118,
+      width: 90,
       onCell: (record) => mergeCell(record.groupRowSpan),
       render: (_, record) =>
         canOpenVoucherLink(record.voucher) ? (
@@ -558,7 +578,7 @@ export default function VoucherTable({
     {
       title: '日期',
       dataIndex: ['voucher', 'date'],
-      width: 108,
+      width: 110,
       onCell: (record) => mergeCell(record.groupRowSpan),
       render: (_, record) => record.voucher.date
     },
@@ -576,7 +596,7 @@ export default function VoucherTable({
     {
       title: '科目',
       key: 'account',
-      width: 220,
+      width: 140,
       ellipsis: true,
       render: (_, record) => {
         if (record.rowType === 'subtotal') return '';
@@ -587,7 +607,7 @@ export default function VoucherTable({
     {
       title: '借方金额',
       key: 'debit',
-      width: 112,
+      width: 110,
       align: 'right',
       render: (_, record) =>
         record.rowType === 'subtotal'
@@ -597,7 +617,7 @@ export default function VoucherTable({
     {
       title: '贷方金额',
       key: 'credit',
-      width: 112,
+      width: 110,
       align: 'right',
       render: (_, record) =>
         record.rowType === 'subtotal'
@@ -605,17 +625,33 @@ export default function VoucherTable({
           : formatAmount(record.entry.credit, record.voucher)
     },
     {
+      title: '备注',
+      key: 'remark',
+      ellipsis: true,
+      onCell: (record) => mergeCell(record.groupRowSpan),
+      render: (_, record) => (
+        <span className="voucher-grouped-table__multiline">{record.voucher.remark || ''}</span>
+      )
+    },
+    {
       title: '附件',
       key: 'attachments',
-      width: 108,
+      width: 90,
       align: 'center',
       onCell: (record) => mergeCell(record.groupRowSpan),
       render: (_, record) => renderAttachments(record.voucher)
     },
     {
+      title: '发票号',
+      key: 'invoiceNumbers',
+      width: 160,
+      onCell: (record) => mergeCell(record.groupRowSpan),
+      render: (_, record) => renderMultilineText(record.voucher.invoiceNumbers)
+    },
+    {
       title: '制单人',
       key: 'preparedBy',
-      width: 88,
+      width: 80,
       ellipsis: true,
       onCell: (record) => mergeCell(record.groupRowSpan),
       render: (_, record) => record.voucher.preparedBy || ''
@@ -623,7 +659,7 @@ export default function VoucherTable({
     {
       title: '审核人',
       key: 'reviewedBy',
-      width: 88,
+      width: 80,
       ellipsis: true,
       onCell: (record) => mergeCell(record.groupRowSpan),
       render: (_, record) => record.voucher.reviewedBy || ''
@@ -631,7 +667,7 @@ export default function VoucherTable({
     {
       title: '状态',
       key: 'status',
-      width: 148,
+      width: 80,
       onCell: (record) => mergeCell(record.groupRowSpan),
       render: (_, record) => (
         <StatusBadge status={record.voucher.status} voucher={record.voucher} />
@@ -640,7 +676,7 @@ export default function VoucherTable({
     {
       title: '操作',
       key: 'actions',
-      width: 56,
+      width: 60,
       align: 'center',
       onCell: (record) => mergeCell(record.groupRowSpan),
       render: (_, record) => renderActions(record.voucher)
@@ -675,6 +711,7 @@ export default function VoucherTable({
     return (
       <Table
         rowKey="id"
+        loading={loading}
         columns={compactColumns as ColumnsType<any>}
         dataSource={vouchers}
         pagination={false}
@@ -687,6 +724,7 @@ export default function VoucherTable({
   const tableProps = {
     className: 'voucher-grouped-table',
     rowKey: 'key',
+    loading,
     columns: groupedColumns as ColumnsType<any>,
     dataSource: groupedRows,
     pagination: {
@@ -719,7 +757,7 @@ export default function VoucherTable({
             <Table.Summary.Cell index={selectable ? 6 : 5} align="right">
               {formatAmount(pageTotals.credit)}
             </Table.Summary.Cell>
-            <Table.Summary.Cell index={selectable ? 7 : 6} colSpan={4} />
+            <Table.Summary.Cell index={selectable ? 7 : 6} colSpan={selectable ? 8 : 7} />
           </Table.Summary.Row>
         </Table.Summary>
       ) : null
@@ -729,7 +767,7 @@ export default function VoucherTable({
     return (
       <ScrollTable
         {...(tableProps as Record<string, unknown>)}
-        scroll={{ x: selectable ? 1330 : 1290 }}
+        scroll={{ x: selectable ? 1630 : 1590 }}
       />
     );
   }

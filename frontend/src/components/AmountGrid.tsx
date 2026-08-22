@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { Popover } from 'antd';
 import { CalculatorOutlined } from '@ant-design/icons';
 import { AMOUNT_UNITS, amountToDigits } from '../utils/amountGrid';
+import AmountCalculatorPanel from './AmountCalculatorPanel';
 
 function cellBorderClass(index: number) {
   if (index === 8) return 'amount-grid__cell--yuan';
@@ -25,18 +27,22 @@ export default function AmountGrid({
   tabIndex?: number;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const calcOpenRef = useRef(false);
   const [focused, setFocused] = useState(false);
   const [editText, setEditText] = useState('');
+  const [calcOpen, setCalcOpen] = useState(false);
+  const [calcSeed, setCalcSeed] = useState('');
+
   const digits = amountToDigits(String(value ?? ''));
   const hasAmount = (parseFloat(String(value)) || 0) > 0;
   const redClass = redLetter && hasAmount ? ' amount-grid--red-letter' : '';
 
   useEffect(() => {
-    if (!focused) {
+    if (!focused && !calcOpen) {
       const n = parseFloat(String(value));
       setEditText(Number.isFinite(n) && n > 0 ? String(n) : '');
     }
-  }, [value, focused]);
+  }, [value, focused, calcOpen]);
 
   const commit = (text: string) => {
     const trimmed = text.trim();
@@ -59,8 +65,30 @@ export default function AmountGrid({
   };
 
   const handleBlur = () => {
-    setFocused(false);
-    commit(editText);
+    window.setTimeout(() => {
+      if (calcOpenRef.current) return;
+      setFocused(false);
+      commit(editText);
+    }, 0);
+  };
+
+  const openCalculator = () => {
+    const n = parseFloat(String(value));
+    setCalcSeed(Number.isFinite(n) && n > 0 ? String(n) : editText || '');
+    calcOpenRef.current = true;
+    setCalcOpen(true);
+  };
+
+  const applyCalculator = (result: number) => {
+    const text = String(result);
+    setEditText(text);
+    onChange?.(result);
+    calcOpenRef.current = false;
+    setCalcOpen(false);
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    });
   };
 
   if (readOnly) {
@@ -97,24 +125,49 @@ export default function AmountGrid({
           <span className="amount-grid__digit">{digits[i]}</span>
         </div>
       ))}
-      <div className="amount-grid__editor" onClick={(e) => e.stopPropagation()}>
-        <button
-          type="button"
-          className="amount-grid__calc-btn"
-          tabIndex={-1}
-          aria-label="计算器"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => inputRef.current?.focus()}
+      <div className="amount-grid__editor">
+        <Popover
+          open={calcOpen}
+          onOpenChange={(open) => {
+            calcOpenRef.current = open;
+            setCalcOpen(open);
+            if (!open) {
+              requestAnimationFrame(() => inputRef.current?.focus());
+            }
+          }}
+          trigger="click"
+          placement="bottomLeft"
+          overlayClassName="amount-grid__calc-popover"
+          content={
+            <AmountCalculatorPanel
+              key={calcSeed}
+              initialValue={calcSeed}
+              onApply={applyCalculator}
+            />
+          }
+          destroyOnHidden
         >
-          <CalculatorOutlined />
-        </button>
+          <button
+            type="button"
+            className="amount-grid__calc-btn"
+            tabIndex={-1}
+            aria-label="计算器"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={(e) => {
+              e.stopPropagation();
+              openCalculator();
+            }}
+          >
+            <CalculatorOutlined />
+          </button>
+        </Popover>
         <input
           ref={inputRef}
           className="amount-grid__input"
           type="text"
           inputMode="decimal"
           value={editText}
-          tabIndex={0}
+          tabIndex={tabIndex}
           onFocus={() => setFocused(true)}
           onBlur={handleBlur}
           onChange={(e) => setEditText(e.target.value.replace(/[^\d.]/g, ''))}

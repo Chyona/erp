@@ -1,17 +1,21 @@
 import { Modal, Input } from 'antd';
 import type { ModalFuncProps } from 'antd';
+import type { HookAPI } from 'antd/es/modal/useModal';
 import type { ReactNode } from 'react';
 
 /** 管理员删除：弹窗输入登录密码；其他角色仅确认。 */
 export function confirmDeleteWithPassword(options: {
+  modal?: HookAPI;
   isAdmin: boolean;
   title: string;
   content: ReactNode;
   okText?: string;
   onConfirm: (confirmPassword?: string) => Promise<void>;
 }): void {
+  const modalApi = options.modal ?? Modal;
+
   if (!options.isAdmin) {
-    Modal.confirm({
+    modalApi.confirm({
       title: options.title,
       content: options.content,
       okText: options.okText || '删除',
@@ -23,7 +27,7 @@ export function confirmDeleteWithPassword(options: {
   }
 
   let password = '';
-  Modal.confirm({
+  modalApi.confirm({
     title: options.title,
     content: (
       <div>

@@ -1,5 +1,6 @@
 import { Voucher } from './voucher';
 import { ErpApi } from './erpApi';
+import { resolveAttachmentDisplayName } from '../utils/attachmentName';
 import { mergeBalanceSheetRows } from '../utils/balanceSheetRows';
 import { formatStoredTaxExemptionPeriod } from '../utils/reportPeriod';
 
@@ -23,7 +24,7 @@ const VOUCHER_EXPORT_HEADERS = [
   '借方金额',
   '贷方金额',
   '附件数',
-  '发票/单据号码',
+  '发票号',
   '校验码',
   '状态',
   '制表人',
@@ -760,18 +761,18 @@ function balanceSheetToCSV(data) {
           : '',
         liabilityLabel,
         row.liabilityType &&
-        row.liabilityType !== 'section' &&
-        row.liabilityType !== 'spacer'
+          row.liabilityType !== 'section' &&
+          row.liabilityType !== 'spacer'
           ? (row.liabilityRow ?? '')
           : '',
         row.liabilityType &&
-        row.liabilityType !== 'section' &&
-        row.liabilityType !== 'spacer'
+          row.liabilityType !== 'section' &&
+          row.liabilityType !== 'spacer'
           ? fmtAmount(row.liabilityEnding)
           : '',
         row.liabilityType &&
-        row.liabilityType !== 'section' &&
-        row.liabilityType !== 'spacer'
+          row.liabilityType !== 'section' &&
+          row.liabilityType !== 'spacer'
           ? fmtAmount(row.liabilityOpening)
           : ''
       ].join(',')
@@ -882,26 +883,33 @@ function downloadBinaryBlob(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
-/** 从附件 URL 解析对象存储相对路径 attachments/YYYY/MM/filename */
-function attachmentObjectPath(att, voucherDate = '') {
-  const rawUrl = String(att?.url || '').trim();
-  if (rawUrl && !rawUrl.startsWith('data:')) {
-    try {
-      const u = new URL(rawUrl);
-      const path = decodeURIComponent(u.pathname.replace(/^\/+/, ''));
-      const idx = path.indexOf('attachments/');
-      if (idx >= 0) {
-        return path.slice(idx);
-      }
-    } catch {
-      // ignore
-    }
-  }
-  const date = String(voucherDate || '').slice(0, 10);
+/** ZIP 内附件路径：按当前凭证字号生成展示名，与 COS 对象键解耦 */
+function attachmentZipPath(
+  voucher: {
+    date?: string;
+    voucherNo?: string;
+    entries?: Array<{ summary?: string }>;
+    totalDebit?: number;
+    totalCredit?: number;
+  },
+  att: { name?: string },
+  index: number,
+  usedPaths: Set<string>
+) {
+  const date = String(voucher?.date || '').slice(0, 10);
   const year = date.slice(0, 4) || 'unknown';
   const month = date.slice(5, 7) || '00';
-  const name = String(att?.name || att?.id || 'file').replace(/[\\/:*?"<>|]/g, '_');
-  return `attachments/${year}/${month}/${name}`;
+  const displayName = resolveAttachmentDisplayName(
+    {
+      voucherNo: voucher.voucherNo,
+      entries: voucher.entries,
+      totals: { debit: voucher.totalDebit, credit: voucher.totalCredit }
+    },
+    att,
+    index
+  );
+  const safe = displayName.replace(/[\\/:*?"<>|]/g, '_');
+  return uniqueZipPath(usedPaths, `attachments/${year}/${month}/${safe}`);
 }
 
 function uniqueZipPath(used: Set<string>, path: string) {
@@ -930,19 +938,19 @@ async function appendPeriodAttachmentsToZip(
   const usedPaths = new Set<string>();
   let attachmentCount = 0;
   let failed = 0;
-  const tasks: { voucher: { date?: string; attachmentIds?: string[] }; id: string }[] = [];
+  const tasks: { voucher: { date?: string; voucherNo?: string; entries?: Array<{ summary?: string }>; totalDebit?: number; totalCredit?: number; attachmentIds?: string[] }; id: string; index: number }[] = [];
 
   for (const voucher of vouchers || []) {
-    for (const id of voucher.attachmentIds || []) {
-      tasks.push({ voucher, id });
-    }
+    (voucher.attachmentIds || []).forEach((id, index) => {
+      tasks.push({ voucher, id, index });
+    });
   }
 
   const total = tasks.length;
   onProgress?.(0, total);
 
   for (let i = 0; i < tasks.length; i++) {
-    const { voucher, id } = tasks[i];
+    const { voucher, id, index } = tasks[i];
     try {
       const att = await Voucher.getAttachment(id);
       if (!att?.url || String(att.url).startsWith('data:')) {
@@ -955,7 +963,7 @@ async function appendPeriodAttachmentsToZip(
         throw new Error(`HTTP ${res.status}`);
       }
       const buf = await res.arrayBuffer();
-      const path = uniqueZipPath(usedPaths, attachmentObjectPath(att, voucher.date));
+      const path = attachmentZipPath(voucher, att, index, usedPaths);
       zip.file(path, buf);
       attachmentCount += 1;
     } catch {
@@ -1014,7 +1022,6 @@ export const ExportUtil = {
   balanceSheetToCSV,
   exportVouchersPackage,
   exportFinancialReportsWorkbook,
-  attachmentObjectPath,
   renderPrintVoucher,
   printVoucher
 };

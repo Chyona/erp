@@ -83,8 +83,15 @@ func main() {
 	}
 
 	// 补齐新增列，并确保内置管理员账号存在
-	if err := db.AutoMigrate(&model.Account{}, &model.Voucher{}); err != nil {
-		logger.Fatal("自动迁移账号/凭证表失败", zap.Error(err))
+	if err := db.AutoMigrate(
+		&model.Account{},
+		&model.Voucher{},
+		&model.ChartAccount{},
+		&model.Attachment{},
+		&model.AuditLog{},
+		&model.Setting{},
+	); err != nil {
+		logger.Fatal("自动迁移数据库表失败", zap.Error(err))
 	}
 	if err := seeder.EnsureBuiltinAdmin(db, logger); err != nil {
 		logger.Warn("确保内置管理员失败", zap.Error(err))

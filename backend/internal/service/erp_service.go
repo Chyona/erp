@@ -583,8 +583,12 @@ func (s *erpService) UploadAttachment(
 		name = "file"
 	}
 	safeName := sanitizeAttachmentFileName(name)
+	ext := filepath.Ext(safeName)
+	if ext == "" {
+		ext = ".dat"
+	}
 	year, month := parseVoucherYearMonth(voucherDate)
-	objectKey := storage.AttachmentObjectKey(year, month, id, safeName)
+	objectKey := storage.AttachmentObjectKey(year, month, id, ext)
 	publicURL, err := s.store.UploadPublic(ctx, r, objectKey, size)
 	if err != nil {
 		return nil, fmt.Errorf("上传附件到对象存储失败: %w", err)

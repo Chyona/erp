@@ -70,17 +70,17 @@ func TestClient_ObjectKey(t *testing.T) {
 
 func TestAttachmentObjectKey(t *testing.T) {
 	tests := []struct {
-		year, month, id, fileName, want string
+		year, month, id, ext, want string
 	}{
-		{"2026", "8", "att1", "a.pdf", "attachments/2026/08/a.pdf"},
-		{"2026", "08", "att1", "记-021.pdf", "attachments/2026/08/记-021.pdf"},
-		{"2026", "12", "", "a.pdf", "attachments/2026/12/a.pdf"},
-		{"", "", "att1", "", "attachments/unknown/00/att1"},
+		{"2026", "8", "att1", ".pdf", "attachments/2026/08/att1.pdf"},
+		{"2026", "08", "cb0131c3-b0d8-4a94-986f-b9048e7a67ff", ".png", "attachments/2026/08/cb0131c3-b0d8-4a94-986f-b9048e7a67ff.png"},
+		{"2026", "12", "", ".pdf", "attachments/2026/12/file.pdf"},
+		{"", "", "att1", "", "attachments/unknown/00/att1.dat"},
 	}
 	for _, tt := range tests {
-		if got := AttachmentObjectKey(tt.year, tt.month, tt.id, tt.fileName); got != tt.want {
+		if got := AttachmentObjectKey(tt.year, tt.month, tt.id, tt.ext); got != tt.want {
 			t.Errorf("AttachmentObjectKey(%q,%q,%q,%q) = %q, want %q",
-				tt.year, tt.month, tt.id, tt.fileName, got, tt.want)
+				tt.year, tt.month, tt.id, tt.ext, got, tt.want)
 		}
 	}
 }

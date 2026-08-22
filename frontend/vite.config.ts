@@ -12,6 +12,10 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), ...(useMock ? [erpMockPlugin()] : [])],
+    resolve: {
+      // 避免 antd/rc-picker 与业务代码各打包一份 dayjs，导致 DatePicker 报 clone.weekday is not a function
+      dedupe: ['dayjs', 'react', 'react-dom']
+    },
     build: {
       chunkSizeWarningLimit: 1200,
       rollupOptions: {

@@ -102,6 +102,15 @@ const tableExtractPrompt = `你是会计凭证表格识别助手。请从图片�
 正例（缴纳社保：两借一贷，注意第二行其他应付款在借方）：
 [["凭证号","凭证日期","摘要","一级科目","二级科目","借方金额","贷方金额","往来单位","备注"],["记-021","2026/8/20","缴纳 2026 年 08 月社会保险费","主营业务成本","社保","5289.42","","国家税务总局深圳市龙华区税务局",""],["记-021","2026/8/20","缴纳 2026 年 08 月社会保险费","其他应付款","代垫员工社保","2398.77","","国家税务总局深圳市龙华区税务局",""],["记-021","2026/8/20","缴纳 2026 年 08 月社会保险费","银行存款","公账","","7688.19","",""]]`
 
+const invoiceExtractPrompt = `你是中国发票信息识别助手。请从图片中的增值税发票、全电发票、电子发票等提取「发票号码」。
+
+要求：
+1. 只输出一个 JSON 字符串数组，如 ["12345678901234567890"]，不要 Markdown、不要解释。
+2. 只提取标注为「发票号码」的号码；全电发票通常为 20 位数字，旧版发票号码常为 8 位数字。
+3. 不要输出发票代码、校验码、纳税人识别号。
+4. 若图片中有多个发票号码，全部放入数组；找不到则输出 []。
+5. 号码只保留数字，去掉空格与分隔符。`
+
 // ExtractTableRows 用视觉模型从图片提取表格行。
 func (c *Client) ExtractTableRows(ctx context.Context, mimeType, base64Data string) ([][]string, error) {
 	if !c.Enabled() {
@@ -177,6 +186,135 @@ func (c *Client) ExtractTableRows(ctx context.Context, mimeType, base64Data stri
 		return nil, err
 	}
 	return rows, nil
+}
+
+// ExtractInvoiceNumbers 用视觉模型从发票图片提取发票号码。
+func (c *Client) ExtractInvoiceNumbers(ctx context.Context, mimeType, base64Data string) ([]string, error) {
+	if !c.Enabled() {
+		return nil, fmt.Errorf("未配置 APP_LLM_API_KEY，无法使用大模型识别")
+	}
+	if base64Data == "" {
+		return nil, fmt.Errorf("图片内容为空")
+	}
+	if mimeType == "" {
+		mimeType = "image/png"
+	}
+	dataURL := fmt.Sprintf("data:%s;base64,%s", mimeType, base64Data)
+
+	payload := chatRequest{
+		Model: c.visionModel,
+		Messages: []chatMessage{{
+			Role: "user",
+			Content: []map[string]any{
+				{
+					"type": "image_url",
+					"image_url": map[string]string{
+						"url": dataURL,
+					},
+				},
+				{
+					"type": "text",
+					"text": invoiceExtractPrompt,
+				},
+			},
+		}},
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/chat/completions", bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("调用大模型失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var parsed chatResponse
+	if err := json.Unmarshal(raw, &parsed); err != nil {
+		return nil, fmt.Errorf("解析大模型响应失败: %w", err)
+	}
+	if parsed.Error != nil && parsed.Error.Message != "" {
+		return nil, fmt.Errorf("大模型错误: %s", parsed.Error.Message)
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("大模型 HTTP %d: %s", resp.StatusCode, truncate(string(raw), 300))
+	}
+	if len(parsed.Choices) == 0 {
+		return nil, fmt.Errorf("大模型未返回内容")
+	}
+
+	content := strings.TrimSpace(parsed.Choices[0].Message.Content)
+	numbers, err := parseJSONStringArray(content)
+	if err != nil {
+		return nil, err
+	}
+	return normalizeInvoiceNumbers(numbers), nil
+}
+
+func parseJSONStringArray(content string) ([]string, error) {
+	text := strings.TrimSpace(content)
+	text = strings.TrimPrefix(text, "```json")
+	text = strings.TrimPrefix(text, "```JSON")
+	text = strings.TrimPrefix(text, "```")
+	text = strings.TrimSuffix(text, "```")
+	text = strings.TrimSpace(text)
+
+	start := strings.Index(text, "[")
+	end := strings.LastIndex(text, "]")
+	if start < 0 || end <= start {
+		return nil, fmt.Errorf("大模型未返回发票号码 JSON")
+	}
+	text = text[start : end+1]
+
+	var raw []any
+	if err := json.Unmarshal([]byte(text), &raw); err != nil {
+		return nil, fmt.Errorf("解析发票号码 JSON 失败: %w", err)
+	}
+
+	numbers := make([]string, 0, len(raw))
+	for _, item := range raw {
+		num := strings.TrimSpace(stringifyCell(item))
+		if num != "" {
+			numbers = append(numbers, num)
+		}
+	}
+	return numbers, nil
+}
+
+func normalizeInvoiceNumbers(numbers []string) []string {
+	seen := make(map[string]struct{})
+	out := make([]string, 0, len(numbers))
+	for _, num := range numbers {
+		digits := strings.Map(func(r rune) rune {
+			if r >= '0' && r <= '9' {
+				return r
+			}
+			return -1
+		}, num)
+		if len(digits) < 8 || len(digits) > 20 {
+			continue
+		}
+		if _, ok := seen[digits]; ok {
+			continue
+		}
+		seen[digits] = struct{}{}
+		out = append(out, digits)
+	}
+	return out
 }
 
 func parseJSONTable(content string) ([][]string, error) {

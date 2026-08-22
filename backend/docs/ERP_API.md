@@ -31,6 +31,7 @@
 | POST | `/vouchers/batch` | **统一批量入口**（见下） |
 | GET | `/vouchers/import-llm-status` | 截图识别大模型是否已配置 |
 | POST | `/vouchers/parse-import-image` | 分录表截图 → 表格行列（视觉大模型） |
+| POST | `/vouchers/parse-invoice-number` | 发票截图 → 发票号码（视觉大模型；PDF 可在前端先文本提取） |
 | GET | `/vouchers/:id` | 按 ID 查询 |
 | PUT | `/vouchers/:id` | 新增/更新 |
 | DELETE | `/vouchers/:id` | 删除一条 |
