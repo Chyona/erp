@@ -1,4 +1,5 @@
 import { ErpApi } from './erpApi';
+import { Voucher } from './voucher';
 import {
   formatQuarterLabel,
   taxExemptionPeriodKey
@@ -74,7 +75,6 @@ async function markQuarterDeclared(period: QuarterPeriod): Promise<DeclaredQuart
     throw new Error(`${formatQuarterLabel(period.year, period.quarter)} 已申报`);
   }
 
-  const { Voucher } = await import('./voucher');
   await Voucher.lockManyInQuarter(period);
 
   const record: DeclaredQuarterRecord = {
@@ -96,7 +96,6 @@ async function unmarkQuarterDeclared(period: QuarterPeriod): Promise<void> {
     throw new Error(`${formatQuarterLabel(period.year, period.quarter)} 未申报`);
   }
 
-  const { Voucher } = await import('./voucher');
   await Voucher.unlockManyInQuarter(period);
 
   await ErpApi.setSetting(SETTING_KEY, next);
@@ -105,7 +104,6 @@ async function unmarkQuarterDeclared(period: QuarterPeriod): Promise<void> {
 
 /** 启动时补齐：已结项季度内凭证状态同步为已结项 */
 async function syncDeclaredQuarterVoucherLocks(): Promise<number> {
-  const { Voucher } = await import('./voucher');
   const list = await getDeclaredQuarters();
   let total = 0;
   for (const record of list) {

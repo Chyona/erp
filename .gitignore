@@ -1,9 +1,10 @@
 # ui dependencies
 frontend/node_modules
 frontend/dist
+frontend/dist.rar
+frontend/dist.zip
 frontend/.DS_Store
 frontend/*.local
-frontend/package-lock.json
 frontend/.env
 frontend/.env.*
 !frontend/.env.example

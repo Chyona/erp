@@ -12,6 +12,40 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), ...(useMock ? [erpMockPlugin()] : [])],
+    build: {
+      chunkSizeWarningLimit: 1200,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return;
+            // 重型按需库单独分包（export / 导入时再加载）
+            if (id.includes('exceljs')) return 'exceljs';
+            if (id.includes('jszip')) return 'jszip';
+            if (id.includes('xlsx')) return 'xlsx';
+            // antd 与其依赖（含 dayjs、rc-*）同包，避免循环 chunk
+            if (
+              id.includes('antd') ||
+              id.includes('@ant-design') ||
+              id.includes('dayjs') ||
+              id.includes('/rc-') ||
+              id.includes('\\rc-')
+            ) {
+              return 'antd';
+            }
+            // 仅匹配真正的 react 包路径，避免误伤 @ant-design/react-*
+            if (
+              id.includes('node_modules/react/') ||
+              id.includes('node_modules\\react\\') ||
+              id.includes('node_modules/react-dom') ||
+              id.includes('node_modules\\react-dom') ||
+              id.includes('react-router')
+            ) {
+              return 'react-vendor';
+            }
+          }
+        }
+      }
+    },
     server: {
       port: Number(env.VITE_DEV_PORT) || 5173,
       host: true,

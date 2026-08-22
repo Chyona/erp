@@ -78,6 +78,6 @@ export async function pingBackend(): Promise<void> {
   const healthUrl = origin ? `${origin}/health` : '/health';
   const res = await fetch(healthUrl);
   if (!res.ok) {
-    throw new ApiError(`后端不可用（${res.status}）`);
+    throw new ApiError(`无法连接服务器（错误码 ${res.status}）`);
   }
 }
