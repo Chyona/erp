@@ -19,7 +19,7 @@ database:
 logger:
   level: "info"              # debug | info | warn | error
   format: "json"             # json | console
-  filename: "logs/base.log"  # 日志文件路径
+  filename: "logs/erp.log"   # 日志文件路径
   max_size: 10               # 单个日志文件最大 10MB
   max_backups: 10            # 最多保留 10 个历史日志文件
 
