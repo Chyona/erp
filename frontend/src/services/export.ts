@@ -239,35 +239,82 @@ async function createWorkbook() {
   return workbook;
 }
 
+/** cm → inch，保留 4 位小数，避免长浮点导致部分 Office 忽略页边距 */
+function cmToInch(cm: number) {
+  return Math.round((cm / 2.54) * 10000) / 10000;
+}
+
+function buildPrintPageSetup() {
+  return {
+    paperSize: 9, // A4
+    orientation: 'portrait' as const,
+    fitToPage: false,
+    scale: 100,
+    fitToWidth: undefined as number | undefined,
+    fitToHeight: undefined as number | undefined,
+    horizontalDpi: 4294967295,
+    verticalDpi: 4294967295,
+    pageOrder: 'downThenOver' as const,
+    blackAndWhite: false,
+    draft: false,
+    cellComments: 'None' as const,
+    errors: 'displayed' as const,
+    showRowColHeaders: false,
+    showGridLines: false,
+    // 上 1cm，其余 0；水平居中
+    margins: {
+      top: cmToInch(1),
+      bottom: cmToInch(0),
+      left: cmToInch(0),
+      right: cmToInch(0),
+      header: cmToInch(0),
+      footer: cmToInch(0)
+    },
+    horizontalCentered: true,
+    verticalCentered: false
+  };
+}
+
+function sheetCreateOptions(views?: { state: 'frozen'; ySplit: number }[]) {
+  return {
+    ...(views ? { views } : {}),
+    pageSetup: buildPrintPageSetup()
+  };
+}
+
+/** 打印页边距与居中（须在写完表格后再次确认，避免被覆盖） */
+function applyPrintPageSetup(sheet) {
+  const next = buildPrintPageSetup();
+  sheet.pageSetup.paperSize = next.paperSize;
+  sheet.pageSetup.orientation = next.orientation;
+  sheet.pageSetup.fitToPage = false;
+  sheet.pageSetup.scale = 100;
+  sheet.pageSetup.fitToWidth = undefined;
+  sheet.pageSetup.fitToHeight = undefined;
+  sheet.pageSetup.margins = { ...next.margins };
+  sheet.pageSetup.horizontalCentered = true;
+  sheet.pageSetup.verticalCentered = false;
+  sheet.pageSetup.showRowColHeaders = false;
+  sheet.pageSetup.showGridLines = false;
+}
+
 async function workbookToBlob(workbook) {
+  // 写出前再刷一遍每个工作表的页面设置
+  workbook.eachSheet((sheet) => {
+    applyPrintPageSetup(sheet);
+  });
   const buffer = await workbook.xlsx.writeBuffer();
   return new Blob([buffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
   });
 }
 
-/** 打印页边距：上 1cm，其余 0；水平居中（ExcelJS 单位为英寸） */
-function applyPrintPageSetup(sheet) {
-  const cm = (v: number) => v / 2.54;
-  Object.assign(sheet.pageSetup, {
-    margins: {
-      top: cm(1),
-      bottom: cm(0),
-      left: cm(0),
-      right: cm(0),
-      header: cm(0),
-      footer: cm(0)
-    },
-    horizontalCentered: true,
-    verticalCentered: false
-  });
-}
-
 function addVoucherJournalSheet(workbook, vouchers, companyName, year) {
   const colCount = VOUCHER_EXPORT_HEADERS.length;
-  const sheet = workbook.addWorksheet('凭证分录表', {
-    views: [{ state: 'frozen', ySplit: 3 }]
-  });
+  const sheet = workbook.addWorksheet(
+    '凭证分录表',
+    sheetCreateOptions([{ state: 'frozen', ySplit: 3 }])
+  );
 
   sheet.columns = VOUCHER_EXPORT_HEADERS.map((_, i) => ({
     key: `c${i}`,
@@ -332,9 +379,10 @@ function addTrialBalanceSheet(workbook, data, meta: { companyName: string; perio
     '期末贷方'
   ];
   const widths = [12, 18, 12, 12, 12, 12, 12, 14, 14, 12, 12];
-  const sheet = workbook.addWorksheet('科目余额表', {
-    views: [{ state: 'frozen', ySplit: 3 }]
-  });
+  const sheet = workbook.addWorksheet(
+    '科目余额表',
+    sheetCreateOptions([{ state: 'frozen', ySplit: 3 }])
+  );
   sheet.columns = headers.map((_, i) => ({ width: widths[i] }));
 
   const headerRowIndex = writeTitleAndUnitRows(sheet, {
@@ -413,9 +461,10 @@ function addIncomeStatementSheet(
 ) {
   const headers = ['项目', '行次', '本期金额', '本年累计金额'];
   const widths = [36, 8, 14, 14];
-  const sheet = workbook.addWorksheet('利润表', {
-    views: [{ state: 'frozen', ySplit: 3 }]
-  });
+  const sheet = workbook.addWorksheet(
+    '利润表',
+    sheetCreateOptions([{ state: 'frozen', ySplit: 3 }])
+  );
   sheet.columns = headers.map((_, i) => ({ width: widths[i] }));
 
   const headerRowIndex = writeTitleAndUnitRows(sheet, {
@@ -474,9 +523,10 @@ function addBalanceSheetSheet(
     '年初余额'
   ];
   const widths = [28, 8, 14, 14, 32, 8, 14, 14];
-  const sheet = workbook.addWorksheet('负债表', {
-    views: [{ state: 'frozen', ySplit: 3 }]
-  });
+  const sheet = workbook.addWorksheet(
+    '负债表',
+    sheetCreateOptions([{ state: 'frozen', ySplit: 3 }])
+  );
   sheet.columns = headers.map((_, i) => ({ width: widths[i] }));
 
   const headerRowIndex = writeTitleAndUnitRows(sheet, {

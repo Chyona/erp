@@ -1,10 +1,12 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Alert, Spin } from 'antd';
+import { Alert, Spin, Typography } from 'antd';
 import { ErpApi } from '../services/erpApi';
 import { apiRequest } from '../services/apiClient';
 import { repairFinanceInterestEntries } from '../services/financeExpenseRepair';
 import { useApp } from '../context/AppContext';
 import type { Account } from '../types';
+
+const { Paragraph, Text } = Typography;
 
 type AppInitResult = {
   companyName: string;
@@ -13,16 +15,43 @@ type AppInitResult = {
   syncedLocks: number;
 };
 
+function formatInitError(err: unknown): { summary: string; tips: string[] } {
+  const raw = err instanceof Error ? err.message : '加载失败';
+  const lower = raw.toLowerCase();
+
+  if (
+    /无法连接服务器|后端不可用|failed to fetch|networkerror|net::|econnrefused|http\s*[45]\d\d|加载失败/i.test(
+      raw
+    ) ||
+    lower.includes('fetch')
+  ) {
+    return {
+      summary: '连不上服务器，暂时无法打开系统。',
+      tips: [
+        '请确认电脑上的「后端服务」已启动（一般在本机 30000 端口）。',
+        '请确认数据库服务已启动。',
+        '若是第一次使用，需先完成数据库初始化后再启动后端。',
+        '都就绪后，刷新本页面再试。'
+      ]
+    };
+  }
+
+  return {
+    summary: raw,
+    tips: ['请稍后刷新页面重试；若仍然失败，请联系管理员协助排查。']
+  };
+}
+
 export default function AppInit({ children }: { children: ReactNode }) {
   const { setCompanyName, setAccounts, refresh, refreshKey } = useApp();
   const [ready, setReady] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<{ summary: string; tips: string[] } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        setError('');
+        setError(null);
         await ErpApi.open();
 
         const result = await apiRequest<AppInitResult>('POST', '/app/init');
@@ -39,10 +68,7 @@ export default function AppInit({ children }: { children: ReactNode }) {
         }
       } catch (err) {
         if (!cancelled) {
-          const message = err instanceof Error ? err.message : '加载失败';
-          setError(
-            `${message}。请确认 PostgreSQL 已启动并已执行 go run ./cmd/envinit schema，且 API 运行在 :30000`
-          );
+          setError(formatInitError(err));
         }
       }
     })();
@@ -54,7 +80,24 @@ export default function AppInit({ children }: { children: ReactNode }) {
   if (error) {
     return (
       <div style={{ maxWidth: 560, margin: '20vh auto', padding: '0 24px' }}>
-        <Alert type="error" showIcon message="应用初始化失败" description={error} />
+        <Alert
+          type="error"
+          showIcon
+          message="无法启动系统"
+          description={
+            <div>
+              <Paragraph style={{ marginBottom: 12 }}>{error.summary}</Paragraph>
+              <Text type="secondary">你可以按下面步骤检查：</Text>
+              <ol style={{ margin: '8px 0 0', paddingLeft: 20 }}>
+                {error.tips.map((tip) => (
+                  <li key={tip} style={{ marginBottom: 4 }}>
+                    {tip}
+                  </li>
+                ))}
+              </ol>
+            </div>
+          }
+        />
       </div>
     );
   }
