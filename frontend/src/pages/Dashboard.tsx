@@ -85,6 +85,8 @@ export default function Dashboard() {
         open={!!viewId}
         onClose={() => setViewId(null)}
         onDeleted={loadDashboard}
+        onVoucherChange={setViewId}
+        navigationIds={recent.map((v) => v.id)}
       />
     </div>
   );

@@ -11,6 +11,64 @@ export function defaultReportPeriod() {
   };
 }
 
+export function currentReportMonthPeriod() {
+  const now = dayjs();
+  return { year: now.year(), month: now.month() + 1 };
+}
+
+export function currentReportQuarterPeriod() {
+  const now = dayjs();
+  const month = now.month() + 1;
+  return { year: now.year(), quarter: Math.ceil(month / 3) };
+}
+
+export function compareReportMonth(
+  a: { year: number; month: number },
+  b: { year: number; month: number }
+) {
+  return a.year * 12 + a.month - (b.year * 12 + b.month);
+}
+
+export function compareReportQuarter(
+  a: { year: number; quarter: number },
+  b: { year: number; quarter: number }
+) {
+  return a.year * 4 + a.quarter - (b.year * 4 + b.quarter);
+}
+
+export function isFutureReportMonth(year: number, month: number) {
+  return compareReportMonth({ year, month }, currentReportMonthPeriod()) > 0;
+}
+
+export function isFutureReportQuarter(year: number, quarter: number) {
+  return compareReportQuarter({ year, quarter }, currentReportQuarterPeriod()) > 0;
+}
+
+export function clampReportPeriodToNow<T extends {
+  type: 'month' | 'quarter';
+  year: number;
+  month?: number;
+  quarter?: number;
+}>(period: T): T {
+  if (period.type === 'quarter' && period.quarter != null) {
+    if (isFutureReportQuarter(period.year, period.quarter)) {
+      const current = currentReportQuarterPeriod();
+      return { ...period, year: current.year, quarter: current.quarter };
+    }
+    return period;
+  }
+  if (period.month != null && isFutureReportMonth(period.year, period.month)) {
+    const current = currentReportMonthPeriod();
+    return {
+      ...period,
+      year: current.year,
+      month: current.month,
+      quarter: Math.ceil(current.month / 3)
+    };
+  }
+  return period;
+}
+
 /** 财务报表默认按当前季度 */
 export function defaultReportsPeriod() {
   return { ...defaultReportPeriod(), type: 'quarter' as const };

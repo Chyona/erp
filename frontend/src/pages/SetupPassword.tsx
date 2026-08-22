@@ -4,19 +4,21 @@ import { LockOutlined } from '@ant-design/icons';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { APP_CONFIG } from '../config/app';
 import { useAuth } from '../context/AuthContext';
-import { setupPasswordRequest } from '../services/auth';
+import { setupPasswordRequest, skipPasswordSetupRequest } from '../services/auth';
 import { normalizeRole } from '../utils/permissions';
+import { toUserMessage } from '../utils/userMessage';
 
 type FormValues = {
   password: string;
   confirm: string;
 };
 
-/** 首次登录强制设置密码；之后改密请联系管理员。 */
+/** 首次登录可设置专用密码，也可放弃并沿用当前密码进入。 */
 export default function SetupPassword() {
   const { isAuthenticated, mustChangePassword, login, logout, user } = useAuth();
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
+  const [skipping, setSkipping] = useState(false);
   const [error, setError] = useState('');
 
   if (!isAuthenticated) {
@@ -26,23 +28,47 @@ export default function SetupPassword() {
     return <Navigate to="/" replace />;
   }
 
+  const applyLogin = (data: {
+    token: string;
+    account_id: number;
+    username: string;
+    nickname: string;
+    role: string;
+    must_change_password: boolean;
+  }) => {
+    login(data.token, {
+      accountId: data.account_id,
+      username: data.username,
+      nickname: data.nickname || data.username,
+      role: normalizeRole(data.role),
+      mustChangePassword: data.must_change_password
+    });
+    navigate('/', { replace: true });
+  };
+
   const onFinish = async (values: FormValues) => {
     setSubmitting(true);
     setError('');
     try {
       const data = await setupPasswordRequest(values.password);
-      login(data.token, {
-        accountId: data.account_id,
-        username: data.username,
-        nickname: data.nickname || data.username,
-        role: normalizeRole(data.role),
-        mustChangePassword: data.must_change_password
-      });
-      navigate('/', { replace: true });
+      applyLogin(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '设置失败');
+      setError(toUserMessage(err, '设置失败'));
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const onSkip = async () => {
+    setSkipping(true);
+    setError('');
+    try {
+      const data = await skipPasswordSetupRequest();
+      applyLogin(data);
+    } catch (err) {
+      setError(toUserMessage(err, '操作失败'));
+    } finally {
+      setSkipping(false);
     }
   };
 
@@ -55,7 +81,7 @@ export default function SetupPassword() {
             设置登录密码
           </Typography.Title>
           <Typography.Text type="secondary">
-            {user?.nickname || user?.username}，首次登录请设置您的专用密码
+            {user?.nickname || user?.username}，建议设置您的专用密码
           </Typography.Text>
         </div>
 
@@ -63,7 +89,7 @@ export default function SetupPassword() {
           type="info"
           showIcon
           style={{ marginBottom: 16 }}
-          message="设置完成后，如需再次修改密码，请联系管理员重置。"
+          message="可设置新密码，或暂不修改、继续使用当前密码进入。之后也可在右上角「修改密码」。"
         />
 
         {error ? (
@@ -108,13 +134,23 @@ export default function SetupPassword() {
             />
           </Form.Item>
           <Form.Item style={{ marginBottom: 8 }}>
-            <Button type="primary" htmlType="submit" block loading={submitting}>
+            <Button type="primary" htmlType="submit" block loading={submitting} disabled={skipping}>
               确认并进入系统
             </Button>
           </Form.Item>
           <Button
+            block
+            style={{ marginBottom: 8 }}
+            loading={skipping}
+            disabled={submitting}
+            onClick={() => void onSkip()}
+          >
+            暂不修改，使用当前密码进入
+          </Button>
+          <Button
             type="link"
             block
+            disabled={submitting || skipping}
             onClick={() => {
               logout();
               navigate('/login', { replace: true });

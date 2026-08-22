@@ -71,6 +71,72 @@ func (h *ErpHandler) writeAudit(c *gin.Context, action, target, details string) 
 	_, _ = h.erpService.AddAuditLog(c.Request.Context(), action, target, details, c.GetHeader("User-Agent"))
 }
 
+// formatVoucherAuditDetail 生成可读的凭证审计详情（号/日期/摘要/金额）。
+func formatVoucherAuditDetail(v *model.Voucher) string {
+	if v == nil {
+		return "未知凭证"
+	}
+	parts := make([]string, 0, 5)
+	no := strings.TrimSpace(v.VoucherNo)
+	if no == "" {
+		no = strings.TrimSpace(v.VoucherType + "-" + v.VoucherNumber)
+	}
+	if no == "" || no == "-" {
+		no = v.ID
+	}
+	parts = append(parts, no)
+	if d := strings.TrimSpace(v.Date); d != "" {
+		parts = append(parts, "日期 "+d)
+	}
+	if summary := voucherEntrySummaries([]byte(v.Entries)); summary != "" {
+		parts = append(parts, "摘要「"+summary+"」")
+	} else if r := strings.TrimSpace(v.Remark); r != "" {
+		parts = append(parts, "备注「"+r+"」")
+	}
+	if v.TotalDebit > 0 {
+		parts = append(parts, "金额 "+strconv.FormatFloat(v.TotalDebit, 'f', 2, 64))
+	}
+	if bt := strings.TrimSpace(v.BusinessType); bt != "" {
+		parts = append(parts, "业务 "+bt)
+	}
+	return strings.Join(parts, "，")
+}
+
+func voucherEntrySummaries(raw []byte) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var entries []struct {
+		Summary string `json:"summary"`
+	}
+	if err := json.Unmarshal(raw, &entries); err != nil {
+		return ""
+	}
+	seen := map[string]struct{}{}
+	list := make([]string, 0, 2)
+	for _, e := range entries {
+		s := strings.TrimSpace(e.Summary)
+		if s == "" {
+			continue
+		}
+		if _, ok := seen[s]; ok {
+			continue
+		}
+		seen[s] = struct{}{}
+		list = append(list, s)
+		if len(list) >= 2 {
+			break
+		}
+	}
+	if len(list) == 0 {
+		return ""
+	}
+	if len(seen) > len(list) {
+		return strings.Join(list, "；") + "等"
+	}
+	return strings.Join(list, "；")
+}
+
 type setSettingRequest struct {
 	Value json.RawMessage `json:"value"`
 }
@@ -425,11 +491,16 @@ func (h *ErpHandler) DeleteVoucher(c *gin.Context) {
 	if !h.requireAdminDeletePassword(c, req.ConfirmPassword) {
 		return
 	}
-	if err := h.erpService.DeleteVoucher(c.Request.Context(), c.Param("id")); err != nil {
+	id := c.Param("id")
+	detail := id
+	if existing, err := h.erpService.GetVoucher(c.Request.Context(), id); err == nil && existing != nil {
+		detail = formatVoucherAuditDetail(existing)
+	}
+	if err := h.erpService.DeleteVoucher(c.Request.Context(), id); err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}
-	h.writeAudit(c, "删除凭证", c.Param("id"), "")
+	h.writeAudit(c, "删除凭证", "凭证", detail)
 	response.SuccessWithMessage(c, "删除成功", nil)
 }
 

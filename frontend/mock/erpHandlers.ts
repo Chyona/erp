@@ -199,6 +199,56 @@ export async function handleErpMockRequest(
     return true;
   }
 
+  if (pathname === '/openapi/base/v1/auth/skip-password-setup' && method === 'POST') {
+    const auth = parseBearer(req);
+    if (!auth) {
+      fail(res, 401, '请先登录');
+      return true;
+    }
+    const me = mockUsers.find((u) => u.id === auth.accountId);
+    if (!me) {
+      fail(res, 401, '请先登录');
+      return true;
+    }
+    me.mustChangePassword = false;
+    ok(res, {
+      token: tokenFor(me),
+      expires_at: '2099-12-31 23:59:59',
+      account_id: me.id,
+      username: me.username,
+      nickname: me.nickname,
+      role: me.role,
+      must_change_password: false
+    });
+    return true;
+  }
+
+  if (pathname === '/openapi/base/v1/auth/change-password' && method === 'POST') {
+    const auth = parseBearer(req);
+    if (!auth) {
+      fail(res, 401, '请先登录');
+      return true;
+    }
+    const body = (await parseJSON<{ old_password?: string; new_password?: string }>(req)) || {};
+    if (!body.old_password || !body.new_password || body.new_password.length < 6) {
+      fail(res, 400, '请填写当前密码，以及至少 6 位的新密码');
+      return true;
+    }
+    const me = mockUsers.find((u) => u.id === auth.accountId);
+    if (!me) {
+      fail(res, 401, '请先登录');
+      return true;
+    }
+    if (me.password !== body.old_password) {
+      fail(res, 400, '当前密码不正确');
+      return true;
+    }
+    me.password = body.new_password;
+    me.mustChangePassword = false;
+    ok(res, null, '密码已修改');
+    return true;
+  }
+
   // —— 账号管理（仅管理员）——
   if (pathname === '/openapi/base/v1/accounts' || pathname.startsWith('/openapi/base/v1/accounts/')) {
     const auth = parseBearer(req);
@@ -212,8 +262,15 @@ export async function handleErpMockRequest(
     }
 
     if (pathname === '/openapi/base/v1/accounts' && method === 'GET') {
+      const list = [...mockUsers]
+        .sort((a, b) => {
+          if (a.username === 'admin') return -1;
+          if (b.username === 'admin') return 1;
+          return b.id - a.id;
+        })
+        .map(publicAccount);
       ok(res, {
-        list: mockUsers.map(publicAccount),
+        list,
         total: mockUsers.length,
         page: 1,
         page_size: 100
@@ -235,7 +292,11 @@ export async function handleErpMockRequest(
         return true;
       }
       if (mockUsers.some((u) => u.username === body.username)) {
-        fail(res, 400, '账号名已存在');
+        fail(res, 400, '该用户名已被使用，请换一个用户名');
+        return true;
+      }
+      if (mockUsers.some((u) => u.email === body.email)) {
+        fail(res, 400, '该邮箱已被使用，请换一个邮箱');
         return true;
       }
       const nextId = Math.max(0, ...mockUsers.map((u) => u.id)) + 1;
@@ -268,8 +329,12 @@ export async function handleErpMockRequest(
         return true;
       }
       mockUsers[idx].password = body.password;
-      mockUsers[idx].mustChangePassword = true;
-      ok(res, publicAccount(mockUsers[idx]), '密码已重置，用户下次登录需重新设置密码');
+      mockUsers[idx].mustChangePassword = auth.accountId !== id;
+      ok(
+        res,
+        publicAccount(mockUsers[idx]),
+        auth.accountId === id ? '密码已修改' : '密码已重置，用户下次登录需重新设置密码'
+      );
       return true;
     }
 
@@ -289,6 +354,10 @@ export async function handleErpMockRequest(
         const body =
           (await parseJSON<{ nickname?: string; role?: MockRole; status?: number }>(req)) || {};
         const target = mockUsers[idx];
+        if (target.username === 'admin') {
+          fail(res, 400, '内置管理员账号不可修改');
+          return true;
+        }
         if (body.nickname) target.nickname = body.nickname;
         if (body.role === 'admin' || body.role === 'user' || body.role === 'readonly') {
           if (target.role === 'admin' && body.role !== 'admin') {
@@ -299,11 +368,21 @@ export async function handleErpMockRequest(
           }
           target.role = body.role;
         }
-        if (typeof body.status === 'number') target.status = body.status;
+        if (typeof body.status === 'number') {
+          if (body.status !== 1 && mockUsers.filter((u) => u.role === 'admin' && u.status === 1).length <= 1 && target.role === 'admin') {
+            fail(res, 400, '不能禁用最后一个管理员');
+            return true;
+          }
+          target.status = body.status;
+        }
         ok(res, publicAccount(target));
         return true;
       }
       if (method === 'DELETE') {
+        if (mockUsers[idx].username === 'admin') {
+          fail(res, 400, '内置管理员账号不可删除');
+          return true;
+        }
         if (mockUsers[idx].role === 'admin' && mockUsers.filter((u) => u.role === 'admin').length <= 1) {
           fail(res, 400, '不能删除最后一个管理员');
           return true;
@@ -535,6 +614,8 @@ export async function handleErpMockRequest(
           item.status = 'approved';
           item.approvedAt = now;
           item.updatedAt = now;
+          const me = auth ? mockUsers.find((u) => u.id === auth.accountId) : undefined;
+          if (me) item.reviewedBy = me.nickname || me.username;
           store.vouchers.set(id, item);
           approved++;
         }
@@ -568,6 +649,7 @@ export async function handleErpMockRequest(
           }
           item.status = 'draft';
           delete item.approvedAt;
+          item.reviewedBy = '';
           item.updatedAt = now;
           store.vouchers.set(id, item);
           unapproved++;
@@ -659,6 +741,10 @@ export async function handleErpMockRequest(
         item.status = 'approved';
         item.approvedAt = now;
         item.updatedAt = now;
+        {
+          const me = auth ? mockUsers.find((u) => u.id === auth.accountId) : undefined;
+          if (me) item.reviewedBy = me.nickname || me.username;
+        }
         store.vouchers.set(id, item);
         approved++;
       }
@@ -692,6 +778,7 @@ export async function handleErpMockRequest(
         }
         item.status = 'draft';
         delete item.approvedAt;
+        item.reviewedBy = '';
         item.updatedAt = now;
         store.vouchers.set(id, item);
         unapproved++;
@@ -843,13 +930,17 @@ export async function handleErpMockRequest(
         }
         let ua = String(req.headers['user-agent'] || '');
         if (ua.length > 100) ua = ua.slice(0, 100);
+        const me = auth ? mockUsers.find((u) => u.id === auth.accountId) : undefined;
         const log = {
           id: mockId(),
           timestamp: new Date().toISOString(),
           action: body.action,
           target: body.target ?? '',
           details: body.details ?? '',
-          userAgent: ua
+          userAgent: ua,
+          operatorAccountId: me?.id ?? 0,
+          operatorUsername: me?.username ?? '',
+          operatorNickname: me?.nickname ?? ''
         };
         store.auditLogs.set(log.id, log);
         ok(res, log);

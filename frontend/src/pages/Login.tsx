@@ -6,6 +6,7 @@ import { APP_CONFIG } from '../config/app';
 import { useAuth } from '../context/AuthContext';
 import { loginRequest } from '../services/auth';
 import { normalizeRole } from '../utils/permissions';
+import { toUserMessage } from '../utils/userMessage';
 
 type LoginForm = {
   username: string;
@@ -47,7 +48,7 @@ export default function Login() {
         navigate(from, { replace: true });
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : '登录失败');
+      setError(toUserMessage(err, '登录失败'));
     } finally {
       setSubmitting(false);
     }
@@ -105,7 +106,7 @@ export default function Login() {
           </Typography.Paragraph>
         ) : (
           <Typography.Paragraph type="secondary" style={{ marginTop: 16, marginBottom: 0, fontSize: 12 }}>
-            首次登录请使用管理员提供的初始密码并设置新密码；之后改密请联系管理员。
+            首次登录请使用管理员提供的初始密码并设置新密码；之后可在右上角「修改密码」。
           </Typography.Paragraph>
         )}
       </Card>

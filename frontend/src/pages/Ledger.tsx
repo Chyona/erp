@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Button, DatePicker, Select, Table, Typography, App, Space } from 'antd';
 import { SearchOutlined, DownloadOutlined } from '@ant-design/icons';
 import dayjs, { type Dayjs } from 'dayjs';
+import { clampDateRangeToToday, disableFutureDate } from '../utils/dateConstraints';
 import type { ColumnsType } from 'antd/es/table';
 import type { Account, LedgerResult, LedgerRow } from '../types';
 import { Voucher } from '../services/voucher';
@@ -93,7 +94,14 @@ export default function Ledger() {
               label: Accounts.formatAccountOption(a)
             }))}
           />
-          <RangePicker value={dateRange} onChange={setDateRange} />
+          <RangePicker
+            value={dateRange}
+            disabledDate={disableFutureDate}
+            onChange={(range) => {
+              const next = clampDateRangeToToday(range as [Dayjs, Dayjs] | null);
+              if (next) setDateRange(next);
+            }}
+          />
           <Button type="primary" icon={<SearchOutlined />} onClick={handleQuery}>
             查询
           </Button>

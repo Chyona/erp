@@ -31,6 +31,9 @@ export type MockAuditLog = {
   target: string;
   details: string;
   userAgent: string;
+  operatorAccountId?: number;
+  operatorUsername?: string;
+  operatorNickname?: string;
 };
 
 export type MockSetting = {

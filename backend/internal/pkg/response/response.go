@@ -4,6 +4,7 @@ package response
 import (
 	"net/http"
 
+	"erp/internal/pkg/usermsg"
 	"github.com/gin-gonic/gin"
 )
 
@@ -32,11 +33,11 @@ func SuccessWithMessage(c *gin.Context, message string, data interface{}) {
 	})
 }
 
-// Fail 返回业务失败响应。
+// Fail 返回业务失败响应（message 会转成用户可读文案）。
 func Fail(c *gin.Context, httpStatus, code int, message string) {
 	c.JSON(httpStatus, Body{
 		Code:    code,
-		Message: message,
+		Message: usermsg.Sanitize(message),
 	})
 }
 

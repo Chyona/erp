@@ -16,6 +16,8 @@ func RegisterRoutes(rg *gin.RouterGroup, accountHandler *v1handler.AccountHandle
 		auth.POST("/login", authHandler.Login)
 		auth.POST("/confirm-password", middleware.Auth(jwtManager), authHandler.ConfirmPassword)
 		auth.POST("/setup-password", middleware.Auth(jwtManager), authHandler.SetupPassword)
+		auth.POST("/skip-password-setup", middleware.Auth(jwtManager), authHandler.SkipPasswordSetup)
+		auth.POST("/change-password", middleware.Auth(jwtManager), middleware.RequirePasswordSetupDone(), authHandler.ChangePassword)
 	}
 
 	accounts := rg.Group("/accounts", middleware.Auth(jwtManager), middleware.RequirePasswordSetupDone(), middleware.RequireRoles(rbac.RoleAdmin))

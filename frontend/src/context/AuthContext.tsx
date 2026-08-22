@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
-import { can, canMutateVoucher, normalizeRole, type Permission, type Role } from '../utils/permissions';
+import { can, canMutateVoucher, canPrintVoucher, canAccessOwnVoucher, normalizeRole, type Permission, type Role } from '../utils/permissions';
 
 const TOKEN_KEY = 'erp_auth_token';
 const USER_KEY = 'erp_auth_user';
@@ -22,6 +22,8 @@ type AuthContextValue = {
   logout: () => void;
   can: (permission: Permission) => boolean;
   canMutateVoucher: (voucher: { createdByAccountId?: number; status?: string } | null | undefined) => boolean;
+  canPrintVoucher: (voucher: { createdByAccountId?: number } | null | undefined) => boolean;
+  canAccessOwnVoucher: (voucher: { createdByAccountId?: number } | null | undefined) => boolean;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -74,7 +76,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       logout,
       can: (permission) => can(user?.role, permission),
-      canMutateVoucher: (voucher) => canMutateVoucher(user?.role, user?.accountId, voucher)
+      canMutateVoucher: (voucher) => canMutateVoucher(user?.role, user?.accountId, voucher),
+      canPrintVoucher: (voucher) => canPrintVoucher(user?.role, user?.accountId, voucher),
+      canAccessOwnVoucher: (voucher) => canAccessOwnVoucher(user?.role, user?.accountId, voucher)
     }),
     [token, user, login, logout]
   );
@@ -90,6 +94,18 @@ export function useAuth(): AuthContextValue {
 
 export function getStoredToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
+}
+
+/** 当前登录操作人展示名（昵称优先，否则用户名） */
+export function getCurrentOperatorName(): string {
+  try {
+    const raw = localStorage.getItem(USER_KEY);
+    if (!raw) return '';
+    const parsed = JSON.parse(raw) as { nickname?: string; username?: string };
+    return String(parsed.nickname || parsed.username || '').trim();
+  } catch {
+    return '';
+  }
 }
 
 export function clearStoredAuth(): void {

@@ -250,12 +250,30 @@ func (s *erpService) applyVoucherWritePolicy(ctx context.Context, voucher *model
 			return errors.New("无权新建凭证")
 		}
 		voucher.CreatedByAccountID = actor.AccountID
+		if strings.TrimSpace(voucher.PreparedBy) == "" {
+			voucher.PreparedBy = actor.DisplayName()
+		}
+		if voucher.Status == "approved" && strings.TrimSpace(voucher.ReviewedBy) == "" {
+			voucher.ReviewedBy = actor.DisplayName()
+		}
 		return nil
 	}
 	if !actor.CanMutateVoucher(existing.CreatedByAccountID, existing.Status) {
-		return errors.New("无权修改该凭证")
+		if existing.CreatedByAccountID == 0 {
+			return errors.New("该凭证为历史数据、无归属人，仅管理员可修改")
+		}
+		if existing.CreatedByAccountID != actor.AccountID {
+			return errors.New("无权修改他人的凭证")
+		}
+		return errors.New("无权修改该凭证（普通用户仅可修改自己的草稿）")
 	}
 	voucher.CreatedByAccountID = existing.CreatedByAccountID
+	// 制单人一旦写入则保留创建时的姓名
+	if strings.TrimSpace(existing.PreparedBy) != "" {
+		voucher.PreparedBy = existing.PreparedBy
+	} else if strings.TrimSpace(voucher.PreparedBy) == "" {
+		voucher.PreparedBy = actor.DisplayName()
+	}
 	return nil
 }
 
@@ -305,6 +323,10 @@ func (s *erpService) ApproveVouchersBatch(ctx context.Context, ids []string) (*V
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
+	reviewer := ""
+	if actor := rbac.ActorFrom(ctx); actor != nil {
+		reviewer = actor.DisplayName()
+	}
 	toSave := make([]model.Voucher, 0, len(ids))
 	for _, id := range ids {
 		item, ok := byID[id]
@@ -319,6 +341,9 @@ func (s *erpService) ApproveVouchersBatch(ctx context.Context, ids []string) (*V
 		item.Status = "approved"
 		item.ApprovedAt = now
 		item.UpdatedAt = now
+		if reviewer != "" {
+			item.ReviewedBy = reviewer
+		}
 		toSave = append(toSave, item)
 	}
 	if len(toSave) > 0 {
@@ -376,6 +401,7 @@ func (s *erpService) UnapproveVouchersBatch(ctx context.Context, ids []string) (
 		}
 		item.Status = "draft"
 		item.ApprovedAt = ""
+		item.ReviewedBy = ""
 		item.UpdatedAt = now
 		toSave = append(toSave, item)
 	}
@@ -727,6 +753,11 @@ func (s *erpService) AddAuditLog(ctx context.Context, action, target, details, u
 		Target:    target,
 		Details:   details,
 		UserAgent: userAgent,
+	}
+	if actor := rbac.ActorFrom(ctx); actor != nil {
+		log.OperatorAccountID = actor.AccountID
+		log.OperatorUsername = actor.Username
+		log.OperatorNickname = actor.Nickname
 	}
 	if err := s.repo.SaveAuditLog(ctx, log); err != nil {
 		return nil, err

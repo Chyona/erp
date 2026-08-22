@@ -1,4 +1,5 @@
 import { ApiError } from './apiClient';
+import { sanitizeUserMessage, toUserMessage } from '../utils/userMessage';
 
 const AUTH_API_BASE = '/openapi/base/v1';
 
@@ -29,31 +30,25 @@ async function parseAuthResponse<T>(res: Response, fallbackMessage: string): Pro
     json = text ? (JSON.parse(text) as ApiBody<T>) : undefined;
   } catch {
     if (res.status === 404) {
-      throw new ApiError(
-        '登录接口不存在（404）。远程环境可能尚未部署含鉴权的后端，或未关闭 Mock（VITE_USE_MOCK 须为 false 才会走代理）',
-        404
-      );
+      throw new ApiError('登录服务暂不可用，请确认后端已启动且为最新版本', 404);
     }
     throw new ApiError(
-      res.ok ? '响应解析失败' : `HTTP ${res.status}: ${res.statusText || text.slice(0, 80)}`
+      res.ok ? '服务器返回了无法识别的内容' : `请求失败（${res.status}）`
     );
   }
 
   if (!res.ok || !json || json.code !== 0) {
-    throw new ApiError(json?.message || fallbackMessage, json?.code ?? res.status);
+    throw new ApiError(
+      sanitizeUserMessage(json?.message || fallbackMessage),
+      json?.code ?? res.status
+    );
   }
 
   return json.data;
 }
 
 function networkErrorMessage(err: unknown): never {
-  const msg = err instanceof Error ? err.message : String(err);
-  if (/failed to fetch|networkerror|load failed|econnrefused/i.test(msg)) {
-    throw new ApiError(
-      '无法连接后端。请确认：1) VITE_USE_MOCK=false 并重启 pnpm dev；2) VITE_PROXY_TARGET 可访问；3) 远程已部署登录接口'
-    );
-  }
-  throw err instanceof ApiError ? err : new ApiError(msg || '请求失败');
+  throw new ApiError(toUserMessage(err, '无法连接服务器，请确认网络或后端服务是否正常'));
 }
 
 export async function loginRequest(username: string, password: string): Promise<LoginResult> {
@@ -90,6 +85,23 @@ export async function setupPasswordRequest(password: string): Promise<LoginResul
   return parseAuthResponse<LoginResult>(res, '设置密码失败');
 }
 
+export async function skipPasswordSetupRequest(): Promise<LoginResult> {
+  const token = localStorage.getItem('erp_auth_token');
+  let res: Response;
+  try {
+    res = await fetch(authUrl('/auth/skip-password-setup'), {
+      method: 'POST',
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      }
+    });
+  } catch (err) {
+    networkErrorMessage(err);
+  }
+
+  return parseAuthResponse<LoginResult>(res, '操作失败');
+}
+
 export async function confirmPasswordRequest(password: string): Promise<void> {
   const token = localStorage.getItem('erp_auth_token');
   let res: Response;
@@ -107,4 +119,26 @@ export async function confirmPasswordRequest(password: string): Promise<void> {
   }
 
   await parseAuthResponse<null>(res, '密码校验失败');
+}
+
+export async function changePasswordRequest(
+  oldPassword: string,
+  newPassword: string
+): Promise<void> {
+  const token = localStorage.getItem('erp_auth_token');
+  let res: Response;
+  try {
+    res = await fetch(authUrl('/auth/change-password'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({ old_password: oldPassword, new_password: newPassword })
+    });
+  } catch (err) {
+    networkErrorMessage(err);
+  }
+
+  await parseAuthResponse<null>(res, '修改密码失败');
 }

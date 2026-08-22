@@ -20,6 +20,7 @@ import {
   type SystemAccount
 } from '../services/systemAccounts';
 import { ROLE_LABEL, type Role } from '../utils/permissions';
+import { toUserMessage } from '../utils/userMessage';
 import { useAuth } from '../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 
@@ -31,9 +32,14 @@ const ROLE_OPTIONS: { value: Role; label: string }[] = [
   { value: 'readonly', label: ROLE_LABEL.readonly }
 ];
 
+/** 仅用户名为 admin 的内置账号不可在此管理（不可改角色/禁用/删除）。 */
+function isBuiltinAdminAccount(record: SystemAccount): boolean {
+  return record.username === 'admin';
+}
+
 export default function Users() {
   const { message, modal } = App.useApp();
-  const { can } = useAuth();
+  const { can, user } = useAuth();
   const [rows, setRows] = useState<SystemAccount[]>([]);
   const [loading, setLoading] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -46,9 +52,14 @@ export default function Users() {
     setLoading(true);
     try {
       const data = await listSystemAccounts(1, 200);
-      setRows(data.list || []);
+      const list = [...(data.list || [])].sort((a, b) => {
+        if (a.username === 'admin') return -1;
+        if (b.username === 'admin') return 1;
+        return b.id - a.id;
+      });
+      setRows(list);
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '加载失败');
+      message.error(toUserMessage(err, '加载失败'));
     } finally {
       setLoading(false);
     }
@@ -78,7 +89,7 @@ export default function Users() {
       form.resetFields();
       await load();
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '创建失败');
+      message.error(toUserMessage(err, '创建失败'));
     }
   };
 
@@ -87,12 +98,15 @@ export default function Users() {
     const values = await resetForm.validateFields();
     try {
       await resetSystemAccountPassword(resetTarget.id, values.password);
-      message.success('密码已重置，用户下次登录需重新设置密码');
+      const isSelf = user?.accountId === resetTarget.id;
+      message.success(
+        isSelf ? '密码已修改' : '密码已重置，用户下次登录需重新设置密码'
+      );
       setResetTarget(null);
       resetForm.resetFields();
       await load();
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '重置失败');
+      message.error(toUserMessage(err, '重置失败'));
     }
   };
 
@@ -108,7 +122,8 @@ export default function Users() {
       </div>
 
       <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
-        新建账号时填写初始密码；用户首次登录后需自行设置密码。之后改密请使用「重置密码」。
+        新建账号时填写初始密码；用户首次登录后需自行设置密码。之后可在右上角「修改密码」，或由管理员「重置密码」。内置
+        admin 仅可改密码，不可删除或降权。
       </Typography.Paragraph>
 
       <Table
@@ -138,8 +153,18 @@ export default function Users() {
           {
             title: '操作',
             render: (_, record) => {
-              if (record.role === 'admin') {
-                return <Typography.Text type="secondary">—</Typography.Text>;
+              if (isBuiltinAdminAccount(record)) {
+                return (
+                  <Button
+                    size="small"
+                    onClick={() => {
+                      resetForm.resetFields();
+                      setResetTarget(record);
+                    }}
+                  >
+                    修改密码
+                  </Button>
+                );
               }
               return (
                 <Space wrap>
@@ -147,14 +172,14 @@ export default function Users() {
                     size="small"
                     style={{ width: 120 }}
                     value={(record.role as Role) || 'user'}
-                    options={ROLE_OPTIONS.filter((o) => o.value !== 'admin')}
+                    options={ROLE_OPTIONS}
                     onChange={async (role) => {
                       try {
                         await updateSystemAccount(record.id, { role });
                         message.success('角色已更新');
                         await load();
                       } catch (err) {
-                        message.error(err instanceof Error ? err.message : '更新失败');
+                        message.error(toUserMessage(err, '更新失败'));
                       }
                     }}
                   />
@@ -176,7 +201,7 @@ export default function Users() {
                         message.success(next === 1 ? '已启用' : '已禁用');
                         await load();
                       } catch (err) {
-                        message.error(err instanceof Error ? err.message : '操作失败');
+                        message.error(toUserMessage(err, '操作失败'));
                       }
                     }}
                   >
@@ -196,7 +221,7 @@ export default function Users() {
                             message.success('已删除');
                             await load();
                           } catch (err) {
-                            message.error(err instanceof Error ? err.message : '删除失败');
+                            message.error(toUserMessage(err, '删除失败'));
                           }
                         }
                       });
@@ -243,7 +268,13 @@ export default function Users() {
       </Modal>
 
       <Modal
-        title={resetTarget ? `重置密码：${resetTarget.username}` : '重置密码'}
+        title={
+          resetTarget
+            ? user?.accountId === resetTarget.id
+              ? `修改密码：${resetTarget.username}`
+              : `重置密码：${resetTarget.username}`
+            : '重置密码'
+        }
         open={Boolean(resetTarget)}
         onCancel={() => setResetTarget(null)}
         onOk={handleResetPassword}
@@ -252,8 +283,12 @@ export default function Users() {
         <Form form={resetForm} layout="vertical">
           <Form.Item
             name="password"
-            label="新的初始密码"
-            extra="用户下次登录后需再次设置自己的密码"
+            label={user?.accountId === resetTarget?.id ? '新密码' : '新的初始密码'}
+            extra={
+              user?.accountId === resetTarget?.id
+                ? '修改后立即生效'
+                : '用户下次登录后需再次设置自己的密码'
+            }
             rules={[{ required: true, min: 6, message: '至少 6 位' }]}
           >
             <Input.Password />

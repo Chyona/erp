@@ -1,4 +1,4 @@
-import { Layout, Menu, Button, Typography, App, Space } from 'antd';
+import { Layout, Menu, Button, Typography, App, Space, Modal, Form, Input } from 'antd';
 import {
   DashboardOutlined,
   FileTextOutlined,
@@ -9,17 +9,20 @@ import {
   AuditOutlined,
   SettingOutlined,
   LogoutOutlined,
-  TeamOutlined
+  TeamOutlined,
+  LockOutlined
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { ErpApi } from '../services/erpApi';
 import { ExportUtil } from '../services/export';
+import { changePasswordRequest } from '../services/auth';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { confirmWarning } from '../utils/confirmAction';
 import { APP_CONFIG } from '../config/app';
 import { ROLE_LABEL } from '../utils/permissions';
+import { toUserMessage } from '../utils/userMessage';
 
 const { Sider, Header, Content } = Layout;
 
@@ -29,16 +32,19 @@ export default function MainLayout() {
   const { message, modal } = App.useApp();
   const { companyName, refresh } = useApp();
   const { user, logout, can } = useAuth();
+  const [pwdOpen, setPwdOpen] = useState(false);
+  const [pwdForm] = Form.useForm();
+  const [pwdSaving, setPwdSaving] = useState(false);
 
   const navItems = useMemo(() => {
     const items = [
       { key: '/', icon: <DashboardOutlined />, label: '工作台' },
-      { key: '/vouchers', icon: <FileTextOutlined />, label: '凭证管理' }
     ];
     if (can('voucher.create')) {
       items.push({ key: '/vouchers/new', icon: <PlusOutlined />, label: '新建凭证' });
     }
     items.push(
+      { key: '/vouchers', icon: <FileTextOutlined />, label: '凭证管理' },
       { key: '/accounts', icon: <BookOutlined />, label: '会计科目' },
       { key: '/ledger', icon: <ReadOutlined />, label: '明细账' },
       { key: '/reports', icon: <FundOutlined />, label: '财务报表' },
@@ -56,7 +62,7 @@ export default function MainLayout() {
   const menuKey = location.pathname.includes('/edit') || location.pathname.startsWith('/vouchers/new')
     ? '/vouchers/new'
     : navItems.find((item) => item.key !== '/' && location.pathname.startsWith(item.key))?.key ||
-      (location.pathname === '/' ? '/' : location.pathname);
+    (location.pathname === '/' ? '/' : location.pathname);
 
   const handleBackup = async () => {
     if (!can('backup')) {
@@ -102,10 +108,25 @@ export default function MainLayout() {
         refresh();
         navigate('/');
       } catch (err) {
-        message.error('恢复失败：' + (err as Error).message);
+        message.error('恢复失败：' + toUserMessage(err));
       }
     };
     input.click();
+  };
+
+  const handleChangePassword = async () => {
+    const values = await pwdForm.validateFields();
+    setPwdSaving(true);
+    try {
+      await changePasswordRequest(values.oldPassword, values.newPassword);
+      message.success('密码已修改');
+      setPwdOpen(false);
+      pwdForm.resetFields();
+    } catch (err) {
+      message.error(toUserMessage(err, '修改密码失败'));
+    } finally {
+      setPwdSaving(false);
+    }
   };
 
   return (
@@ -139,6 +160,15 @@ export default function MainLayout() {
               {user?.nickname || user?.username || ''}
               {user?.role ? `（${ROLE_LABEL[user.role] || user.role}）` : ''}
             </Typography.Text>
+            <Button
+              icon={<LockOutlined />}
+              onClick={() => {
+                pwdForm.resetFields();
+                setPwdOpen(true);
+              }}
+            >
+              修改密码
+            </Button>
             {can('backup') ? <Button onClick={handleBackup}>备份数据</Button> : null}
             {can('restore') ? <Button onClick={handleRestore}>恢复数据</Button> : null}
             <Button
@@ -156,6 +186,50 @@ export default function MainLayout() {
           <Outlet />
         </Content>
       </Layout>
+
+      <Modal
+        title="修改密码"
+        open={pwdOpen}
+        onCancel={() => setPwdOpen(false)}
+        onOk={handleChangePassword}
+        confirmLoading={pwdSaving}
+        destroyOnHidden
+      >
+        <Form form={pwdForm} layout="vertical">
+          <Form.Item
+            name="oldPassword"
+            label="当前密码"
+            rules={[{ required: true, message: '请输入当前密码' }]}
+          >
+            <Input.Password autoComplete="current-password" />
+          </Form.Item>
+          <Form.Item
+            name="newPassword"
+            label="新密码"
+            rules={[{ required: true, min: 6, message: '新密码至少 6 位' }]}
+          >
+            <Input.Password autoComplete="new-password" />
+          </Form.Item>
+          <Form.Item
+            name="confirmPassword"
+            label="确认新密码"
+            dependencies={['newPassword']}
+            rules={[
+              { required: true, message: '请再次输入新密码' },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (!value || getFieldValue('newPassword') === value) {
+                    return Promise.resolve();
+                  }
+                  return Promise.reject(new Error('两次输入的新密码不一致'));
+                }
+              })
+            ]}
+          >
+            <Input.Password autoComplete="new-password" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </Layout>
   );
 }

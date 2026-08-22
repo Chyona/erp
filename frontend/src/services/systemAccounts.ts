@@ -3,6 +3,7 @@
  */
 import { ApiError } from './apiClient';
 import { getStoredToken } from '../context/AuthContext';
+import { sanitizeUserMessage, toUserMessage } from '../utils/userMessage';
 import type { Role } from '../utils/permissions';
 
 const BASE = '/openapi/base/v1';
@@ -23,22 +24,30 @@ type ApiBody<T> = { code: number; message: string; data: T };
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const token = getStoredToken();
-  const res = await fetch(`${BASE}${path}`, {
-    method,
-    headers: {
-      ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {})
-    },
-    body: body !== undefined ? JSON.stringify(body) : undefined
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      method,
+      headers: {
+        ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: body !== undefined ? JSON.stringify(body) : undefined
+    });
+  } catch (err) {
+    throw new ApiError(toUserMessage(err, '无法连接服务器，请确认网络或后端服务是否正常'));
+  }
   let json: ApiBody<T>;
   try {
     json = (await res.json()) as ApiBody<T>;
   } catch {
-    throw new ApiError(res.ok ? '响应解析失败' : `HTTP ${res.status}`);
+    throw new ApiError(res.ok ? '服务器返回了无法识别的内容' : `请求失败（${res.status}）`);
   }
   if (!res.ok || json.code !== 0) {
-    throw new ApiError(json.message || '请求失败', json.code ?? res.status);
+    throw new ApiError(
+      sanitizeUserMessage(json.message || '请求失败'),
+      json.code ?? res.status
+    );
   }
   return json.data;
 }

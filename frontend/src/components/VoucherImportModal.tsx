@@ -28,6 +28,7 @@ import {
 import dayjs from 'dayjs';
 import { Accounts } from '../services/accounts';
 import { VoucherImport } from '../services/voucherImport';
+import { clampDayjsToToday, disableFutureDate } from '../utils/dateConstraints';
 import { isImportImageFile } from '../services/voucherImportImage';
 
 const { Dragger } = Upload;
@@ -213,11 +214,17 @@ export default function VoucherImportModal({ open, accounts, onClose, onSuccess 
             size="small"
             variant="borderless"
             allowClear={false}
+            disabledDate={disableFutureDate}
             className="voucher-import-modal__edit-input voucher-import-modal__edit-date"
             value={row.date ? dayjs(row.date) : null}
-            onChange={(d) =>
-              updateVoucherField(row.voucherIndex, 'date', d ? d.format('YYYY-MM-DD') : '')
-            }
+            onChange={(d) => {
+              const next = clampDayjsToToday(d);
+              updateVoucherField(
+                row.voucherIndex,
+                'date',
+                next ? next.format('YYYY-MM-DD') : ''
+              );
+            }}
           />
         )
       },

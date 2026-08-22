@@ -3,12 +3,22 @@ import { Typography } from 'antd';
 import { ErpApi } from '../services/erpApi';
 import { useApp } from '../context/AppContext';
 import ScrollTable from '../components/ScrollTable';
+import type { AuditLog } from '../types';
 
 const { Title, Paragraph } = Typography;
 
+function formatOperator(log: AuditLog): string {
+  const name = (log.operatorNickname || '').trim() || (log.operatorUsername || '').trim();
+  if (name && log.operatorUsername && log.operatorNickname && log.operatorNickname !== log.operatorUsername) {
+    return `${log.operatorNickname}（${log.operatorUsername}）`;
+  }
+  if (name) return name;
+  return '未知';
+}
+
 export default function Audit() {
   const { refreshKey } = useApp();
-  const [logs, setLogs] = useState([]);
+  const [logs, setLogs] = useState<AuditLog[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -22,7 +32,14 @@ export default function Audit() {
       title: '时间',
       dataIndex: 'timestamp',
       width: 180,
-      render: (t) => new Date(t).toLocaleString('zh-CN')
+      render: (t: string) => new Date(t).toLocaleString('zh-CN')
+    },
+    {
+      title: '操作人',
+      key: 'operator',
+      width: 160,
+      ellipsis: true,
+      render: (_: unknown, record: AuditLog) => formatOperator(record)
     },
     { title: '操作', dataIndex: 'action', width: 120 },
     { title: '对象', dataIndex: 'target', width: 120 },
@@ -36,7 +53,7 @@ export default function Audit() {
           审计日志
         </Title>
         <Paragraph type="secondary" style={{ margin: 0 }}>
-          所有操作均自动记录，便于税务查账时追溯数据来源与变更历史
+          所有操作均自动记录操作人，便于税务查账时追溯数据来源与变更历史
         </Paragraph>
       </div>
 

@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Checkbox, Dropdown, Space, Typography, App } from 'antd';
-import type { MenuProps } from 'antd';
 import {
   PlusOutlined,
   DownloadOutlined,
   UploadOutlined,
   DeleteOutlined,
-  MoreOutlined,
   ReloadOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
@@ -151,9 +149,8 @@ export default function VoucherList() {
         '导出',
         withAttachments ? 'ZIP' : 'Excel',
         withAttachments
-          ? `${result.voucherCount} 条凭证，附件 ${result.attachmentCount} 个${
-              result.failed ? `，失败 ${result.failed}` : ''
-            }`
+          ? `${result.voucherCount} 条凭证，附件 ${result.attachmentCount} 个${result.failed ? `，失败 ${result.failed}` : ''
+          }`
           : `${result.voucherCount} 条凭证`
       );
       if (withAttachments) {
@@ -194,7 +191,7 @@ export default function VoucherList() {
   }).length;
 
   const finishBatchAction = (
-    result: { skipped: number; failed: { id: string; voucherNo?: string }[]; [key: string]: unknown },
+    result: { skipped: number; failed: { id: string; voucherNo?: string }[];[key: string]: unknown },
     { successKey, successLabel, skippedHint }: { successKey: string; successLabel: string; skippedHint: string }
   ) => {
     if (result[successKey]) {
@@ -278,37 +275,6 @@ export default function VoucherList() {
     });
   };
 
-  const moreMenuItems: MenuProps['items'] = [
-    can('export')
-      ? {
-          key: 'export',
-          label: '导出',
-          icon: <DownloadOutlined />,
-          children: [
-            { key: 'export-csv', label: '仅导出表格（Excel）' },
-            { key: 'export-zip', label: '导出表格及所属期间附件（ZIP）' }
-          ]
-        }
-      : null,
-    can('voucher.import')
-      ? { key: 'import', label: '导入历史凭证', icon: <UploadOutlined /> }
-      : null
-  ].filter(Boolean) as MenuProps['items'];
-
-  const handleMoreMenuClick: MenuProps['onClick'] = ({ key }) => {
-    if (key === 'export-csv') {
-      void handleExport(false);
-      return;
-    }
-    if (key === 'export-zip') {
-      void handleExport(true);
-      return;
-    }
-    if (key === 'import') {
-      setImportOpen(true);
-    }
-  };
-
   return (
     <div className="page-table-layout">
       <div className="page-header">
@@ -347,37 +313,58 @@ export default function VoucherList() {
           <Checkbox checked={showSubtotal} onChange={(e) => setShowSubtotal(e.target.checked)}>
             显示凭证金额小计
           </Checkbox>
-
-          <Button icon={<ReloadOutlined />} onClick={handleRefresh}>
-            刷新
-          </Button>
         </div>
 
-        <Space wrap className="voucher-list-toolbar__actions">
-          {can('voucher.approve') ? (
-            <Dropdown.Button
-              onClick={handleBatchApprove}
-              menu={{
-                items: [{ key: 'unapprove', label: '反审核' }],
-                onClick: ({ key }) => {
-                  if (key === 'unapprove') handleBatchUnapprove();
-                }
-              }}
-            >
-              审核
-            </Dropdown.Button>
-          ) : null}
-          {can('voucher.create') ? (
-            <Button danger icon={<DeleteOutlined />} onClick={handleBatchDelete}>
-              删除
+        <div className="voucher-list-toolbar__actions">
+          <Space>
+          </Space>
+          <Space wrap>
+            {can('voucher.create') ? (
+              <Button icon={<DeleteOutlined />} onClick={handleBatchDelete}>
+                删除
+              </Button>
+            ) : null}
+            {can('voucher.approve') ? (
+              <Dropdown.Button
+                onClick={handleBatchApprove}
+                menu={{
+                  items: [{ key: 'unapprove', label: '反审核' }],
+                  onClick: ({ key }) => {
+                    if (key === 'unapprove') handleBatchUnapprove();
+                  }
+                }}
+              >
+                审核
+              </Dropdown.Button>
+            ) : null}
+            {can('export') ? (
+              <Dropdown.Button
+                icon={<DownloadOutlined />}
+                onClick={() => void handleExport(false)}
+                menu={{
+                  items: [
+                    { key: 'export-csv', label: '仅导出表格（Excel）' },
+                    { key: 'export-zip', label: '导出表格及所属期间附件（ZIP）' }
+                  ],
+                  onClick: ({ key }) => {
+                    if (key === 'export-csv') void handleExport(false);
+                    if (key === 'export-zip') void handleExport(true);
+                  }
+                }}
+              >
+                导出
+              </Dropdown.Button>
+            ) : null}
+            {can('voucher.import') ? (
+              <Button icon={<UploadOutlined />} onClick={() => setImportOpen(true)}>
+                导入历史凭证
+              </Button>
+            ) : null}
+            <Button className="voucher-list-toolbar__refresh" icon={<ReloadOutlined />} onClick={handleRefresh}>
+              刷新
             </Button>
-          ) : null}
-          {moreMenuItems && moreMenuItems.length > 0 ? (
-            <Dropdown menu={{ items: moreMenuItems, onClick: handleMoreMenuClick }}>
-              <Button icon={<MoreOutlined />}>更多</Button>
-            </Dropdown>
-          ) : null}
-        </Space>
+          </Space>
+        </div>
       </div>
 
       <VoucherTable
@@ -397,6 +384,8 @@ export default function VoucherList() {
         onClose={() => setViewId(null)}
         onLocked={loadList}
         onDeleted={loadList}
+        onVoucherChange={setViewId}
+        navigationIds={vouchers.map((v) => v.id)}
       />
 
       <VoucherImportModal

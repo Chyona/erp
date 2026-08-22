@@ -498,6 +498,7 @@ export default function MonthEndClosingPanel({ readOnly = false }: { readOnly?: 
         onClose={() => setViewId(null)}
         onLocked={loadSummary}
         onDeleted={loadSummary}
+        onVoucherChange={setViewId}
       />
     </div>
   );

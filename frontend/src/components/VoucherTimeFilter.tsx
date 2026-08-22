@@ -8,9 +8,12 @@ import {
   applyDateShortcut,
   applyPeriodShortcut,
   currentPeriod,
+  clampDateToToday,
   datesToPeriods,
   formatPeriodRange,
   getTimeFilterDisplay,
+  isFutureDate,
+  isFuturePeriod,
   normalizePeriodRange,
   periodsToDateRange,
   resolveTimeFilterQuery
@@ -64,23 +67,36 @@ function PeriodPanel({
   onYearChange: (year: number) => void;
   onSelect: (period: VoucherPeriod) => void;
 }) {
+  const maxPeriod = currentPeriod();
+
   return (
     <div className="voucher-time-filter__period-panel">
       <div className="voucher-time-filter__panel-title">{title}</div>
       <div className="voucher-time-filter__year-nav">
         <Button type="text" size="small" icon={<DoubleLeftOutlined />} onClick={() => onYearChange(panelYear - 1)} />
         <span>{panelYear}年</span>
-        <Button type="text" size="small" icon={<DoubleRightOutlined />} onClick={() => onYearChange(panelYear + 1)} />
+        <Button
+          type="text"
+          size="small"
+          icon={<DoubleRightOutlined />}
+          disabled={panelYear >= maxPeriod.year}
+          onClick={() => onYearChange(panelYear + 1)}
+        />
       </div>
       <div className="voucher-time-filter__period-grid">
         {MONTHS.map((month) => {
+          const period = { year: panelYear, month };
+          const disabled = isFuturePeriod(period);
           const active = selected?.year === panelYear && selected?.month === month;
           return (
             <button
               key={month}
               type="button"
-              className={`voucher-time-filter__period-item${active ? ' voucher-time-filter__period-item--active' : ''}`}
-              onClick={() => onSelect({ year: panelYear, month })}
+              disabled={disabled}
+              className={`voucher-time-filter__period-item${active ? ' voucher-time-filter__period-item--active' : ''}${disabled ? ' voucher-time-filter__period-item--disabled' : ''}`}
+              onClick={() => {
+                if (!disabled) onSelect(period);
+              }}
             >
               {month}期
             </button>
@@ -184,6 +200,8 @@ export default function VoucherTimeFilter({
   };
 
   const pickDate = (side: 'start' | 'end', date: Dayjs) => {
+    if (isFutureDate(date)) return;
+
     if (side === 'start') {
       setDraftStartDate(date.startOf('day'));
       if (draftEndDate && date.isAfter(draftEndDate, 'day')) {
@@ -205,8 +223,8 @@ export default function VoucherTimeFilter({
         setTimeOpen(false);
         return;
       }
-      const startDate = draftStartDate.format('YYYY-MM-DD');
-      const endDate = draftEndDate.format('YYYY-MM-DD');
+      const startDate = clampDateToToday(draftStartDate).format('YYYY-MM-DD');
+      const endDate = clampDateToToday(draftEndDate).format('YYYY-MM-DD');
       const periods = datesToPeriods(startDate, endDate);
       const next: VoucherTimeFilterState = {
         mode: 'date',
@@ -247,6 +265,7 @@ export default function VoucherTimeFilter({
             <Calendar
               fullscreen={false}
               value={draftStartDate ?? undefined}
+              disabledDate={isFutureDate}
               onSelect={(date) => pickDate('start', date)}
             />
           </div>
@@ -255,6 +274,7 @@ export default function VoucherTimeFilter({
             <Calendar
               fullscreen={false}
               value={draftEndDate ?? undefined}
+              disabledDate={isFutureDate}
               onSelect={(date) => pickDate('end', date)}
             />
           </div>

@@ -50,6 +50,12 @@ type SetupPasswordRequest struct {
 	Password string `json:"password" binding:"required,min=6"`
 }
 
+// ChangePasswordRequest 当前用户修改密码。
+type ChangePasswordRequest struct {
+	OldPassword string `json:"old_password" binding:"required"`
+	NewPassword string `json:"new_password" binding:"required,min=6"`
+}
+
 // Login 用户名密码登录
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req LoginRequest
@@ -135,4 +141,55 @@ func (h *AuthHandler) SetupPassword(c *gin.Context) {
 		Role:               rbac.NormalizeRole(account.Role),
 		MustChangePassword: account.MustChangePassword,
 	})
+}
+
+// SkipPasswordSetup 放弃设置新密码，沿用当前密码进入系统。
+func (h *AuthHandler) SkipPasswordSetup(c *gin.Context) {
+	claims := middleware.GetAuthClaims(c)
+	if claims == nil {
+		response.Unauthorized(c, "请先登录")
+		return
+	}
+	account, err := h.accountService.SkipPasswordSetup(c.Request.Context(), claims.AccountID)
+	if err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	token, expiresAt, err := h.jwtManager.Sign(
+		account.ID, account.Username, account.Nickname, account.Role, account.MustChangePassword,
+	)
+	if err != nil {
+		response.InternalError(c, "签发登录凭证失败")
+		return
+	}
+	response.Success(c, LoginResponse{
+		Token:              token,
+		ExpiresAt:          expiresAt.Format("2006-01-02 15:04:05"),
+		AccountID:          account.ID,
+		Username:           account.Username,
+		Nickname:           account.Nickname,
+		Role:               rbac.NormalizeRole(account.Role),
+		MustChangePassword: account.MustChangePassword,
+	})
+}
+
+// ChangePassword 当前登录用户修改自己的密码。
+func (h *AuthHandler) ChangePassword(c *gin.Context) {
+	var req ChangePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "请填写当前密码，以及至少 6 位的新密码")
+		return
+	}
+	claims := middleware.GetAuthClaims(c)
+	if claims == nil {
+		response.Unauthorized(c, "请先登录")
+		return
+	}
+	if _, err := h.accountService.ChangePassword(
+		c.Request.Context(), claims.AccountID, req.OldPassword, req.NewPassword,
+	); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	response.SuccessWithMessage(c, "密码已修改", nil)
 }

@@ -78,23 +78,23 @@ export default function VoucherAttachmentColumn({
                   <span className="voucher-attach-panel__name" title={att.name}>
                     {att.name}
                   </span>
-                  <Popconfirm
-                    title="确定删除该附件？"
-                    okText="删除"
-                    cancelText="取消"
-                    okButtonProps={{ danger: true }}
-                    onConfirm={() => onRemove?.(index)}
-                    disabled={!canModify}
-                  >
-                    <button
-                      type="button"
-                      className="voucher-attach-panel__delete"
-                      aria-label="删除"
-                      disabled={!canModify}
+                  {canModify ? (
+                    <Popconfirm
+                      title="确定删除该附件？"
+                      okText="删除"
+                      cancelText="取消"
+                      okButtonProps={{ danger: true }}
+                      onConfirm={() => onRemove?.(index)}
                     >
-                      <DeleteOutlined />
-                    </button>
-                  </Popconfirm>
+                      <button
+                        type="button"
+                        className="voucher-attach-panel__delete"
+                        aria-label="删除"
+                      >
+                        <DeleteOutlined />
+                      </button>
+                    </Popconfirm>
+                  ) : null}
                 </div>
                 <button
                   type="button"

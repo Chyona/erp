@@ -1,4 +1,5 @@
 import { clearStoredAuth, getStoredToken } from '../context/AuthContext';
+import { sanitizeUserMessage, toUserMessage } from '../utils/userMessage';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/openapi/erp/v1';
 
@@ -12,7 +13,7 @@ export class ApiError extends Error {
   code: number;
 
   constructor(message: string, code = 500) {
-    super(message);
+    super(sanitizeUserMessage(message));
     this.name = 'ApiError';
     this.code = code;
   }
@@ -52,23 +53,28 @@ export async function apiRequest<T>(
   body?: unknown
 ): Promise<T> {
   const url = `${getApiBase()}${path.startsWith('/') ? path : `/${path}`}`;
-  const res = await fetch(url, {
-    method,
-    headers: authHeaders(body !== undefined ? { 'Content-Type': 'application/json' } : undefined),
-    body: body !== undefined ? JSON.stringify(body) : undefined
-  });
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method,
+      headers: authHeaders(body !== undefined ? { 'Content-Type': 'application/json' } : undefined),
+      body: body !== undefined ? JSON.stringify(body) : undefined
+    });
+  } catch (err) {
+    throw new ApiError(toUserMessage(err, '无法连接服务器，请确认网络或后端服务是否正常'));
+  }
 
   let json: ApiBody<T>;
   try {
     json = (await res.json()) as ApiBody<T>;
   } catch {
     handleUnauthorized(res.status, res.status);
-    throw new ApiError(res.ok ? '响应解析失败' : `HTTP ${res.status}: ${res.statusText}`);
+    throw new ApiError(res.ok ? '服务器返回了无法识别的内容' : `请求失败（${res.status}）`);
   }
 
   if (!res.ok || json.code !== 0) {
     handleUnauthorized(res.status, json.code ?? res.status);
-    throw new ApiError(json.message || `HTTP ${res.status}`, json.code ?? res.status);
+    throw new ApiError(json.message || `请求失败（${res.status}）`, json.code ?? res.status);
   }
 
   return json.data;
@@ -77,19 +83,24 @@ export async function apiRequest<T>(
 /** multipart 上传（不要手动设 Content-Type，由浏览器带 boundary） */
 export async function apiUploadForm<T>(path: string, form: FormData): Promise<T> {
   const url = `${getApiBase()}${path.startsWith('/') ? path : `/${path}`}`;
-  const res = await fetch(url, { method: 'POST', headers: authHeaders(), body: form });
+  let res: Response;
+  try {
+    res = await fetch(url, { method: 'POST', headers: authHeaders(), body: form });
+  } catch (err) {
+    throw new ApiError(toUserMessage(err, '无法连接服务器，请确认网络或后端服务是否正常'));
+  }
 
   let json: ApiBody<T>;
   try {
     json = (await res.json()) as ApiBody<T>;
   } catch {
     handleUnauthorized(res.status, res.status);
-    throw new ApiError(res.ok ? '响应解析失败' : `HTTP ${res.status}: ${res.statusText}`);
+    throw new ApiError(res.ok ? '服务器返回了无法识别的内容' : `请求失败（${res.status}）`);
   }
 
   if (!res.ok || json.code !== 0) {
     handleUnauthorized(res.status, json.code ?? res.status);
-    throw new ApiError(json.message || `HTTP ${res.status}`, json.code ?? res.status);
+    throw new ApiError(json.message || `请求失败（${res.status}）`, json.code ?? res.status);
   }
 
   return json.data;

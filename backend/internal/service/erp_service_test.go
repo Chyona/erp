@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"erp/internal/model"
+	"erp/internal/pkg/rbac"
 	"gorm.io/datatypes"
 )
 
@@ -115,7 +116,13 @@ func TestErpService_VoucherBatch(t *testing.T) {
 		t.Fatalf("SaveVouchersBatch() error = %v", err)
 	}
 
-	approve, err := svc.ApproveVouchersBatch(ctx, []string{"d1", "d2", "a1", "missing", "d1"})
+	approveCtx := rbac.WithActor(ctx, &rbac.Actor{
+		AccountID: 1,
+		Username:  "lisi",
+		Nickname:  "李四",
+		Role:      rbac.RoleAdmin,
+	})
+	approve, err := svc.ApproveVouchersBatch(approveCtx, []string{"d1", "d2", "a1", "missing", "d1"})
 	if err != nil {
 		t.Fatalf("ApproveVouchersBatch() error = %v", err)
 	}
@@ -123,11 +130,11 @@ func TestErpService_VoucherBatch(t *testing.T) {
 		t.Fatalf("ApproveVouchersBatch() = %+v, want approved=2 skipped=2", approve)
 	}
 	got, _ := svc.GetVoucher(ctx, "d1")
-	if got.Status != "approved" || got.ApprovedAt == "" {
-		t.Fatalf("d1 after approve = %+v", got)
+	if got.Status != "approved" || got.ApprovedAt == "" || got.ReviewedBy != "李四" {
+		t.Fatalf("d1 after approve = %+v, want reviewedBy=李四", got)
 	}
 
-	unapprove, err := svc.UnapproveVouchersBatch(ctx, []string{"d1", "l1", "c1", "missing"})
+	unapprove, err := svc.UnapproveVouchersBatch(approveCtx, []string{"d1", "l1", "c1", "missing"})
 	if err != nil {
 		t.Fatalf("UnapproveVouchersBatch() error = %v", err)
 	}
@@ -135,8 +142,8 @@ func TestErpService_VoucherBatch(t *testing.T) {
 		t.Fatalf("UnapproveVouchersBatch() = %+v", unapprove)
 	}
 	got, _ = svc.GetVoucher(ctx, "d1")
-	if got.Status != "draft" || got.ApprovedAt != "" {
-		t.Fatalf("d1 after unapprove = %+v", got)
+	if got.Status != "draft" || got.ApprovedAt != "" || got.ReviewedBy != "" {
+		t.Fatalf("d1 after unapprove = %+v, want reviewedBy cleared", got)
 	}
 
 	del, err := svc.DeleteVouchersBatch(ctx, []string{"d2", "l1", "c1", "missing"})
@@ -213,12 +220,26 @@ func TestErpService_AuditLogs(t *testing.T) {
 		t.Fatalf("UserAgent length = %d, want 100", len(log.UserAgent))
 	}
 
+	ctxWithActor := rbac.WithActor(ctx, &rbac.Actor{
+		AccountID: 9,
+		Username:  "hommy",
+		Nickname:  "Hommy",
+		Role:      rbac.RoleAdmin,
+	})
+	withOp, err := svc.AddAuditLog(ctxWithActor, "update", "voucher:2", "更新", "ua")
+	if err != nil {
+		t.Fatalf("AddAuditLog with actor error = %v", err)
+	}
+	if withOp.OperatorAccountID != 9 || withOp.OperatorUsername != "hommy" || withOp.OperatorNickname != "Hommy" {
+		t.Fatalf("operator not filled: %+v", withOp)
+	}
+
 	got, err := svc.GetAuditLog(ctx, log.ID)
 	if err != nil || got.Action != "create" {
 		t.Fatalf("GetAuditLog() = %+v, %v", got, err)
 	}
 	list, err := svc.ListAuditLogs(ctx, 0)
-	if err != nil || len(list) != 1 {
+	if err != nil || len(list) != 2 {
 		t.Fatalf("ListAuditLogs() = %v, %v", list, err)
 	}
 	if err := svc.ClearAuditLogs(ctx); err != nil {

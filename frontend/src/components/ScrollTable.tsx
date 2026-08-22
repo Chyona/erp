@@ -1,6 +1,22 @@
-import { Table, type TableProps } from 'antd';
+import { Empty, Table, type TableProps } from 'antd';
 import type { ReactNode } from 'react';
 import { useTableScrollY } from '../hooks/useTableScrollY';
+
+function renderTableEmpty(description: string) {
+  return (
+    <div className="app-table-empty">
+      <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={description} />
+    </div>
+  );
+}
+
+function normalizeTableLocale(locale?: TableProps['locale']): TableProps['locale'] {
+  const emptyText = locale?.emptyText;
+  if (typeof emptyText === 'string') {
+    return { ...locale, emptyText: renderTableEmpty(emptyText) };
+  }
+  return locale;
+}
 
 const ROW_SCROLL_THRESHOLD = 12;
 
@@ -46,7 +62,13 @@ export default function ScrollTable<T extends object = Record<string, unknown>>(
 
   return (
     <div className={bodyClass} ref={needScrollY ? wrapRef : undefined}>
-      <Table {...props} bordered={bordered} size={size} scroll={scrollConfig} />
+      <Table
+        {...props}
+        bordered={bordered}
+        size={size}
+        scroll={scrollConfig}
+        locale={normalizeTableLocale(props.locale)}
+      />
       {footer}
     </div>
   );

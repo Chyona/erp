@@ -11,12 +11,14 @@ import {
   Alert,
   App
 } from 'antd';
+import { disableFutureDate } from '../utils/dateConstraints';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { Voucher } from '../services/voucher';
 import type { Attachment, VoucherStatus } from '../types';
 import { ErpApi } from '../services/erpApi';
 import { useApp } from '../context/AppContext';
+import { getCurrentOperatorName } from '../context/AuthContext';
 import { confirmDanger, confirmWarning } from '../utils/confirmAction';
 import BusinessTypeHint from '../components/BusinessTypeHint';
 import VoucherEntrySheet from '../components/VoucherEntrySheet';
@@ -272,11 +274,7 @@ export default function VoucherForm() {
     });
   };
 
-  const loadDefaultSignatory = async () =>
-    (await ErpApi.getSetting('defaultSignatory')) ||
-    (await ErpApi.getSetting('defaultPreparedBy')) ||
-    (await ErpApi.getSetting('defaultReviewedBy')) ||
-    '';
+  const loadDefaultSignatory = async () => getCurrentOperatorName();
 
   const clearForm = async () => {
     const values = form.getFieldsValue();
@@ -508,6 +506,7 @@ export default function VoucherForm() {
       let isProfitLossClosing = false;
       let profitLossClosingPeriod = '';
       let profitLossClosingPeriodType = 'month';
+      let existingPreparedBy = '';
 
       if (isEdit) {
         const existing = await Voucher.getById(id);
@@ -519,6 +518,7 @@ export default function VoucherForm() {
         isProfitLossClosing = existing?.isProfitLossClosing || false;
         profitLossClosingPeriod = existing?.profitLossClosingPeriod || '';
         profitLossClosingPeriodType = existing?.profitLossClosingPeriodType || 'month';
+        existingPreparedBy = existing?.preparedBy || '';
       }
 
       const voucherData = {
@@ -561,10 +561,10 @@ export default function VoucherForm() {
         invoiceNumbers: values.invoiceNumbers?.trim() || '',
         remark: values.remark?.trim() || '',
         attachmentIds: attachments.map((a) => a.id),
-        preparedBy: values.signatory?.trim() || '',
-        reviewedBy: values.signatory?.trim() || '',
-        postedBy: values.signatory?.trim() || '',
-        cashierBy: values.signatory?.trim() || ''
+        preparedBy:
+          existingPreparedBy.trim() ||
+          values.signatory?.trim() ||
+          getCurrentOperatorName()
       };
 
       const finalVoucherNo = `${VOUCHER_TYPE}-${voucherNumber}`;
@@ -726,7 +726,7 @@ export default function VoucherForm() {
           ) : null}
           <Form form={form} layout="vertical" className="voucher-form">
             <Form.Item name="voucherDate" hidden rules={[{ required: true, message: '请选择日期' }]}>
-              <DatePicker />
+              <DatePicker disabledDate={disableFutureDate} />
             </Form.Item>
             <Form.Item name="signatory" hidden>
               <Input />
@@ -748,7 +748,6 @@ export default function VoucherForm() {
               attachments={attachments}
               attachmentsCount={attachments.length}
               signatory={signatory || ''}
-              onSignatoryChange={(v) => form.setFieldValue('signatory', v)}
               onUpdateEntry={updateEntry}
               onInsertEntryAfter={insertEntryAfter}
               onCopyEntry={copyEntry}

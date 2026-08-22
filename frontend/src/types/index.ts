@@ -120,6 +120,12 @@ export interface AuditLog {
   target: string;
   details: string;
   userAgent: string;
+  /** 操作人账号 ID（历史日志可能为 0） */
+  operatorAccountId?: number;
+  /** 操作人用户名 */
+  operatorUsername?: string;
+  /** 操作人昵称 */
+  operatorNickname?: string;
 }
 
 export interface Setting {

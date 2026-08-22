@@ -2,6 +2,7 @@ import { ErpApi } from './erpApi';
 import { Accounts } from './accounts';
 import { Voucher } from './voucher';
 import { TaxDeclaration } from './taxDeclaration';
+import { getCurrentOperatorName } from '../context/AuthContext';
 import {
   formatQuarterLabel,
   formatTaxExemptionPeriod,
@@ -210,7 +211,7 @@ export async function createReimbursementVoucher(period, person, { approve = tru
     throw new Error('缺少 2241 其他应付款 或 1002 银行存款 科目');
   }
 
-  const signatory = String((await ErpApi.getSetting('defaultSignatory')) ?? '');
+  const signatory = getCurrentOperatorName();
   const periodLabel = formatTaxExemptionPeriod(period);
   const entries = [];
 

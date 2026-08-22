@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button, Input, Popover, Select, Space } from 'antd';
 import {
   CalendarOutlined,
@@ -6,7 +6,13 @@ import {
   DoubleRightOutlined,
   ReloadOutlined
 } from '@ant-design/icons';
-import { formatReportPeriod } from '../utils/reportPeriod';
+import {
+  currentReportMonthPeriod,
+  clampReportPeriodToNow,
+  formatReportPeriod,
+  isFutureReportMonth,
+  isFutureReportQuarter
+} from '../utils/reportPeriod';
 
 const REPORT_TYPE_OPTIONS = [
   { value: 'month', label: '月报' },
@@ -17,6 +23,7 @@ const MONTHS = Array.from({ length: 12 }, (_, index) => index + 1);
 const QUARTERS = [1, 2, 3, 4];
 
 function PeriodPickerPanel({ period, panelYear, onPanelYearChange, onSelect, onClose }) {
+  const maxYear = currentReportMonthPeriod().year;
   const changeYear = (delta) => onPanelYearChange(panelYear + delta);
 
   return (
@@ -33,6 +40,7 @@ function PeriodPickerPanel({ period, panelYear, onPanelYearChange, onSelect, onC
           type="text"
           size="small"
           icon={<DoubleRightOutlined />}
+          disabled={panelYear >= maxYear}
           onClick={() => changeYear(1)}
         />
       </div>
@@ -41,12 +49,15 @@ function PeriodPickerPanel({ period, panelYear, onPanelYearChange, onSelect, onC
         <div className="report-period-picker__grid report-period-picker__grid--month">
           {MONTHS.map((month) => {
             const selected = panelYear === period.year && month === period.month;
+            const disabled = isFutureReportMonth(panelYear, month);
             return (
               <button
                 key={month}
                 type="button"
-                className={`report-period-picker__item${selected ? ' report-period-picker__item--active' : ''}`}
+                disabled={disabled}
+                className={`report-period-picker__item${selected ? ' report-period-picker__item--active' : ''}${disabled ? ' report-period-picker__item--disabled' : ''}`}
                 onClick={() => {
+                  if (disabled) return;
                   onSelect({ ...period, year: panelYear, month });
                   onClose();
                 }}
@@ -60,12 +71,15 @@ function PeriodPickerPanel({ period, panelYear, onPanelYearChange, onSelect, onC
         <div className="report-period-picker__grid report-period-picker__grid--quarter">
           {QUARTERS.map((quarter) => {
             const selected = panelYear === period.year && quarter === period.quarter;
+            const disabled = isFutureReportQuarter(panelYear, quarter);
             return (
               <button
                 key={quarter}
                 type="button"
-                className={`report-period-picker__item${selected ? ' report-period-picker__item--active' : ''}`}
+                disabled={disabled}
+                className={`report-period-picker__item${selected ? ' report-period-picker__item--active' : ''}${disabled ? ' report-period-picker__item--disabled' : ''}`}
                 onClick={() => {
+                  if (disabled) return;
                   onSelect({ ...period, year: panelYear, quarter });
                   onClose();
                 }}
@@ -93,8 +107,23 @@ export default function ReportPeriodFilter({
 
   const displayText = useMemo(() => formatReportPeriod(value), [value]);
 
+  useEffect(() => {
+    const clamped = clampReportPeriodToNow(value);
+    if (
+      clamped.year !== value.year ||
+      clamped.month !== value.month ||
+      clamped.quarter !== value.quarter
+    ) {
+      onChange(clamped);
+    }
+  }, [value.year, value.month, value.quarter, value.type]);
+
+  const handleSelect = (next) => {
+    onChange(clampReportPeriodToNow(next));
+  };
+
   const handleTypeChange = (type) => {
-    onChange({ ...value, type });
+    onChange(clampReportPeriodToNow({ ...value, type }));
   };
 
   const handleOpenChange = (nextOpen) => {
@@ -125,7 +154,7 @@ export default function ReportPeriodFilter({
             period={value}
             panelYear={panelYear}
             onPanelYearChange={setPanelYear}
-            onSelect={onChange}
+            onSelect={handleSelect}
             onClose={() => setOpen(false)}
           />
         }

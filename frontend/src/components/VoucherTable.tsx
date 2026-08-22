@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { Voucher } from '../services/voucher';
 import type { Attachment, Voucher as VoucherRecord } from '../types';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { isCarryForwardVoucher } from '../utils/carryForwardVoucher';
 import StatusBadge from './StatusBadge';
 import VoucherMoreActions from './VoucherMoreActions';
@@ -84,6 +85,7 @@ export default function VoucherTable({
   const navigate = useNavigate();
   const { message } = App.useApp();
   const { refresh } = useApp();
+  const { canMutateVoucher, canAccessOwnVoucher } = useAuth();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(100);
   const [uploadingId, setUploadingId] = useState('');
@@ -141,11 +143,12 @@ export default function VoucherTable({
       pagedVouchers
         .filter(
           (v) =>
+            canMutateVoucher(v) &&
             (v.status === Voucher.STATUS.DRAFT || v.status === Voucher.STATUS.APPROVED) &&
             !isCarryForwardVoucher(v)
         )
         .map((v) => v.id),
-    [pagedVouchers]
+    [pagedVouchers, canMutateVoucher]
   );
 
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
@@ -180,7 +183,9 @@ export default function VoucherTable({
     onRefresh?.();
   };
 
-  const openVoucher = (voucher) => {
+  const openVoucherPage = (voucher) => {
+    if (!canAccessOwnVoucher(voucher)) return;
+    // 已结项只能看详情弹窗（编辑页会拦截）
     if (voucher.status === Voucher.STATUS.LOCKED || isCarryForwardVoucher(voucher)) {
       onView?.(voucher.id);
       return;
@@ -188,60 +193,64 @@ export default function VoucherTable({
     navigate(`/vouchers/${voucher.id}/edit`);
   };
 
-  const renderActions = (voucher) => (
-    <Space size={0} direction="vertical" align="center" className="voucher-grouped-table__actions">
-      <Button
-        type="text"
-        size="small"
-        icon={<EyeOutlined />}
-        title="查看"
-        onClick={() => onView?.(voucher.id)}
-      />
-      {!isCarryForwardVoucher(voucher) &&
-        (voucher.status === 'locked' ? (
-          <Popconfirm
-            title="确定强制删除已结项凭证？"
-            description={`凭证 ${voucher.voucherNo} 及关联附件删除后不可恢复。`}
-            okText="强制删除"
-            cancelText="取消"
-            okButtonProps={{ danger: true }}
-            onConfirm={async () => {
-              try {
-                await Voucher.forceRemove(voucher.id);
-                message.success('凭证已删除');
-                notifyDataChanged();
-              } catch (err) {
-                message.error(err.message);
-              }
-            }}
-          >
-            <Button type="text" size="small" danger icon={<DeleteOutlined />} title="强制删除" />
-          </Popconfirm>
-        ) : (
-          <Popconfirm
-            title="确定删除该凭证？"
-            description={`凭证 ${voucher.voucherNo} 及关联附件删除后不可恢复。`}
-            okText="确定删除"
-            cancelText="取消"
-            okButtonProps={{ danger: true }}
-            onConfirm={async () => {
-              try {
-                await Voucher.remove(voucher.id);
-                message.success('凭证已删除');
-                notifyDataChanged();
-              } catch (err) {
-                message.error(err.message);
-              }
-            }}
-          >
-            <Button type="text" size="small" danger icon={<DeleteOutlined />} title="删除" />
-          </Popconfirm>
-        ))}
-      {!isCarryForwardVoucher(voucher) ? (
-        <VoucherMoreActions voucher={voucher} onRefresh={onRefresh} />
-      ) : null}
-    </Space>
-  );
+  const canOpenVoucherLink = (voucher) => canAccessOwnVoucher(voucher);
+
+  const renderActions = (voucher) => {
+    const mutable = canMutateVoucher(voucher) && !isCarryForwardVoucher(voucher);
+    return (
+      <Space size={0} direction="vertical" align="center" className="voucher-grouped-table__actions">
+        <Button
+          type="text"
+          size="small"
+          icon={<EyeOutlined />}
+          title="查看"
+          onClick={() => onView?.(voucher.id)}
+        />
+        {mutable ? (
+          voucher.status === 'locked' ? (
+            <Popconfirm
+              title="确定强制删除已结项凭证？"
+              description={`凭证 ${voucher.voucherNo} 及关联附件删除后不可恢复。`}
+              okText="强制删除"
+              cancelText="取消"
+              okButtonProps={{ danger: true }}
+              onConfirm={async () => {
+                try {
+                  await Voucher.forceRemove(voucher.id);
+                  message.success('凭证已删除');
+                  notifyDataChanged();
+                } catch (err) {
+                  message.error(err.message);
+                }
+              }}
+            >
+              <Button type="text" size="small" danger icon={<DeleteOutlined />} title="强制删除" />
+            </Popconfirm>
+          ) : (
+            <Popconfirm
+              title="确定删除该凭证？"
+              description={`凭证 ${voucher.voucherNo} 及关联附件删除后不可恢复。`}
+              okText="确定删除"
+              cancelText="取消"
+              okButtonProps={{ danger: true }}
+              onConfirm={async () => {
+                try {
+                  await Voucher.remove(voucher.id);
+                  message.success('凭证已删除');
+                  notifyDataChanged();
+                } catch (err) {
+                  message.error(err.message);
+                }
+              }}
+            >
+              <Button type="text" size="small" danger icon={<DeleteOutlined />} title="删除" />
+            </Popconfirm>
+          )
+        ) : null}
+        {mutable ? <VoucherMoreActions voucher={voucher} onRefresh={onRefresh} /> : null}
+      </Space>
+    );
+  };
 
   const attachPanelVoucherRef = useRef(attachPanelVoucher);
   attachPanelVoucherRef.current = attachPanelVoucher;
@@ -330,10 +339,10 @@ export default function VoucherTable({
       if (!(node instanceof Element)) return false;
       return Boolean(
         node.closest('.voucher-list-attach-popover') ||
-          node.closest('.voucher-grouped-table__attach-count') ||
-          node.closest('.ant-popconfirm') ||
-          node.closest('.ant-modal-root') ||
-          node.closest('.ant-image-preview')
+        node.closest('.voucher-grouped-table__attach-count') ||
+        node.closest('.ant-popconfirm') ||
+        node.closest('.ant-modal-root') ||
+        node.closest('.ant-image-preview')
       );
     };
 
@@ -423,14 +432,17 @@ export default function VoucherTable({
         onRemove={handlePanelRemove}
         onRemoveMany={handlePanelRemoveMany}
         onUpload={handlePanelUpload}
-        canModify={Voucher.canModifyAttachments(voucher.status)}
+        canModify={
+          canMutateVoucher(voucher) && Voucher.canModifyAttachments(voucher.status)
+        }
       />
     );
   };
 
   const renderAttachments = (voucher) => {
     const count = (voucher.attachmentIds || []).length;
-    const editable = Voucher.canModifyAttachments(voucher.status);
+    const editable =
+      canMutateVoucher(voucher) && Voucher.canModifyAttachments(voucher.status);
     const panelOpen = attachPanelVoucher?.id === voucher.id;
 
     const uploadLink = editable ? (
@@ -500,52 +512,55 @@ export default function VoucherTable({
   const groupedColumns = [
     ...(selectable
       ? [
-          {
-            title: (
+        {
+          title: (
+            <Checkbox
+              indeterminate={somePageSelectableSelected}
+              checked={allPageSelectableSelected}
+              disabled={!pageSelectableIds.length}
+              onChange={(e) => toggleSelectAllPage(e.target.checked)}
+            />
+          ),
+          key: 'select',
+          width: 40,
+          align: 'center',
+          fixed: 'left',
+          onCell: (record) => mergeCell(record.groupRowSpan),
+          render: (_, record) => {
+            const voucher = record.voucher;
+            const rowSelectable =
+              (voucher.status === Voucher.STATUS.DRAFT ||
+                voucher.status === Voucher.STATUS.APPROVED) &&
+              !isCarryForwardVoucher(voucher);
+            return (
               <Checkbox
-                indeterminate={somePageSelectableSelected}
-                checked={allPageSelectableSelected}
-                disabled={!pageSelectableIds.length}
-                onChange={(e) => toggleSelectAllPage(e.target.checked)}
+                checked={selectedSet.has(voucher.id)}
+                disabled={!rowSelectable}
+                onChange={(e) => toggleVoucherSelect(voucher.id, e.target.checked)}
               />
-            ),
-            key: 'select',
-            width: 40,
-            align: 'center',
-            fixed: 'left',
-            onCell: (record) => mergeCell(record.groupRowSpan),
-            render: (_, record) => {
-              const voucher = record.voucher;
-              const rowSelectable =
-                (voucher.status === Voucher.STATUS.DRAFT ||
-                  voucher.status === Voucher.STATUS.APPROVED) &&
-                !isCarryForwardVoucher(voucher);
-              return (
-                <Checkbox
-                  checked={selectedSet.has(voucher.id)}
-                  disabled={!rowSelectable}
-                  onChange={(e) => toggleVoucherSelect(voucher.id, e.target.checked)}
-                />
-              );
-            }
+            );
           }
-        ]
+        }
+      ]
       : []),
+    {
+      title: '凭证字号',
+      key: 'voucherNo',
+      width: 118,
+      onCell: (record) => mergeCell(record.groupRowSpan),
+      render: (_, record) =>
+        canOpenVoucherLink(record.voucher) ? (
+          <Link onClick={() => openVoucherPage(record.voucher)}>{record.voucher.voucherNo}</Link>
+        ) : (
+          record.voucher.voucherNo
+        )
+    },
     {
       title: '日期',
       dataIndex: ['voucher', 'date'],
       width: 108,
       onCell: (record) => mergeCell(record.groupRowSpan),
       render: (_, record) => record.voucher.date
-    },
-    {
-      title: '凭证字号',
-      key: 'voucherNo',
-      width: 118,
-      onCell: (record) => mergeCell(record.groupRowSpan),
-      render: (_, record) => (
-        <Link onClick={() => openVoucher(record.voucher)}>{record.voucher.voucherNo}</Link>
-      )
     },
     {
       title: '摘要',

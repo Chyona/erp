@@ -1,4 +1,11 @@
 import dayjs, { type Dayjs } from 'dayjs';
+import {
+  clampDayjsToToday,
+  isFutureDate,
+  todayDayjs
+} from './dateConstraints';
+
+export { isFutureDate, todayDayjs } from './dateConstraints';
 
 export type VoucherTimeMode = 'date' | 'period';
 
@@ -39,6 +46,14 @@ export function defaultTimeFilter(): VoucherTimeFilterState {
 export function currentPeriod(): VoucherPeriod {
   const now = dayjs();
   return { year: now.year(), month: now.month() + 1 };
+}
+
+export function isFuturePeriod(period: VoucherPeriod): boolean {
+  return comparePeriod(period, currentPeriod()) > 0;
+}
+
+export function clampDateToToday(date: Dayjs): Dayjs {
+  return clampDayjsToToday(date) as Dayjs;
 }
 
 export function periodToDayjs(period: VoucherPeriod): Dayjs {
@@ -131,7 +146,7 @@ export function applyDateShortcut(key: DateShortcutKey): { start: Dayjs; end: Da
       return { start: prev.startOf('month'), end: prev.endOf('month') };
     }
     case 'thisYear':
-      return { start: now.startOf('year'), end: now.endOf('year') };
+      return { start: now.startOf('year'), end: now.endOf('day') };
     default:
       return { start: now.startOf('month'), end: now.endOf('month') };
   }
@@ -152,7 +167,7 @@ export function applyPeriodShortcut(key: PeriodShortcutKey): [VoucherPeriod, Vou
       return [{ year: prev.year(), month: prev.month() + 1 }, { year: prev.year(), month: prev.month() + 1 }];
     }
     case 'thisYear':
-      return [{ year, month: 1 }, { year, month: 12 }];
+      return [{ year, month: 1 }, { year, month }];
     case 'lastYear':
       return [{ year: year - 1, month: 1 }, { year: year - 1, month: 12 }];
     default:

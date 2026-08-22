@@ -24,14 +24,14 @@ func Auth(jwtManager *authjwt.Manager) gin.HandlerFunc {
 
 		parts := strings.SplitN(header, " ", 2)
 		if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-			response.Unauthorized(c, "Authorization 格式错误，应为 Bearer <token>")
+			response.Unauthorized(c, "登录状态无效，请重新登录")
 			c.Abort()
 			return
 		}
 
 		token := strings.TrimSpace(parts[1])
 		if token == "" {
-			response.Unauthorized(c, "Token 不能为空")
+			response.Unauthorized(c, "请先登录")
 			c.Abort()
 			return
 		}

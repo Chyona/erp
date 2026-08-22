@@ -19,8 +19,10 @@ type AccountService interface {
 	GetAccount(ctx context.Context, id uint) (*model.Account, error)
 	ListAccounts(ctx context.Context, page, pageSize int) ([]model.Account, int64, error)
 	UpdateAccount(ctx context.Context, id uint, nickname string, role *string, status *int8) (*model.Account, error)
-	ResetPassword(ctx context.Context, id uint, newPassword string) (*model.Account, error)
+	ResetPassword(ctx context.Context, id uint, newPassword string, requireReSetup bool) (*model.Account, error)
 	SetupPassword(ctx context.Context, accountID uint, newPassword string) (*model.Account, error)
+	SkipPasswordSetup(ctx context.Context, accountID uint) (*model.Account, error)
+	ChangePassword(ctx context.Context, accountID uint, oldPassword, newPassword string) (*model.Account, error)
 	DeleteAccount(ctx context.Context, id uint) error
 	Authenticate(ctx context.Context, username, password string) (*model.Account, error)
 	VerifyPassword(ctx context.Context, accountID uint, password string) error
@@ -37,8 +39,22 @@ func NewAccountService(accountRepo repository.AccountRepository) AccountService 
 }
 
 func (s *accountService) CreateAccount(ctx context.Context, username, email, password, nickname, role string) (*model.Account, error) {
+	username = strings.TrimSpace(username)
+	email = strings.TrimSpace(email)
+	if username == "" {
+		return nil, errors.New("请填写用户名")
+	}
+	if email == "" {
+		return nil, errors.New("请填写邮箱")
+	}
+
 	if _, err := s.accountRepo.GetByUsername(ctx, username); err == nil {
-		return nil, errors.New("账号名已存在")
+		return nil, errors.New("该用户名已被使用，请换一个用户名")
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+	if _, err := s.accountRepo.GetByEmail(ctx, email); err == nil {
+		return nil, errors.New("该邮箱已被使用，请换一个邮箱")
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
@@ -47,7 +63,7 @@ func (s *accountService) CreateAccount(ctx context.Context, username, email, pas
 		role = rbac.RoleUser
 	}
 	if !rbac.IsValidRole(role) {
-		return nil, errors.New("无效的角色")
+		return nil, errors.New("请选择有效的角色")
 	}
 	if len(password) < 6 {
 		return nil, errors.New("密码至少 6 位")
@@ -105,13 +121,20 @@ func (s *accountService) UpdateAccount(ctx context.Context, id uint, nickname st
 		}
 		return nil, err
 	}
+	builtin := rbac.IsBuiltinAdminUsername(account.Username)
 	oldRole := resolveAccountRole(account)
 	if nickname != "" {
+		if builtin {
+			return nil, errors.New("内置管理员账号不可修改")
+		}
 		account.Nickname = nickname
 	}
 	if role != nil {
+		if builtin {
+			return nil, errors.New("内置管理员账号不可修改角色")
+		}
 		if !rbac.IsValidRole(*role) {
-			return nil, errors.New("无效的角色")
+			return nil, errors.New("请选择有效的角色")
 		}
 		newRole := rbac.NormalizeRole(*role)
 		if oldRole == rbac.RoleAdmin && newRole != rbac.RoleAdmin {
@@ -126,6 +149,9 @@ func (s *accountService) UpdateAccount(ctx context.Context, id uint, nickname st
 		account.Role = newRole
 	}
 	if status != nil {
+		if builtin && *status != 1 {
+			return nil, errors.New("内置管理员账号不可禁用")
+		}
 		if oldRole == rbac.RoleAdmin && *status != 1 {
 			n, err := s.accountRepo.CountByRole(ctx, rbac.RoleAdmin)
 			if err != nil {
@@ -144,8 +170,9 @@ func (s *accountService) UpdateAccount(ctx context.Context, id uint, nickname st
 	return account, nil
 }
 
-// ResetPassword 管理员重置密码；重置后需用户下次登录重新设置。
-func (s *accountService) ResetPassword(ctx context.Context, id uint, newPassword string) (*model.Account, error) {
+// ResetPassword 管理员重置密码。
+// requireReSetup=true 时，目标用户下次登录需重新设置密码；改自己的密码时一般为 false。
+func (s *accountService) ResetPassword(ctx context.Context, id uint, newPassword string, requireReSetup bool) (*model.Account, error) {
 	if len(newPassword) < 6 {
 		return nil, errors.New("密码至少 6 位")
 	}
@@ -161,7 +188,35 @@ func (s *accountService) ResetPassword(ctx context.Context, id uint, newPassword
 		return nil, err
 	}
 	account.Password = hashed
-	account.MustChangePassword = true
+	account.MustChangePassword = requireReSetup
+	if err := s.accountRepo.Update(ctx, account); err != nil {
+		return nil, err
+	}
+	account.Role = resolveAccountRole(account)
+	return account, nil
+}
+
+// ChangePassword 当前用户修改自己的密码（需验证旧密码）。
+func (s *accountService) ChangePassword(ctx context.Context, accountID uint, oldPassword, newPassword string) (*model.Account, error) {
+	if len(newPassword) < 6 {
+		return nil, errors.New("新密码至少 6 位")
+	}
+	account, err := s.accountRepo.GetByID(ctx, accountID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("账号不存在")
+		}
+		return nil, err
+	}
+	if !utils.CheckPassword(oldPassword, account.Password) {
+		return nil, errors.New("当前密码不正确")
+	}
+	hashed, err := utils.HashPassword(newPassword)
+	if err != nil {
+		return nil, err
+	}
+	account.Password = hashed
+	account.MustChangePassword = false
 	if err := s.accountRepo.Update(ctx, account); err != nil {
 		return nil, err
 	}
@@ -197,6 +252,27 @@ func (s *accountService) SetupPassword(ctx context.Context, accountID uint, newP
 	return account, nil
 }
 
+// SkipPasswordSetup 放弃本次设密，继续使用当前密码进入系统。
+func (s *accountService) SkipPasswordSetup(ctx context.Context, accountID uint) (*model.Account, error) {
+	account, err := s.accountRepo.GetByID(ctx, accountID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("账号不存在")
+		}
+		return nil, err
+	}
+	if !account.MustChangePassword {
+		account.Role = resolveAccountRole(account)
+		return account, nil
+	}
+	account.MustChangePassword = false
+	if err := s.accountRepo.Update(ctx, account); err != nil {
+		return nil, err
+	}
+	account.Role = resolveAccountRole(account)
+	return account, nil
+}
+
 func (s *accountService) DeleteAccount(ctx context.Context, id uint) error {
 	account, err := s.accountRepo.GetByID(ctx, id)
 	if err != nil {
@@ -204,6 +280,9 @@ func (s *accountService) DeleteAccount(ctx context.Context, id uint) error {
 			return errors.New("账号不存在")
 		}
 		return err
+	}
+	if rbac.IsBuiltinAdminUsername(account.Username) {
+		return errors.New("内置管理员账号不可删除")
 	}
 	if resolveAccountRole(account) == rbac.RoleAdmin {
 		n, err := s.accountRepo.CountByRole(ctx, rbac.RoleAdmin)

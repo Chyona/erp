@@ -4,6 +4,7 @@ import { ErpApi } from '../services/erpApi';
 import { apiRequest } from '../services/apiClient';
 import { repairFinanceInterestEntries } from '../services/financeExpenseRepair';
 import { useApp } from '../context/AppContext';
+import { sanitizeUserMessage } from '../utils/userMessage';
 import type { Account } from '../types';
 
 const { Paragraph, Text } = Typography;
@@ -37,7 +38,7 @@ function formatInitError(err: unknown): { summary: string; tips: string[] } {
   }
 
   return {
-    summary: raw,
+    summary: sanitizeUserMessage(raw),
     tips: ['请稍后刷新页面重试；若仍然失败，请联系管理员协助排查。']
   };
 }

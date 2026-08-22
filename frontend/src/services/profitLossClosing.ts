@@ -3,6 +3,7 @@ import { Accounts } from './accounts';
 import { Voucher } from './voucher';
 import { TaxExemption } from './taxExemption';
 import { TaxDeclaration } from './taxDeclaration';
+import { getCurrentOperatorName } from '../context/AuthContext';
 import type { Account, Voucher as VoucherRecord, VoucherEntry } from '../types';
 import {
   formatReportPeriod,
@@ -358,7 +359,7 @@ export async function createClosing(period: ReportPeriod, { approve = true } = {
     throw new Error(summary.blockReason || '该期间没有可结转的损益发生额');
   }
 
-  const signatory = String((await ErpApi.getSetting('defaultSignatory')) ?? '');
+  const signatory = getCurrentOperatorName();
 
   const voucherData = {
     voucherType: '记',

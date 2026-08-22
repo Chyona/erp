@@ -787,16 +787,6 @@ function balanceSheetToCSV(data) {
   return rows.join('\n');
 }
 
-function resolveSignatory(voucher) {
-  return (
-    voucher.preparedBy ||
-    voucher.reviewedBy ||
-    voucher.postedBy ||
-    voucher.cashierBy ||
-    ''
-  );
-}
-
 function renderPrintVoucher(voucher, company, attachments) {
   const INVOICE_LABELS = { ordinary: '普票', special: '专票' };
   const invoiceMeta =
@@ -825,7 +815,8 @@ function renderPrintVoucher(voucher, company, attachments) {
     ? `<div class="pv-attachments">附件：${attachments.map((a) => a.name).join('、')}</div>`
     : '';
 
-  const signatory = resolveSignatory(voucher);
+  const preparedBy = (voucher.preparedBy || '').trim() || '______';
+  const reviewedBy = (voucher.reviewedBy || '').trim() || '______';
 
   return `
       <div class="print-voucher print-area">
@@ -863,8 +854,8 @@ function renderPrintVoucher(voucher, company, attachments) {
         ${voucher.remark ? `<div style="margin-top:4px;font-size:12px">备注：${voucher.remark}</div>` : ''}
         ${attachHtml}
         <div class="pv-signatures">
-          <span>经办人：${signatory || '______'}</span>
-          <span class="pv-signatures__roles">兼任制单、审核、记账、出纳</span>
+          <span>制单人：${preparedBy}</span>
+          <span>审核人：${reviewedBy}</span>
         </div>
       </div>
     `;
@@ -884,8 +875,7 @@ function printVoucher(html) {
         table { width: 100%; border-collapse: collapse; }
         th, td { border: 1px solid #000; padding: 6px 8px; font-size: 13px; }
         .amount { text-align: right; }
-        .pv-signatures { display: flex; align-items: baseline; gap: 12px; margin-top: 20px; font-size: 13px; flex-wrap: wrap; }
-        .pv-signatures__roles { color: #666; font-size: 12px; }
+        .pv-signatures { display: flex; align-items: baseline; gap: 48px; margin-top: 20px; font-size: 13px; flex-wrap: wrap; }
         .pv-attachments { margin-top: 12px; font-size: 12px; }
         @page { margin: 15mm; }
       </style></head><body>${html}</body></html>

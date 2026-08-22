@@ -3,6 +3,7 @@ import { Accounts } from './accounts';
 import { Voucher } from './voucher';
 import { TaxDeclaration } from './taxDeclaration';
 import { INVOICE_TYPE } from '../constants/invoice';
+import { getCurrentOperatorName } from '../context/AuthContext';
 import type { TaxExemptionTaxLine, Voucher as VoucherRecord } from '../types';
 import {
   formatTaxExemptionPeriod,
@@ -301,7 +302,7 @@ export async function createCarryForward(period, { approve = true } = {}) {
     throw new Error('缺少 2221 应交税费 或 5301 营业外收入 科目');
   }
 
-  const signatory = String((await ErpApi.getSetting('defaultSignatory')) ?? '');
+  const signatory = getCurrentOperatorName();
   const scopeLabel = period.type === 'quarter' ? '季度' : '月度';
 
   const voucherData = {

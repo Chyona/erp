@@ -6,6 +6,7 @@ import (
 
 	"erp/internal/model"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // AccountRepository 账号数据访问接口。
@@ -13,6 +14,7 @@ type AccountRepository interface {
 	Create(ctx context.Context, account *model.Account) error
 	GetByID(ctx context.Context, id uint) (*model.Account, error)
 	GetByUsername(ctx context.Context, username string) (*model.Account, error)
+	GetByEmail(ctx context.Context, email string) (*model.Account, error)
 	List(ctx context.Context, offset, limit int) ([]model.Account, int64, error)
 	Update(ctx context.Context, account *model.Account) error
 	Delete(ctx context.Context, id uint) error
@@ -50,6 +52,15 @@ func (r *accountRepository) GetByUsername(ctx context.Context, username string) 
 	return &account, nil
 }
 
+func (r *accountRepository) GetByEmail(ctx context.Context, email string) (*model.Account, error) {
+	var account model.Account
+	err := r.db.WithContext(ctx).Where("email = ?", email).First(&account).Error
+	if err != nil {
+		return nil, err
+	}
+	return &account, nil
+}
+
 func (r *accountRepository) List(ctx context.Context, offset, limit int) ([]model.Account, int64, error) {
 	var accounts []model.Account
 	var total int64
@@ -58,7 +69,11 @@ func (r *accountRepository) List(ctx context.Context, offset, limit int) ([]mode
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
-	if err := query.Offset(offset).Limit(limit).Order("id DESC").Find(&accounts).Error; err != nil {
+	// 内置 admin 置顶，其余按 id 降序（新账号在前）
+	if err := query.Offset(offset).Limit(limit).
+		Order(clause.Expr{SQL: "CASE WHEN username = ? THEN 0 ELSE 1 END", Vars: []interface{}{"admin"}}).
+		Order("id DESC").
+		Find(&accounts).Error; err != nil {
 		return nil, 0, err
 	}
 	return accounts, total, nil

@@ -7,7 +7,15 @@ const (
 	RoleAdmin    = "admin"
 	RoleUser     = "user"
 	RoleReadonly = "readonly"
+
+	// BuiltinAdminUsername 内置超级管理员用户名（不可删除/降权/禁用）。
+	BuiltinAdminUsername = "admin"
 )
+
+// IsBuiltinAdminUsername 是否为内置超级管理员账号名。
+func IsBuiltinAdminUsername(username string) bool {
+	return strings.TrimSpace(username) == BuiltinAdminUsername
+}
 
 // NormalizeRole 规范化角色；空或未知时返回普通用户。
 func NormalizeRole(role string) string {
@@ -35,6 +43,17 @@ type Actor struct {
 	Username  string
 	Nickname  string
 	Role      string
+}
+
+// DisplayName 展示名：优先昵称，否则用户名。
+func (a *Actor) DisplayName() string {
+	if a == nil {
+		return ""
+	}
+	if name := strings.TrimSpace(a.Nickname); name != "" {
+		return name
+	}
+	return strings.TrimSpace(a.Username)
 }
 
 func (a *Actor) IsAdmin() bool {

@@ -96,15 +96,19 @@ CREATE TABLE IF NOT EXISTS attachments (
 
 -- 审计日志（前端 auditLogs store）
 CREATE TABLE IF NOT EXISTS audit_logs (
-    id         VARCHAR(64) PRIMARY KEY,
-    timestamp  VARCHAR(32),
-    action     VARCHAR(64) NOT NULL,
-    target     VARCHAR(128),
-    details    TEXT,
-    user_agent VARCHAR(256)
+    id                   VARCHAR(64) PRIMARY KEY,
+    timestamp            VARCHAR(32),
+    action               VARCHAR(64) NOT NULL,
+    target               VARCHAR(128),
+    details              TEXT,
+    user_agent           VARCHAR(256),
+    operator_account_id  BIGINT NOT NULL DEFAULT 0,
+    operator_username    VARCHAR(64) NOT NULL DEFAULT '',
+    operator_nickname    VARCHAR(64) NOT NULL DEFAULT ''
 );
 
 CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs (timestamp);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_operator_username ON audit_logs (operator_username);
 
 -- 系统设置（前端 settings store，key-value JSON）
 CREATE TABLE IF NOT EXISTS settings (

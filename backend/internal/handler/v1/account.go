@@ -4,6 +4,7 @@ package v1
 import (
 	"strconv"
 
+	"erp/internal/middleware"
 	"erp/internal/pkg/response"
 	"erp/internal/pkg/utils"
 	"erp/internal/service"
@@ -162,12 +163,19 @@ func (h *AccountHandler) ResetPassword(c *gin.Context) {
 		response.BadRequest(c, "请输入至少 6 位的新密码")
 		return
 	}
-	account, err := h.accountService.ResetPassword(c.Request.Context(), id, req.Password)
+	claims := middleware.GetAuthClaims(c)
+	// 改自己的密码：直接生效；重置他人：对方下次登录需再设密
+	requireReSetup := claims == nil || claims.AccountID != id
+	account, err := h.accountService.ResetPassword(c.Request.Context(), id, req.Password, requireReSetup)
 	if err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}
-	response.SuccessWithMessage(c, "密码已重置，用户下次登录需重新设置密码", account)
+	msg := "密码已重置，用户下次登录需重新设置密码"
+	if !requireReSetup {
+		msg = "密码已修改"
+	}
+	response.SuccessWithMessage(c, msg, account)
 }
 
 // DeleteAccount 删除账号
