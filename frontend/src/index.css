@@ -4106,7 +4106,8 @@ body,
 
 /* Amount digit grid */
 .amount-grid {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(11, minmax(0, 1fr));
   width: 100%;
   height: var(--voucher-row-height, 52px);
   position: relative;
@@ -4195,18 +4196,17 @@ body,
 }
 
 .amount-grid__cell {
-  flex: 1;
   min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-sizing: border-box;
-  border-right: 1px solid #e2e8f0;
   position: relative;
+  box-shadow: inset -1px 0 0 #e2e8f0;
 }
 
-.amount-grid__cell:last-child {
-  border-right: none;
+.amount-grid__cell:last-child,
+.amount-grid__cell.amount-grid__cell--fen {
+  box-shadow: none;
 }
 
 .amount-grid__cell--label {
@@ -4216,15 +4216,15 @@ body,
 }
 
 .amount-grid__cell--yuan {
-  border-right: 2px solid #ef4444 !important;
+  box-shadow: inset -1px 0 0 #ef4444;
 }
 
 .amount-grid__cell--wan {
-  border-right: 1px solid #3b82f6 !important;
+  box-shadow: inset -1px 0 0 #3b82f6;
 }
 
 .amount-grid__cell--yi {
-  border-right: 1px solid #3b82f6 !important;
+  box-shadow: inset -1px 0 0 #3b82f6;
 }
 
 .amount-grid__digit {

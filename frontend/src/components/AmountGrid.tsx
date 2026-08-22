@@ -5,6 +5,7 @@ import { AMOUNT_UNITS, amountToDigits } from '../utils/amountGrid';
 import AmountCalculatorPanel from './AmountCalculatorPanel';
 
 function cellBorderClass(index: number) {
+  if (index === 10) return 'amount-grid__cell--fen';
   if (index === 8) return 'amount-grid__cell--yuan';
   if (index === 4) return 'amount-grid__cell--wan';
   if (index === 0) return 'amount-grid__cell--yi';
