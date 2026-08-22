@@ -1,9 +1,11 @@
 import * as XLSX from 'xlsx';
-import { DB } from './db';
+import { ErpApi } from './erpApi';
 import { Voucher } from './voucher';
 import type { Voucher as VoucherRecord } from '../types';
 import { VoucherImportParser } from './voucherImportParser';
 import { INVOICE_TYPE } from '../constants/invoice';
+import { isCarryForwardImportVoucher } from '../utils/carryForwardVoucher';
+import { imageFileToRows, isImportImageFile } from './voucherImportImage';
 
 function fillMergedCells(sheet, rows) {
   const merges = sheet['!merges'] || [];
@@ -54,7 +56,21 @@ function resolveImportSheet(workbook) {
   };
 }
 
-async function readFileToRows(file) {
+async function readFileToRows(file, onProgress) {
+  if (isImportImageFile(file)) {
+    const { rows } = await imageFileToRows(file, onProgress);
+    return {
+      rows,
+      sheetMeta: {
+        sheetName: file.name || '图片',
+        sheetIndex: 0,
+        totalSheets: 1,
+        ignoredSheetNames: [],
+        source: 'image-llm'
+      }
+    };
+  }
+
   const buffer = await file.arrayBuffer();
   const name = file.name.toLowerCase();
 
@@ -138,12 +154,38 @@ function parseCsv(text) {
   return rows;
 }
 
-async function parseFile(file, accounts) {
-  const { rows, sheetMeta } = await readFileToRows(file);
+async function parseFile(file, accounts, onProgress) {
+  const { rows, sheetMeta } = await readFileToRows(file, onProgress);
   try {
     const parsed = VoucherImportParser.rowsToVouchers(rows, accounts);
-    return { ...parsed, sheetMeta };
+    const vouchers = [];
+    const filteredCarryForward = [];
+    for (const voucher of parsed.vouchers || []) {
+      if (isCarryForwardImportVoucher(voucher)) {
+        filteredCarryForward.push(voucher);
+        continue;
+      }
+      vouchers.push(voucher);
+    }
+    const warnings = [...(parsed.warnings || [])];
+    if (sheetMeta?.source === 'image-llm') {
+      warnings.unshift('截图已由视觉大模型识别，请核对借贷金额与科目后再导入。');
+    }
+    // 结转过滤不混入行级 warnings，单独用 filteredCarryForwardCount 展示
+    return {
+      ...parsed,
+      vouchers,
+      warnings,
+      sheetMeta,
+      filteredCarryForwardCount: filteredCarryForward.length,
+      invalidVoucherCount: parsed.invalidVoucherCount || 0
+    };
   } catch (err) {
+    if (sheetMeta?.source === 'image-llm') {
+      throw new Error(
+        `${err.message || '图片解析失败'}\n建议：截取含表头的完整分录表，或改用 Excel/CSV 导入。`
+      );
+    }
     if (sheetMeta && String(err.message).includes('未找到表头')) {
       const preview = rows
         .filter((row) => row.some((cell) => String(cell || '').trim()))
@@ -170,10 +212,11 @@ function voucherImportKey(voucher) {
   return `${yearMonth}|${voucher.voucherNo}`;
 }
 
-async function importVouchers(vouchers, { skipDuplicates = true, approve = false } = {}) {
+async function importVouchers(vouchers, { skipDuplicates = false, approve = false } = {}) {
   const existing = await Voucher.getAll();
   const existingKeys = new Set(existing.map((v) => voucherImportKey(v)));
   const result = {
+    total: vouchers.length,
     imported: 0,
     skipped: 0,
     failed: 0,
@@ -188,7 +231,19 @@ async function importVouchers(vouchers, { skipDuplicates = true, approve = false
     return a.voucherNo.localeCompare(b.voucherNo);
   });
 
+  const toSave: VoucherRecord[] = [];
+
   for (const raw of sorted) {
+    if (isCarryForwardImportVoucher(raw)) {
+      result.skipped++;
+      result.skippedItems.push({
+        voucherNo: raw.voucherNo,
+        date: raw.date,
+        reason: '系统结转凭证（不导入）'
+      });
+      continue;
+    }
+
     const importKey = voucherImportKey(raw);
     if (skipDuplicates && existingKeys.has(importKey)) {
       result.skipped++;
@@ -209,7 +264,7 @@ async function importVouchers(vouchers, { skipDuplicates = true, approve = false
       }
 
       const voucher: VoucherRecord = {
-        id: DB.generateId(),
+        id: ErpApi.generateId(),
         voucherType: raw.voucherType || '记',
         voucherNumber: raw.voucherNumber || raw.voucherNo,
         voucherNo: raw.voucherNo,
@@ -230,6 +285,7 @@ async function importVouchers(vouchers, { skipDuplicates = true, approve = false
         taxExemptionDone: false,
         taxExemptionVoucherId: '',
         isTaxExemptionCarryForward: false,
+        isProfitLossClosing: false,
         taxExemptionPeriod: '',
         taxExemptionPeriodType: 'month',
         entries: raw.entries,
@@ -250,7 +306,7 @@ async function importVouchers(vouchers, { skipDuplicates = true, approve = false
       };
       voucher.checksum = Voucher.generateChecksum(voucher);
 
-      await DB.put('vouchers', voucher);
+      toSave.push(voucher);
       existingKeys.add(voucherImportKey(voucher));
       result.imported++;
     } catch (err) {
@@ -259,11 +315,13 @@ async function importVouchers(vouchers, { skipDuplicates = true, approve = false
     }
   }
 
-  if (result.imported > 0) {
-    await DB.addAuditLog(
+  await ErpApi.putMany('vouchers', toSave);
+
+  if (result.imported > 0 || result.skipped > 0 || result.failed > 0) {
+    await ErpApi.addAuditLog(
       '导入',
       '凭证',
-      `成功 ${result.imported} 张，跳过 ${result.skipped} 张，失败 ${result.failed} 张`
+      `文件共 ${result.total} 张，成功 ${result.imported} 张，跳过 ${result.skipped} 张，失败 ${result.failed} 张`
     );
   }
 

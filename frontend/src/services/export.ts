@@ -1,5 +1,5 @@
 import { Voucher } from './voucher';
-import { DB } from './db';
+import { ErpApi } from './erpApi';
 import { INVOICE_TYPE_LABEL } from '../constants/invoice';
 import { mergeBalanceSheetRows } from '../utils/balanceSheetRows';
 import { formatStoredTaxExemptionPeriod } from '../utils/reportPeriod';
@@ -14,61 +14,594 @@ function downloadBlob(content, filename, type = 'text/plain;charset=utf-8') {
   URL.revokeObjectURL(url);
 }
 
-function vouchersToCSV(vouchers) {
-  const headers = [
-    '凭证字号',
-    '日期',
-    '附单据数',
-    '业务类型',
-    '开票类型',
-    '增值税额',
-    '摘要',
-    '科目编码',
-    '科目名称',
-    '借方金额',
-    '贷方金额',
-    '发票/单据号码',
-    '校验码',
-    '状态',
-    '备注',
-    '经办人'
-  ];
-  const rows = [headers.join(',')];
-  for (const v of vouchers) {
+const VOUCHER_EXPORT_HEADERS = [
+  '凭证字号',
+  '日期',
+  '业务类型',
+  '摘要',
+  '科目编码',
+  '科目名称',
+  '借方金额',
+  '贷方金额',
+  '附件数',
+  '开票类型',
+  '发票/单据号码',
+  '校验码',
+  '状态',
+  '制表人',
+  '审核人',
+  '备注'
+] as const;
+
+/** Excel 列宽（字符宽度），避免打开后日期变成 ####、摘要被截断 */
+const VOUCHER_EXPORT_COL_WIDTHS = [12, 12, 12, 28, 10, 18, 14, 14, 10, 10, 20, 22, 10, 12, 12, 28];
+
+function compareVouchersAsc(a, b) {
+  const dateCmp = String(a?.date || '').localeCompare(String(b?.date || ''));
+  if (dateCmp !== 0) return dateCmp;
+  const numA = parseInt(a?.voucherNumber, 10) || 0;
+  const numB = parseInt(b?.voucherNumber, 10) || 0;
+  if (numA !== numB) return numA - numB;
+  return String(a?.voucherNo || '').localeCompare(String(b?.voucherNo || ''), 'zh-CN');
+}
+
+function buildVoucherExportRows(vouchers) {
+  const rows = [];
+  const sorted = [...(vouchers || [])].sort(compareVouchersAsc);
+  for (const v of sorted) {
     const attachmentCount = v.attachmentCount ?? (v.attachmentIds || []).length;
-    const signatory = resolveSignatory(v);
+    const preparedBy = v.preparedBy || '';
+    const reviewedBy = v.reviewedBy || '';
     const invoiceTypeLabel =
       v.businessType === '销售收入'
         ? INVOICE_TYPE_LABEL[v.invoiceType] || INVOICE_TYPE_LABEL['']
         : '';
-    const taxAmount =
-      v.businessType === '销售收入' && v.taxAmount != null && v.taxAmount !== ''
-        ? parseFloat(v.taxAmount)
-        : '';
     for (const e of v.entries) {
-      rows.push(
-        [
-          v.voucherNo,
-          v.date,
-          attachmentCount,
-          v.businessType || '',
-          invoiceTypeLabel,
-          taxAmount,
-          `"${(e.summary || '').replace(/"/g, '""')}"`,
-          e.accountCode || '',
-          `"${(e.accountName || '').replace(/"/g, '""')}"`,
-          e.debit || 0,
-          e.credit || 0,
-          `"${(v.invoiceNumbers || '').replace(/"/g, '""')}"`,
-          v.checksum || '',
-          Voucher.STATUS_LABEL[v.status] || v.status,
-          `"${(v.remark || '').replace(/"/g, '""')}"`,
-          signatory
-        ].join(',')
-      );
+      rows.push([
+        v.voucherNo,
+        v.date,
+        v.businessType || '',
+        e.summary || '',
+        e.accountCode || '',
+        e.accountName || '',
+        Number(e.debit) || 0,
+        Number(e.credit) || 0,
+        attachmentCount,
+        invoiceTypeLabel,
+        v.invoiceNumbers || '',
+        v.checksum || '',
+        Voucher.STATUS_LABEL[v.status] || v.status,
+        preparedBy,
+        reviewedBy,
+        v.remark || ''
+      ]);
     }
   }
+  return rows;
+}
+
+function vouchersToCSV(vouchers) {
+  const rows = [VOUCHER_EXPORT_HEADERS.join(',')];
+  for (const row of buildVoucherExportRows(vouchers)) {
+    rows.push(
+      row
+        .map((cell, i) => {
+          if (typeof cell === 'number') return String(cell);
+          const text = String(cell ?? '');
+          if (i === 3 || i === 5 || i === 10 || i === 15) {
+            return `"${text.replace(/"/g, '""')}"`;
+          }
+          return text.includes(',') || text.includes('"') ? `"${text.replace(/"/g, '""')}"` : text;
+        })
+        .join(',')
+    );
+  }
   return rows.join('\n');
+}
+
+const HEADER_FILL = {
+  type: 'pattern',
+  pattern: 'solid',
+  fgColor: { argb: 'FF2F5496' }
+};
+/** 竖线：浅灰实线 */
+const GRID_LINE = { style: 'thin', color: { argb: 'FFBFBFBF' } };
+/** 表头顶边（与深蓝底搭配） */
+const HEADER_TOP = { style: 'thin', color: { argb: 'FF1F3A5F' } };
+/** 不同凭证号之间：虚线（图2效果） */
+const VOUCHER_GROUP_SEP = { style: 'dashed', color: { argb: 'FF595959' } };
+/** 表头底 / 表格外框 / 分组竖线：黑细实线 */
+const OUTER_BORDER = { style: 'thin', color: { argb: 'FF000000' } };
+const HEADER_BORDER = {
+  top: HEADER_TOP,
+  left: GRID_LINE,
+  bottom: OUTER_BORDER,
+  right: GRID_LINE
+};
+/** 科目余额表等：普通全网格 */
+const DATA_BORDER = {
+  top: GRID_LINE,
+  left: GRID_LINE,
+  bottom: GRID_LINE,
+  right: GRID_LINE
+};
+
+function resolveExportYear(vouchers) {
+  const years = (vouchers || [])
+    .map((v) => String(v?.date || '').slice(0, 4))
+    .filter((y) => /^\d{4}$/.test(y));
+  if (!years.length) return String(new Date().getFullYear());
+  const unique = [...new Set(years)].sort();
+  return unique.length === 1 ? unique[0] : unique[unique.length - 1];
+}
+
+function applyHeaderStyle(cell) {
+  cell.fill = HEADER_FILL;
+  cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+  cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+  cell.border = HEADER_BORDER;
+}
+
+function applyDataBorder(cell) {
+  cell.border = DATA_BORDER;
+}
+
+/** 分录表：仅保留竖线；同一凭证无横线，凭证切换处加虚线底边 */
+function applyJournalDataBorder(cell, { isGroupEnd = false } = {}) {
+  cell.border = {
+    left: GRID_LINE,
+    right: GRID_LINE,
+    ...(isGroupEnd ? { bottom: VOUCHER_GROUP_SEP } : {})
+  };
+}
+
+/** 表格主体（表头+内容）实心黑外边框 */
+function applyTableOuterBorder(
+  sheet,
+  startRow: number,
+  endRow: number,
+  startCol: number,
+  endCol: number
+) {
+  if (endRow < startRow || endCol < startCol) return;
+  for (let r = startRow; r <= endRow; r++) {
+    for (let c = startCol; c <= endCol; c++) {
+      const cell = sheet.getCell(r, c);
+      const border = { ...(cell.border || {}) };
+      if (r === startRow) border.top = OUTER_BORDER;
+      if (r === endRow) border.bottom = OUTER_BORDER;
+      if (c === startCol) border.left = OUTER_BORDER;
+      if (c === endCol) border.right = OUTER_BORDER;
+      cell.border = border;
+    }
+  }
+}
+
+/** 指定列左侧加黑细竖线（分组分隔） */
+function applyVerticalSectionBorders(
+  sheet,
+  startRow: number,
+  endRow: number,
+  sectionStartCols: number[]
+) {
+  if (endRow < startRow || !sectionStartCols?.length) return;
+  for (let r = startRow; r <= endRow; r++) {
+    for (const c of sectionStartCols) {
+      const cell = sheet.getCell(r, c);
+      const border = { ...(cell.border || {}) };
+      border.left = OUTER_BORDER;
+      cell.border = border;
+    }
+  }
+}
+
+/** ExcelJS row.values 为 0 下标写入第 1 列，不要再前置 undefined，否则表头会右偏一列 */
+function setHeaderValues(row, headers) {
+  row.values = [...headers];
+  for (let c = 1; c <= headers.length; c++) {
+    applyHeaderStyle(row.getCell(c));
+  }
+}
+
+/**
+ * 第 1 行标题，第 2 行「单位：元」，表头从第 3 行起
+ * @returns 表头行号 3
+ */
+function writeTitleAndUnitRows(
+  sheet,
+  {
+    title,
+    colCount,
+    titleFontSize = 14
+  }: { title: string; colCount: number; titleFontSize?: number }
+) {
+  sheet.mergeCells(1, 1, 1, colCount);
+  const titleCell = sheet.getCell(1, 1);
+  titleCell.value = title;
+  titleCell.font = { bold: true, size: titleFontSize, color: { argb: 'FF1F1F1F' } };
+  titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  sheet.getRow(1).height = titleFontSize >= 16 ? 28 : 24;
+
+  const unitRow = sheet.getRow(2);
+  unitRow.height = 20;
+  const unitCell = sheet.getCell(2, colCount);
+  unitCell.value = '单位：元';
+  unitCell.font = { size: 11, color: { argb: 'FF333333' } };
+  unitCell.alignment = { horizontal: 'right', vertical: 'middle' };
+
+  return 3;
+}
+
+async function createWorkbook() {
+  const ExcelJS = (await import('exceljs')).default;
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'ERP';
+  return workbook;
+}
+
+async function workbookToBlob(workbook) {
+  const buffer = await workbook.xlsx.writeBuffer();
+  return new Blob([buffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  });
+}
+
+/** 打印页边距：上 1cm，其余 0；水平居中（ExcelJS 单位为英寸） */
+function applyPrintPageSetup(sheet) {
+  const cm = (v: number) => v / 2.54;
+  Object.assign(sheet.pageSetup, {
+    margins: {
+      top: cm(1),
+      bottom: cm(0),
+      left: cm(0),
+      right: cm(0),
+      header: cm(0),
+      footer: cm(0)
+    },
+    horizontalCentered: true,
+    verticalCentered: false
+  });
+}
+
+function addVoucherJournalSheet(workbook, vouchers, companyName, year) {
+  const colCount = VOUCHER_EXPORT_HEADERS.length;
+  const sheet = workbook.addWorksheet('凭证分录表', {
+    views: [{ state: 'frozen', ySplit: 3 }]
+  });
+
+  sheet.columns = VOUCHER_EXPORT_HEADERS.map((_, i) => ({
+    key: `c${i}`,
+    width: VOUCHER_EXPORT_COL_WIDTHS[i]
+  }));
+
+  const headerRowIndex = writeTitleAndUnitRows(sheet, {
+    title: `${companyName} ${year}年 分录表`,
+    colCount,
+    titleFontSize: 16
+  });
+
+  const headerRow = sheet.getRow(headerRowIndex);
+  headerRow.height = 22;
+  setHeaderValues(headerRow, VOUCHER_EXPORT_HEADERS);
+
+  const dataRows = buildVoucherExportRows(vouchers);
+  for (let i = 0; i < dataRows.length; i++) {
+    const row = dataRows[i];
+    const voucherNo = String(row[0] ?? '');
+    const nextNo = i + 1 < dataRows.length ? String(dataRows[i + 1][0] ?? '') : null;
+    const isGroupEnd = nextNo === null || nextNo !== voucherNo;
+    const excelRow = sheet.addRow(row);
+    excelRow.height = 18;
+    excelRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+      applyJournalDataBorder(cell, { isGroupEnd });
+      cell.alignment = {
+        vertical: 'middle',
+        horizontal: colNumber === 7 || colNumber === 8 || colNumber === 9 ? 'right' : 'left',
+        wrapText: colNumber === 4 || colNumber === 16
+      };
+      if (colNumber === 7 || colNumber === 8) {
+        cell.numFmt = '#,##0.00';
+      }
+    });
+  }
+
+  applyTableOuterBorder(
+    sheet,
+    headerRowIndex,
+    Math.max(headerRowIndex, sheet.rowCount),
+    1,
+    colCount
+  );
+  applyPrintPageSetup(sheet);
+
+  return sheet;
+}
+
+function addTrialBalanceSheet(workbook, data, meta: { companyName: string; periodLabel: string }) {
+  const headers = [
+    '科目编码',
+    '科目名称',
+    '科目大类',
+    '期初借方',
+    '期初贷方',
+    '本期借方',
+    '本期贷方',
+    '本年累计借方',
+    '本年累计贷方',
+    '期末借方',
+    '期末贷方'
+  ];
+  const widths = [12, 18, 12, 12, 12, 12, 12, 14, 14, 12, 12];
+  const sheet = workbook.addWorksheet('科目余额表', {
+    views: [{ state: 'frozen', ySplit: 3 }]
+  });
+  sheet.columns = headers.map((_, i) => ({ width: widths[i] }));
+
+  const headerRowIndex = writeTitleAndUnitRows(sheet, {
+    title: `${meta.companyName} ${meta.periodLabel} 科目余额表`,
+    colCount: headers.length
+  });
+
+  const headerRow = sheet.getRow(headerRowIndex);
+  headerRow.height = 22;
+  setHeaderValues(headerRow, headers);
+
+  const amountCols = new Set([4, 5, 6, 7, 8, 9, 10, 11]);
+  const pushRow = (values: unknown[], bold = false) => {
+    const excelRow = sheet.addRow(values);
+    excelRow.height = 18;
+    excelRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+      applyDataBorder(cell);
+      if (bold) cell.font = { bold: true };
+      cell.alignment = {
+        vertical: 'middle',
+        horizontal: amountCols.has(colNumber) ? 'right' : 'left'
+      };
+      if (amountCols.has(colNumber) && typeof cell.value === 'number') {
+        cell.numFmt = '#,##0.00';
+      }
+    });
+  };
+
+  for (const r of data?.rows || []) {
+    pushRow([
+      r.code,
+      r.name,
+      r.categoryLabel,
+      Number(r.openingDebit) || 0,
+      Number(r.openingCredit) || 0,
+      Number(r.periodDebit) || 0,
+      Number(r.periodCredit) || 0,
+      Number(r.ytdDebit) || 0,
+      Number(r.ytdCredit) || 0,
+      Number(r.endingDebit) || 0,
+      Number(r.endingCredit) || 0
+    ]);
+  }
+
+  if (data?.totals) {
+    const t = data.totals;
+    pushRow(
+      [
+        '',
+        '合计',
+        '',
+        Number(t.openingDebit) || 0,
+        Number(t.openingCredit) || 0,
+        Number(t.periodDebit) || 0,
+        Number(t.periodCredit) || 0,
+        Number(t.ytdDebit) || 0,
+        Number(t.ytdCredit) || 0,
+        Number(t.endingDebit) || 0,
+        Number(t.endingCredit) || 0
+      ],
+      true
+    );
+  }
+
+  const endRow = Math.max(headerRowIndex, sheet.rowCount);
+  applyTableOuterBorder(sheet, headerRowIndex, endRow, 1, headers.length);
+  // 科目信息 | 期初 | 本期 | 本年累计 | 期末
+  applyVerticalSectionBorders(sheet, headerRowIndex, endRow, [4, 6, 8, 10]);
+  applyPrintPageSetup(sheet);
+}
+
+function addIncomeStatementSheet(
+  workbook,
+  data,
+  meta: { companyName: string; periodLabel: string }
+) {
+  const headers = ['项目', '行次', '本期金额', '本年累计金额'];
+  const widths = [36, 8, 14, 14];
+  const sheet = workbook.addWorksheet('利润表', {
+    views: [{ state: 'frozen', ySplit: 3 }]
+  });
+  sheet.columns = headers.map((_, i) => ({ width: widths[i] }));
+
+  const headerRowIndex = writeTitleAndUnitRows(sheet, {
+    title: `${meta.companyName} ${meta.periodLabel} 利润表`,
+    colCount: headers.length
+  });
+
+  const headerRow = sheet.getRow(headerRowIndex);
+  headerRow.height = 22;
+  setHeaderValues(headerRow, headers);
+
+  for (const line of data?.rows || []) {
+    const excelRow = sheet.addRow([
+      line.label,
+      line.row ?? '',
+      line.periodAmount == null ? '' : Number(line.periodAmount) || 0,
+      line.ytdAmount == null ? '' : Number(line.ytdAmount) || 0
+    ]);
+    excelRow.height = 18;
+    excelRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+      applyDataBorder(cell);
+      if (line.bold) cell.font = { bold: true };
+      cell.alignment = {
+        vertical: 'middle',
+        horizontal: colNumber === 3 || colNumber === 4 ? 'right' : colNumber === 2 ? 'center' : 'left'
+      };
+      if ((colNumber === 3 || colNumber === 4) && typeof cell.value === 'number') {
+        cell.numFmt = '#,##0.00';
+      }
+    });
+  }
+
+  applyTableOuterBorder(
+    sheet,
+    headerRowIndex,
+    Math.max(headerRowIndex, sheet.rowCount),
+    1,
+    headers.length
+  );
+  applyPrintPageSetup(sheet);
+}
+
+function addBalanceSheetSheet(
+  workbook,
+  data,
+  meta: { companyName: string; periodLabel: string }
+) {
+  const headers = [
+    '资产',
+    '行次',
+    '期末余额',
+    '年初余额',
+    '负债和所有者权益（或股东权益）',
+    '行次',
+    '期末余额',
+    '年初余额'
+  ];
+  const widths = [28, 8, 14, 14, 32, 8, 14, 14];
+  const sheet = workbook.addWorksheet('负债表', {
+    views: [{ state: 'frozen', ySplit: 3 }]
+  });
+  sheet.columns = headers.map((_, i) => ({ width: widths[i] }));
+
+  const headerRowIndex = writeTitleAndUnitRows(sheet, {
+    title: `${meta.companyName} ${meta.periodLabel} 资产负债表`,
+    colCount: headers.length
+  });
+
+  const headerRow = sheet.getRow(headerRowIndex);
+  headerRow.height = 22;
+  setHeaderValues(headerRow, headers);
+
+  const merged = mergeBalanceSheetRows(data?.assets?.rows, data?.liabilities?.rows);
+  for (const row of merged) {
+    const assetOk = row.assetType && row.assetType !== 'spacer';
+    const liabilityOk = row.liabilityType && row.liabilityType !== 'spacer';
+    const assetItem =
+      assetOk && row.assetType !== 'section' && row.assetType !== 'spacer';
+    const liabilityItem =
+      liabilityOk && row.liabilityType !== 'section' && row.liabilityType !== 'spacer';
+
+    const excelRow = sheet.addRow([
+      assetOk ? row.assetLabel : '',
+      assetItem ? (row.assetRow ?? '') : '',
+      assetItem ? Number(row.assetEnding) || 0 : '',
+      assetItem ? Number(row.assetOpening) || 0 : '',
+      liabilityOk ? row.liabilityLabel : '',
+      liabilityItem ? (row.liabilityRow ?? '') : '',
+      liabilityItem ? Number(row.liabilityEnding) || 0 : '',
+      liabilityItem ? Number(row.liabilityOpening) || 0 : ''
+    ]);
+    excelRow.height = 18;
+    const bold =
+      row.assetType === 'total' ||
+      row.assetType === 'section' ||
+      row.liabilityType === 'total' ||
+      row.liabilityType === 'section';
+    excelRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+      applyDataBorder(cell);
+      if (bold) cell.font = { bold: true };
+      cell.alignment = {
+        vertical: 'middle',
+        horizontal: colNumber === 2 || colNumber === 6 ? 'center' : colNumber === 3 || colNumber === 4 || colNumber === 7 || colNumber === 8 ? 'right' : 'left'
+      };
+      if (
+        (colNumber === 3 || colNumber === 4 || colNumber === 7 || colNumber === 8) &&
+        typeof cell.value === 'number'
+      ) {
+        cell.numFmt = '#,##0.00';
+      }
+    });
+  }
+
+  const endRow = Math.max(headerRowIndex, sheet.rowCount);
+  applyTableOuterBorder(sheet, headerRowIndex, endRow, 1, headers.length);
+  // 资产侧 | 负债和所有者权益侧
+  applyVerticalSectionBorders(sheet, headerRowIndex, endRow, [5]);
+  applyPrintPageSetup(sheet);
+}
+
+async function vouchersToExcelBlob(vouchers) {
+  const workbook = await createWorkbook();
+  const company = await getCompanyInfo();
+  const companyName = String(company?.name || '').trim() || '未设置公司名称';
+  const year = resolveExportYear(vouchers);
+  addVoucherJournalSheet(workbook, vouchers, companyName, year);
+  return workbookToBlob(workbook);
+}
+
+/**
+ * 财务报表一键导出：
+ * 1 凭证分录表 / 2 科目余额表 / 3 利润表 / 4 负债表（资产负债表）
+ * withAttachments 时打包 ZIP（Excel + attachments/年/月）
+ */
+async function exportFinancialReportsWorkbook({
+  vouchers,
+  trialBalance,
+  incomeStatement,
+  balanceSheet,
+  periodLabel,
+  year,
+  withAttachments = false,
+  onProgress
+}: {
+  vouchers: unknown[];
+  trialBalance: unknown;
+  incomeStatement: unknown;
+  balanceSheet: unknown;
+  periodLabel: string;
+  year?: string | number;
+  withAttachments?: boolean;
+  onProgress?: (done: number, total: number) => void;
+}) {
+  const workbook = await createWorkbook();
+  const company = await getCompanyInfo();
+  const companyName = String(company?.name || '').trim() || '未设置公司名称';
+  const exportYear = year || resolveExportYear(vouchers);
+  const meta = { companyName, periodLabel: periodLabel || String(exportYear) };
+
+  addVoucherJournalSheet(workbook, vouchers, companyName, exportYear);
+  addTrialBalanceSheet(workbook, trialBalance, meta);
+  addIncomeStatementSheet(workbook, incomeStatement, meta);
+  addBalanceSheetSheet(workbook, balanceSheet, meta);
+
+  const stamp = new Date().toISOString().slice(0, 10);
+  const safePeriod = String(periodLabel || exportYear).replace(/[\\/:*?"<>|]/g, '_');
+  const excelName = `财务报表_${safePeriod}_${stamp}.xlsx`;
+  const excelBlob = await workbookToBlob(workbook);
+  const voucherCount = Array.isArray(vouchers) ? vouchers.length : 0;
+
+  if (!withAttachments) {
+    downloadBinaryBlob(excelBlob, excelName);
+    return { voucherCount, attachmentCount: 0, failed: 0 };
+  }
+
+  const JSZip = (await import('jszip')).default;
+  const zip = new JSZip();
+  zip.file(excelName, excelBlob);
+  const { attachmentCount, failed } = await appendPeriodAttachmentsToZip(
+    zip,
+    vouchers as { date?: string; attachmentIds?: string[] }[],
+    onProgress
+  );
+  const zipBlob = await zip.generateAsync({ type: 'blob' });
+  downloadBinaryBlob(zipBlob, `财务报表_${safePeriod}_${stamp}.zip`);
+  return { voucherCount, attachmentCount, failed };
 }
 
 function ledgerToCSV(ledger) {
@@ -141,14 +674,14 @@ function trialBalanceToCSV(data) {
 }
 
 function incomeStatementToCSV(data) {
-  const rows = [`利润表,${data.startDate} 至 ${data.endDate}`, '项目,行次,本年累计金额,本期金额'];
+  const rows = [`利润表,${data.startDate} 至 ${data.endDate}`, '项目,行次,本期金额,本年累计金额'];
   for (const line of data.rows) {
     rows.push(
       [
         `"${line.label}"`,
         line.row ?? '',
-        fmtAmount(line.ytdAmount),
-        fmtAmount(line.periodAmount)
+        fmtAmount(line.periodAmount),
+        fmtAmount(line.ytdAmount)
       ].join(',')
     );
   }
@@ -313,20 +846,155 @@ function printVoucher(html) {
   };
 }
 
+function downloadBinaryBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/** 从附件 URL 解析对象存储相对路径 attachments/YYYY/MM/filename */
+function attachmentObjectPath(att, voucherDate = '') {
+  const rawUrl = String(att?.url || '').trim();
+  if (rawUrl && !rawUrl.startsWith('data:')) {
+    try {
+      const u = new URL(rawUrl);
+      const path = decodeURIComponent(u.pathname.replace(/^\/+/, ''));
+      const idx = path.indexOf('attachments/');
+      if (idx >= 0) {
+        return path.slice(idx);
+      }
+    } catch {
+      // ignore
+    }
+  }
+  const date = String(voucherDate || '').slice(0, 10);
+  const year = date.slice(0, 4) || 'unknown';
+  const month = date.slice(5, 7) || '00';
+  const name = String(att?.name || att?.id || 'file').replace(/[\\/:*?"<>|]/g, '_');
+  return `attachments/${year}/${month}/${name}`;
+}
+
+function uniqueZipPath(used: Set<string>, path: string) {
+  if (!used.has(path)) {
+    used.add(path);
+    return path;
+  }
+  const dot = path.lastIndexOf('.');
+  const base = dot > 0 ? path.slice(0, dot) : path;
+  const ext = dot > 0 ? path.slice(dot) : '';
+  let i = 2;
+  let next = `${base}_${i}${ext}`;
+  while (used.has(next)) {
+    i += 1;
+    next = `${base}_${i}${ext}`;
+  }
+  used.add(next);
+  return next;
+}
+
+async function appendPeriodAttachmentsToZip(
+  zip,
+  vouchers: { date?: string; attachmentIds?: string[] }[],
+  onProgress?: (done: number, total: number) => void
+) {
+  const usedPaths = new Set<string>();
+  let attachmentCount = 0;
+  let failed = 0;
+  const tasks: { voucher: { date?: string; attachmentIds?: string[] }; id: string }[] = [];
+
+  for (const voucher of vouchers || []) {
+    for (const id of voucher.attachmentIds || []) {
+      tasks.push({ voucher, id });
+    }
+  }
+
+  const total = tasks.length;
+  onProgress?.(0, total);
+
+  for (let i = 0; i < tasks.length; i++) {
+    const { voucher, id } = tasks[i];
+    try {
+      const att = await Voucher.getAttachment(id);
+      if (!att?.url || String(att.url).startsWith('data:')) {
+        failed += 1;
+        onProgress?.(i + 1, total);
+        continue;
+      }
+      const res = await fetch(att.url);
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      const buf = await res.arrayBuffer();
+      const path = uniqueZipPath(usedPaths, attachmentObjectPath(att, voucher.date));
+      zip.file(path, buf);
+      attachmentCount += 1;
+    } catch {
+      failed += 1;
+    }
+    onProgress?.(i + 1, total);
+  }
+
+  return { attachmentCount, failed };
+}
+
+/**
+ * 导出当前列表 Excel；withAttachments 时打包 ZIP：
+ * - 凭证导出.xlsx（列宽 + 表头样式）
+ * - attachments/YYYY/MM/...（与对象存储目录一致）
+ */
+async function exportVouchersPackage(
+  vouchers,
+  options: {
+    withAttachments?: boolean;
+    onProgress?: (done: number, total: number) => void;
+  } = {}
+) {
+  const { withAttachments = false, onProgress } = options;
+  const list = vouchers || [];
+  if (!list.length) {
+    throw new Error('无数据可导出');
+  }
+
+  const stamp = new Date().toISOString().slice(0, 10);
+  const excelBlob = await vouchersToExcelBlob(list);
+  const excelName = `凭证导出_${stamp}.xlsx`;
+
+  if (!withAttachments) {
+    downloadBinaryBlob(excelBlob, excelName);
+    return { voucherCount: list.length, attachmentCount: 0, failed: 0 };
+  }
+
+  const JSZip = (await import('jszip')).default;
+  const zip = new JSZip();
+  zip.file(excelName, excelBlob);
+  const { attachmentCount, failed } = await appendPeriodAttachmentsToZip(zip, list, onProgress);
+  const blob = await zip.generateAsync({ type: 'blob' });
+  downloadBinaryBlob(blob, `凭证导出_${stamp}.zip`);
+  return { voucherCount: list.length, attachmentCount, failed };
+}
+
 export const ExportUtil = {
   downloadBlob,
+  downloadBinaryBlob,
   vouchersToCSV,
+  vouchersToExcelBlob,
   ledgerToCSV,
   trialBalanceToCSV,
   incomeStatementToCSV,
   balanceSheetToCSV,
+  exportVouchersPackage,
+  exportFinancialReportsWorkbook,
+  attachmentObjectPath,
   renderPrintVoucher,
   printVoucher
 };
 
 export async function getCompanyInfo() {
   return {
-    name: await DB.getSetting('companyName'),
-    taxId: await DB.getSetting('companyTaxId')
+    name: await ErpApi.getSetting('companyName'),
+    taxId: await ErpApi.getSetting('companyTaxId')
   };
 }

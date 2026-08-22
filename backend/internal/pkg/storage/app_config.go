@@ -29,7 +29,7 @@ func ConfigFromApp(cfg appconfig.StorageConfig) Config {
 	}
 }
 
-// NewClientFromAppConfig 从应用配置（config.yaml / APP_* 环境变量）创建对象存储客户端。
+// NewClientFromAppConfig 从应用配置（config.yaml / 环境变量）创建对象存储客户端。
 // 配置加载请使用 config.Load，以保证与项目统一的配置优先级策略。
 func NewClientFromAppConfig(cfg appconfig.StorageConfig, opts ...UploadOptions) (*Client, error) {
 	return NewClient(ConfigFromApp(cfg), opts...)

@@ -60,6 +60,11 @@ func (p *ossProvider) objectURL(objectKey string) string {
 	return fmt.Sprintf("https://%s.%s/%s", p.bucketName, p.endpoint, objectKey)
 }
 
+// ObjectURL 实现 storageProvider，返回未签名公开地址。
+func (p *ossProvider) ObjectURL(objectKey string) string {
+	return p.objectURL(objectKey)
+}
+
 // presignedURL 生成带有效期的 GET 签名链接。
 func (p *ossProvider) presignedURL(objectKey string) (string, error) {
 	expireSec := int64(signedURLExpireDuration(p.signedURLExpireDays, ProviderOSS).Seconds())
@@ -137,6 +142,17 @@ func (p *ossProvider) UploadReader(ctx context.Context, r io.Reader, objectKey s
 		return "", fmt.Errorf("OSS 上传失败: %w", err)
 	}
 	return p.accessURL(objectKey)
+}
+
+// DeleteObject 删除 OSS 对象；对象不存在视为成功。
+func (p *ossProvider) DeleteObject(ctx context.Context, objectKey string) error {
+	_ = ctx
+	err := p.bucket.DeleteObject(objectKey)
+	if err == nil {
+		return nil
+	}
+	// OSS 对不存在的对象通常仍返回成功；其余错误原样返回。
+	return fmt.Errorf("OSS 删除对象失败: %w", err)
 }
 
 // ossCheckpointDir 返回 OSS 断点续传目录，默认使用系统临时目录下的子目录。

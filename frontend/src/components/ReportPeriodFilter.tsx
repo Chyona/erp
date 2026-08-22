@@ -51,7 +51,7 @@ function PeriodPickerPanel({ period, panelYear, onPanelYearChange, onSelect, onC
                   onClose();
                 }}
               >
-                {month}月
+                {month}期
               </button>
             );
           })}
@@ -85,7 +85,8 @@ export default function ReportPeriodFilter({
   onChange,
   onRefresh,
   loading = false,
-  typeOptions = REPORT_TYPE_OPTIONS
+  typeOptions = REPORT_TYPE_OPTIONS,
+  beforeRefresh = null
 }) {
   const [open, setOpen] = useState(false);
   const [panelYear, setPanelYear] = useState(value.year);
@@ -105,12 +106,14 @@ export default function ReportPeriodFilter({
 
   return (
     <Space wrap className="report-period-filter" size={12}>
-      <Select
-        value={value.type}
-        options={typeOptions}
-        onChange={handleTypeChange}
-        className="report-period-filter__type"
-      />
+      {typeOptions.length > 1 ? (
+        <Select
+          value={value.type}
+          options={typeOptions}
+          onChange={handleTypeChange}
+          className="report-period-filter__type"
+        />
+      ) : null}
       <Popover
         trigger="click"
         open={open}
@@ -134,6 +137,7 @@ export default function ReportPeriodFilter({
           suffix={<CalendarOutlined className="report-period-filter__calendar" />}
         />
       </Popover>
+      {beforeRefresh}
       <Button icon={<ReloadOutlined />} loading={loading} onClick={onRefresh}>
         刷新
       </Button>

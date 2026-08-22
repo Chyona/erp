@@ -26,6 +26,13 @@ body {
   --app-table-scrollbar-thumb-hover: #94a3b8;
   --app-table-scrollbar-track: transparent;
   --app-table-sticky-shadow: 0 1px 0 var(--app-table-border), 0 2px 6px rgba(15, 23, 42, 0.04);
+  --app-tooltip-bg: #fff;
+  --app-tooltip-color: rgba(0, 0, 0, 0.88);
+  --app-tooltip-border: #e2e8f0;
+  --app-tooltip-shadow:
+    0 6px 16px 0 rgba(0, 0, 0, 0.08),
+    0 3px 6px -4px rgba(0, 0, 0, 0.12),
+    0 9px 28px 8px rgba(0, 0, 0, 0.05);
 }
 
 html,
@@ -33,6 +40,22 @@ body,
 #root {
   height: 100%;
   overflow: hidden;
+}
+
+/* 全局 Tooltip：白底深字，与 Popover / 报表提示一致 */
+.ant-tooltip .ant-tooltip-inner {
+  color: var(--app-tooltip-color);
+  background: var(--app-tooltip-bg);
+  border: 1px solid var(--app-tooltip-border);
+  box-shadow: var(--app-tooltip-shadow);
+}
+
+.ant-tooltip .ant-tooltip-arrow::before {
+  background: var(--app-tooltip-bg);
+}
+
+.ant-tooltip .ant-tooltip-arrow::after {
+  background: var(--app-tooltip-bg);
 }
 
 .app-layout {
@@ -151,6 +174,294 @@ body,
 .page-table-toolbar {
   flex-shrink: 0;
   margin-bottom: 12px;
+}
+
+.voucher-list-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.voucher-list-toolbar__main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.voucher-list-toolbar__date {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.voucher-time-filter-group {
+  display: inline-flex;
+  align-items: stretch;
+  min-height: 32px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  background: #fff;
+  overflow: hidden;
+  cursor: default;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.voucher-time-filter-group:hover {
+  border-color: #4096ff;
+}
+
+.voucher-time-filter-group__mode {
+  min-width: 84px;
+  flex-shrink: 0;
+}
+
+.voucher-time-filter-group__mode.ant-select-borderless .ant-select-selector {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  height: 30px !important;
+  padding: 0 8px !important;
+}
+
+.voucher-time-filter-group__divider {
+  width: 1px;
+  background: #f0f0f0;
+  flex-shrink: 0;
+}
+
+.voucher-time-filter-group__value {
+  flex: 1;
+  min-width: 168px;
+  border: none;
+  background: transparent;
+  padding: 0 8px;
+  text-align: center;
+  font-size: 14px;
+  color: #374151;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.voucher-time-filter-group__value:hover,
+.voucher-time-filter-group__trigger:hover {
+  background: #fafafa;
+}
+
+.voucher-time-filter-group__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: transparent;
+  padding: 0 10px;
+  font-size: 14px;
+  color: #374151;
+  cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.voucher-time-filter-group__trigger-icon {
+  color: #1a56db;
+  font-size: 14px;
+}
+
+.voucher-time-filter-group__trigger--active {
+  color: #1a56db;
+  font-weight: 500;
+}
+
+.voucher-time-filter-popover-wrap .ant-popover-inner {
+  padding: 0;
+}
+
+.voucher-time-filter-popover {
+  padding: 12px 12px 10px;
+}
+
+.voucher-time-filter-popover__panels {
+  display: flex;
+  gap: 12px;
+}
+
+.voucher-time-filter__panel-title {
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: #374151;
+  font-weight: 500;
+}
+
+.voucher-time-filter__date-panel {
+  width: 280px;
+}
+
+.voucher-time-filter__date-panel .ant-picker-calendar {
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+}
+
+.voucher-time-filter__date-panel .ant-picker-calendar-header {
+  padding: 8px 8px 0;
+}
+
+.voucher-time-filter__date-panel .ant-picker-panel {
+  border-top: none;
+}
+
+.voucher-time-filter__period-panel {
+  width: 220px;
+}
+
+.voucher-time-filter__year-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  color: #374151;
+  font-weight: 500;
+}
+
+.voucher-time-filter__period-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.voucher-time-filter__period-item {
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  border-radius: 6px;
+  height: 34px;
+  cursor: pointer;
+  color: #374151;
+  transition: all 0.15s ease;
+}
+
+.voucher-time-filter__period-item:hover {
+  border-color: #1a56db;
+  color: #1a56db;
+}
+
+.voucher-time-filter__period-item--active {
+  background: #1a56db;
+  border-color: #1a56db;
+  color: #fff;
+}
+
+.voucher-time-filter-popover__shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.voucher-time-filter-popover__shortcut {
+  border: none;
+  background: none;
+  padding: 0;
+  color: #1a56db;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.voucher-time-filter-popover__shortcut:hover {
+  text-decoration: underline;
+}
+
+.voucher-time-filter-popover__preview {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.voucher-time-filter-popover__footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.voucher-list-toolbar__actions {
+  margin-left: auto;
+}
+
+.voucher-filter-popover .ant-popover-inner {
+  padding: 0;
+}
+
+.voucher-filter-panel {
+  width: 420px;
+  max-width: calc(100vw - 32px);
+  padding: 16px 16px 12px;
+}
+
+.voucher-filter-panel__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.voucher-filter-panel__label {
+  width: 56px;
+  flex-shrink: 0;
+  line-height: 32px;
+  color: #374151;
+  text-align: right;
+}
+
+.voucher-filter-panel__field {
+  flex: 1;
+  min-width: 0;
+}
+
+.voucher-filter-panel__field .ant-select,
+.voucher-filter-panel__field .ant-input,
+.voucher-filter-panel__field .ant-input-number {
+  width: 100%;
+}
+
+.voucher-filter-panel__hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #9ca3af;
+  line-height: 1.4;
+}
+
+.voucher-filter-panel__range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.voucher-filter-panel__range .ant-input-number {
+  flex: 1;
+}
+
+.voucher-filter-panel__range-sep {
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
+.voucher-filter-panel__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.voucher-filter-panel__expand {
+  padding-left: 0;
 }
 
 /* 统一表格滚动条 */
@@ -619,14 +930,277 @@ body,
 }
 
 .voucher-import-warnings {
-  margin: 8px 0 0;
+  margin: 0;
   padding-left: 18px;
+  max-height: 240px;
+  overflow: auto;
 }
 
 .voucher-import-warnings li {
   margin-bottom: 4px;
   font-size: 12px;
   color: #64748b;
+}
+
+.voucher-import-warnings-popover {
+  max-width: 440px;
+}
+
+.voucher-import-tip-block--focus {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #fff7e6;
+  border: 1px solid #ffd591;
+}
+
+.voucher-import-tip-block--focus .voucher-import-warnings {
+  margin-top: 6px;
+}
+
+.voucher-import-modal__tip-icon {
+  color: #64748b;
+  cursor: help;
+  font-size: 14px;
+}
+
+.voucher-import-modal__tip-icon:hover {
+  color: var(--ant-color-primary, #1677ff);
+}
+
+.voucher-import-modal__skip-tip {
+  margin-bottom: 12px !important;
+}
+
+.voucher-import-modal__skip-tip-label {
+  color: #d46b08 !important;
+  margin-right: 2px;
+}
+
+.voucher-import-modal__progress.ant-alert {
+  border-radius: 8px;
+  border-color: #91caff;
+  background: linear-gradient(180deg, #f0f7ff 0%, #e6f4ff 100%);
+}
+
+.voucher-import-modal__progress .ant-alert-message {
+  font-weight: 500;
+  color: rgba(0, 0, 0, 0.75);
+}
+
+.voucher-import-modal__sources {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 4px;
+  min-height: 280px;
+}
+
+.voucher-import-modal__source-card {
+  min-width: 0;
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fafbfc;
+}
+
+.voucher-import-modal__source-card--paste {
+  outline: none;
+}
+
+.voucher-import-modal__source-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.voucher-import-modal__source-head .anticon {
+  margin-top: 2px;
+  font-size: 18px;
+  color: #1677ff;
+}
+
+.voucher-import-modal__source-head .ant-typography {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.voucher-import-modal__source-card .ant-upload-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  overflow: visible;
+}
+
+.voucher-import-modal__source-drop {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: #fff;
+  border: 1px dashed #d9d9d9;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.voucher-import-modal__source-drop:hover {
+  border-color: #1677ff;
+}
+
+.voucher-import-modal__source-card--paste.is-active .voucher-import-modal__source-drop,
+.voucher-import-modal__source-card--paste:focus-within .voucher-import-modal__source-drop {
+  border-color: #1677ff;
+}
+
+.voucher-import-modal__source-card .ant-upload,
+.voucher-import-modal__source-card .ant-upload-drag {
+  flex: 1;
+  display: flex !important;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 200px;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+}
+
+.voucher-import-modal__source-card .ant-upload-drag {
+  padding: 28px 16px !important;
+}
+
+.voucher-import-modal__source-card .ant-upload-drag-icon {
+  margin-bottom: 10px !important;
+}
+
+.voucher-import-modal__source-card .ant-upload-drag-icon .anticon {
+  font-size: 42px !important;
+}
+
+.voucher-import-modal__source-card .ant-upload-text {
+  margin: 0 0 6px !important;
+  font-size: 15px !important;
+}
+
+.voucher-import-modal__source-card .ant-upload-hint {
+  margin: 0 !important;
+  font-size: 12px !important;
+}
+
+.voucher-import-modal__source-card .ant-upload-list {
+  display: none !important;
+}
+
+.voucher-import-modal__source-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 10px;
+  border-top: 1px solid #f0f0f0;
+  background: #fafafa;
+  min-height: 36px;
+}
+
+.voucher-import-modal__source-file-icon {
+  color: #1677ff;
+  flex-shrink: 0;
+}
+
+.voucher-import-modal__source-file-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.voucher-import-modal__source-file-remove {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+}
+
+.voucher-import-modal__source-file-remove:hover {
+  color: #ff4d4f;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+/* 有预览时压缩上传区，把高度留给预览表 */
+.voucher-import-modal__sources--compact {
+  min-height: 0;
+  gap: 10px;
+  margin-bottom: 0;
+}
+
+.voucher-import-modal__sources--compact .voucher-import-modal__source-card {
+  min-height: 0;
+  padding: 8px 10px;
+}
+
+.voucher-import-modal__sources--compact .voucher-import-modal__source-head {
+  margin-bottom: 6px;
+  gap: 8px;
+}
+
+.voucher-import-modal__sources--compact .voucher-import-modal__source-head .ant-typography-secondary {
+  display: none;
+}
+
+.voucher-import-modal__sources--compact .voucher-import-modal__source-head h5 {
+  font-size: 14px !important;
+}
+
+.voucher-import-modal__sources--compact .voucher-import-modal__source-card .ant-upload,
+.voucher-import-modal__sources--compact .voucher-import-modal__source-card .ant-upload-drag {
+  min-height: 48px;
+  flex: 0 0 auto;
+}
+
+.voucher-import-modal__sources--compact .voucher-import-modal__source-card .ant-upload-drag {
+  padding: 8px 12px !important;
+}
+
+.voucher-import-modal__sources--compact .voucher-import-modal__source-card .ant-upload-drag-icon {
+  display: none !important;
+}
+
+.voucher-import-modal__sources--compact .voucher-import-modal__source-card .ant-upload-text {
+  font-size: 13px !important;
+  margin: 0 !important;
+}
+
+.voucher-import-modal__sources--compact .voucher-import-modal__source-card .ant-upload-hint {
+  display: none !important;
+}
+
+.voucher-import-modal__sources--compact .voucher-import-modal__source-file {
+  padding: 6px 8px;
+  min-height: 32px;
+}
+
+@media (max-width: 900px) {
+  .voucher-import-modal__sources {
+    grid-template-columns: 1fr;
+  }
 }
 
 .voucher-grouped-table .ant-table-thead>tr>th {
@@ -689,6 +1263,97 @@ body,
   font-size: 12px;
 }
 
+.voucher-list-attach-popover .ant-popover-inner {
+  padding: 0;
+}
+
+.voucher-list-attach-popover .ant-popover-inner-content {
+  padding: 0;
+}
+
+.voucher-list-attach-popover__loading {
+  padding: 16px;
+  text-align: center;
+  color: #64748b;
+  font-size: 13px;
+  min-width: 200px;
+}
+
+.voucher-list-attach-popover .voucher-sheet__attach-col {
+  width: 220px;
+  height: auto;
+  max-height: min(50vh, 320px);
+  border-left: none;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.voucher-list-attach-popover .voucher-sheet__attach-col-header {
+  min-height: 32px;
+  padding: 2px 6px;
+  gap: 4px;
+}
+
+.voucher-list-attach-popover .voucher-sheet__attach-col-actions {
+  gap: 0;
+}
+
+.voucher-list-attach-popover .voucher-sheet__attach-col-clear {
+  padding-inline: 2px !important;
+  margin-inline-end: 0 !important;
+  gap: 2px;
+}
+
+.voucher-list-attach-popover .voucher-sheet__attach-col-clear .anticon {
+  margin-inline-end: 2px !important;
+  font-size: 12px;
+}
+
+.voucher-list-attach-popover .voucher-sheet__attach-col-clear > span {
+  margin-inline-start: 0 !important;
+}
+
+.voucher-list-attach-popover .voucher-sheet__attach-col-close {
+  padding: 0 2px;
+}
+
+.voucher-list-attach-popover .voucher-sheet__attach-col-body {
+  flex: 0 1 auto;
+  max-height: min(40vh, 240px);
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.voucher-list-attach-popover .voucher-attach-panel__item {
+  margin-bottom: 6px;
+}
+
+.voucher-list-attach-popover .voucher-attach-panel__item-head {
+  padding: 4px 6px;
+}
+
+.voucher-list-attach-popover .voucher-attach-panel__preview {
+  min-height: 56px;
+}
+
+.voucher-list-attach-popover .voucher-attach-panel__preview img {
+  max-height: 72px;
+}
+
+.voucher-list-attach-popover .voucher-attach-panel__pdf {
+  min-height: 56px;
+  gap: 2px;
+  font-size: 11px;
+}
+
+.voucher-list-attach-popover .voucher-attach-panel__pdf .anticon {
+  font-size: 22px;
+}
+
+.voucher-grouped-table__attach-count {
+  cursor: pointer;
+}
+
 .voucher-grouped-table__actions {
   width: 100%;
 }
@@ -722,8 +1387,23 @@ body,
   overflow: hidden;
 }
 
+.voucher-import-modal-wrap .ant-modal {
+  max-width: calc(100vw - 48px);
+  width: min(1360px, calc(100vw - 48px)) !important;
+  top: 40px;
+  padding-bottom: 0;
+}
+
+@media (min-width: 1600px) {
+  .voucher-import-modal-wrap .ant-modal {
+    width: min(1480px, calc(100vw - 64px)) !important;
+    max-width: calc(100vw - 64px);
+  }
+}
+
 .voucher-import-modal .ant-modal-content {
-  max-height: calc(100vh - 48px);
+  max-height: calc(100vh - 80px);
+  min-height: min(560px, calc(100vh - 80px));
   display: flex;
   flex-direction: column;
 }
@@ -733,6 +1413,18 @@ body,
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+.voucher-import-modal .ant-modal-header {
+  padding-top: 12px;
+  padding-bottom: 8px;
+}
+
+.voucher-import-modal .ant-modal-footer {
+  padding-top: 10px;
+  padding-bottom: 12px;
 }
 
 .voucher-import-modal__preview {
@@ -742,12 +1434,82 @@ body,
 }
 
 .voucher-import-modal__summary {
-  margin: 16px 0 8px;
+  margin: 12px 0 8px;
   flex-shrink: 0;
 }
 
 .voucher-import-modal__table {
   flex-shrink: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.voucher-import-modal__table .ant-table {
+  table-layout: fixed !important;
+}
+
+.voucher-import-modal__table .ant-table-container,
+.voucher-import-modal__table .ant-table-content,
+.voucher-import-modal__table .ant-table-body {
+  overflow-x: auto !important;
+}
+
+.voucher-import-modal__table .ant-table-cell {
+  vertical-align: middle;
+}
+
+.voucher-import-modal__edit-input {
+  width: 100%;
+}
+
+.voucher-import-modal__edit-input.ant-input,
+.voucher-import-modal__edit-input.ant-input-number,
+.voucher-import-modal__edit-input.ant-picker,
+.voucher-import-modal__edit-input.ant-select .ant-select-selector {
+  padding-inline: 4px !important;
+}
+
+.voucher-import-modal__edit-input.ant-input {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.voucher-import-modal__edit-input.ant-select .ant-select-selection-item {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.voucher-import-modal__edit-input.ant-input-number {
+  width: 100%;
+}
+
+.voucher-import-modal__edit-input.ant-input-number .ant-input-number-input {
+  text-align: right;
+  padding-inline: 0 !important;
+}
+
+.voucher-import-modal__edit-date {
+  width: 100%;
+  min-width: 0;
+}
+
+.voucher-import-modal__edit-amount.voucher-import-modal__amount--unbalanced,
+.voucher-import-modal__edit-amount.voucher-import-modal__amount--unbalanced .ant-input-number-input {
+  color: #cf1322;
+}
+
+.voucher-import-modal__cell-ellipsis {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.voucher-import-modal__amount--unbalanced {
+  color: #cf1322;
+  font-weight: 600;
 }
 
 .voucher-examples-drawer .ant-drawer-body {
@@ -843,6 +1605,47 @@ body,
 
 .month-end-reimbursement-panel {
   min-height: 120px;
+}
+
+.workbench-panel-intro {
+  margin-bottom: 16px;
+}
+
+.reimbursement-declared-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 220px;
+  padding: 32px 24px;
+  margin-top: 4px;
+  text-align: center;
+  background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.reimbursement-declared-state__icon {
+  font-size: 40px;
+  color: #16a34a;
+  margin-bottom: 4px;
+}
+
+.reimbursement-declared-state__title {
+  font-size: 18px;
+  line-height: 1.4;
+}
+
+.reimbursement-declared-state__desc {
+  display: block;
+  max-width: 420px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.reimbursement-declared-state__actions {
+  margin-top: 8px;
 }
 
 .business-type-hint__flow--tax {
@@ -1004,6 +1807,23 @@ body,
   overflow: hidden;
 }
 
+.attachment-preview-modal__pdf-wrap {
+  position: relative;
+  min-height: 420px;
+}
+
+.attachment-preview-modal__pdf-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 420px;
+  padding: 24px;
+  text-align: center;
+  color: #64748b;
+}
+
 .attachment-preview-modal__pdf-frame {
   display: block;
   width: 100%;
@@ -1029,6 +1849,34 @@ body,
 }
 
 /* Print voucher styles in modal */
+.voucher-detail-modal-wrap {
+  overflow: hidden;
+}
+
+.voucher-detail-modal-wrap .ant-modal {
+  top: 24px;
+  padding-bottom: 24px;
+  max-width: calc(100vw - 32px);
+}
+
+.voucher-detail-modal .ant-modal-content {
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+}
+
+.voucher-detail-modal .ant-modal-header,
+.voucher-detail-modal .ant-modal-footer {
+  flex-shrink: 0;
+}
+
+.voucher-detail-modal .ant-modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .print-voucher {
   font-family: SimSun, serif;
   padding: 20px;
@@ -1357,6 +2205,109 @@ body,
   margin-top: 4px;
 }
 
+.report-page-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.report-trial-imbalance-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-left: 0;
+  border-radius: 8px;
+  font-size: 22px;
+  line-height: 1;
+  color: #d46b08;
+  background: #fff7e6;
+  border: 1px solid #ffd591;
+  cursor: help;
+  transition:
+    color 0.15s,
+    background-color 0.15s,
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+.report-trial-imbalance-icon:hover {
+  color: #ad4e00;
+  background: #ffe7ba;
+  border-color: #ffa940;
+  box-shadow: 0 0 0 2px rgba(250, 140, 22, 0.18);
+}
+
+.report-trial-imbalance-icon__svg {
+  display: block;
+}
+
+.report-trial-imbalance-tooltip .ant-tooltip-inner {
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 12px 14px;
+  text-align: left;
+}
+
+.report-trial-imbalance-tooltip__content {
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.report-trial-imbalance-tooltip__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #d46b08;
+  margin-bottom: 8px;
+}
+
+.report-trial-imbalance-tooltip__details {
+  margin: 0 0 8px;
+  padding-left: 18px;
+  color: #475569;
+}
+
+.report-trial-imbalance-tooltip__details strong {
+  color: #d46b08;
+  font-weight: 600;
+}
+
+.report-trial-imbalance-tooltip__reason {
+  margin: 0 0 10px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.report-trial-imbalance-tooltip__action {
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: #fff7e6;
+  border: 1px solid #ffd591;
+}
+
+.report-trial-imbalance-tooltip__action-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #ad4e00;
+  margin-bottom: 6px;
+}
+
+.report-trial-imbalance-tooltip__steps {
+  margin: 0;
+  padding-left: 18px;
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.report-trial-imbalance-tooltip__steps li+li {
+  margin-top: 4px;
+}
+
+.report-trial-imbalance-tooltip__steps strong {
+  color: #ad4e00;
+  font-weight: 600;
+}
+
 .report-period-filter__type {
   width: 96px;
 }
@@ -1558,6 +2509,18 @@ body,
   background: var(--app-table-row-total) !important;
 }
 
+.trial-balance-report .ant-table-cell.trial-balance-report__cell--negative {
+  background: rgb(255, 238, 239) !important;
+}
+
+.trial-balance-report .ant-table-tbody>tr:hover>.trial-balance-report__cell--negative {
+  background: rgb(255, 228, 230) !important;
+}
+
+.trial-balance-report .ant-table-summary .ant-table-cell.trial-balance-report__cell--negative {
+  background: rgb(255, 238, 239) !important;
+}
+
 /* 弹窗 / 面板内嵌表格 */
 .app-table .ant-table-wrapper,
 .voucher-import-modal__table .ant-table-wrapper,
@@ -1588,6 +2551,12 @@ body,
   font-variant-numeric: tabular-nums;
 }
 
+/* 待结转普票：前三列紧凑，摘要/备注无固定宽度、均分剩余空间 */
+.pending-tax-detail-table .ant-table table {
+  table-layout: fixed;
+  width: 100%;
+}
+
 .tax-exemption-panel__tax-value {
   color: var(--app-table-amount);
   font-size: 14px;
@@ -1597,6 +2566,41 @@ body,
 .tax-exemption-panel__tax-total {
   color: var(--app-table-amount);
   font-size: 15px;
+}
+
+.closing-prerequisites__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.closing-prerequisites__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 14px;
+  color: #374151;
+}
+
+.closing-prerequisites__icon {
+  margin-top: 3px;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.closing-prerequisites__icon--ok {
+  color: #52c41a;
+}
+
+.closing-prerequisites__icon--warn {
+  color: #faad14;
+}
+
+.closing-prerequisites__icon--error {
+  color: #ff4d4f;
 }
 
 .report-tab-panel .page-table-body .ant-table {
@@ -1634,6 +2638,7 @@ body,
   flex: 0 0 auto;
   display: flex;
   align-items: center;
+  gap: 10px;
   margin-left: auto;
 }
 
@@ -1653,7 +2658,6 @@ body,
   flex-wrap: wrap;
   margin-top: 12px;
   padding-top: 8px;
-  border-top: 1px dashed #e2e8f0;
   font-size: 13px;
 }
 
@@ -1719,6 +2723,40 @@ body,
   align-items: start;
 }
 
+/* 附加区：label 左、控件右，与上方凭证区信息栏风格一致 */
+.voucher-form__extra .ant-form-item {
+  margin-bottom: 0;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.voucher-form__extra .ant-form-item-row {
+  flex-direction: row !important;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.voucher-form__extra .ant-form-item-label {
+  flex: 0 0 auto;
+  padding: 0 !important;
+  white-space: nowrap;
+  width: auto !important;
+  max-width: none !important;
+}
+
+.voucher-form__extra .ant-form-item-label>label {
+  height: 32px;
+  margin-inline-end: 0 !important;
+}
+
+.voucher-form__extra .ant-form-item-control {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
 @media (min-width: 768px) {
   .voucher-form__extra {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1730,14 +2768,6 @@ body,
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px 20px;
   }
-
-  .voucher-form__extra .ant-form-item {
-    margin-bottom: 0;
-  }
-}
-
-.voucher-form__extra .ant-form-item {
-  margin-bottom: 0;
 }
 
 .voucher-sheet {
@@ -2017,17 +3047,51 @@ body,
 
 .voucher-sheet__attach-col-header {
   flex-shrink: 0;
-  height: var(--voucher-row-height, 52px);
   min-height: var(--voucher-row-height, 52px);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 10px;
+  gap: 6px;
+  padding: 4px 8px;
   background: #dbeafe;
   border-bottom: 1px solid #bfdbfe;
   font-weight: 600;
   font-size: 13px;
   color: #334155;
+}
+
+.voucher-sheet__attach-col-title {
+  flex-shrink: 0;
+}
+
+.voucher-sheet__attach-col-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.voucher-sheet__attach-col-clear {
+  padding-inline: 4px !important;
+  height: auto !important;
+  font-size: 12px;
+  display: inline-flex !important;
+  align-items: center;
+  gap: 2px;
+}
+
+.voucher-sheet__attach-col-clear.ant-btn.ant-btn-sm {
+  gap: 2px;
+}
+
+.voucher-sheet__attach-col-clear .ant-btn-icon {
+  margin-inline-end: 0 !important;
+}
+
+.voucher-attach-panel__check {
+  flex-shrink: 0;
 }
 
 .voucher-sheet__attach-col-close {
@@ -2079,6 +3143,7 @@ body,
   gap: 4px;
   padding: 6px 8px;
   border-bottom: 1px solid #f1f5f9;
+  min-width: 0;
 }
 
 .voucher-attach-panel__name {

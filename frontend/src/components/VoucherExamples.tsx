@@ -22,71 +22,26 @@ const { Text, Paragraph } = Typography;
 /** 记账示例（金额仅为演示，套用后请按实际修改） */
 export const VOUCHER_EXAMPLES = [
   {
-    key: 'purchase-advance-owner',
+    key: 'advance-payment',
     category: '报销与日常',
-    title: '个人垫付采购（法人）',
+    title: '个人垫付',
     businessType: '日常费用',
-    remark: '法人个人支付，贷方摘要写清垫付人',
+    remark:
+      '摘要末尾写（垫付人垫付），如（thm垫付），月底报销会按此人汇总；借 5602、贷 2241，贷方摘要可与借方相同',
     entries: [
-      { summary: '【采购】3月办公用品（法人垫付）', accountCode: '5602', debit: 3800, credit: 0 },
-      { summary: '法人垫付待报销', accountCode: '2241', debit: 0, credit: 3800 }
+      { summary: '【办公费】腾讯云代码助手（thm垫付）', accountCode: '5602', debit: 140, credit: 0 },
+      { summary: '【办公费】腾讯云代码助手（thm垫付）', accountCode: '2241', debit: 0, credit: 140 }
     ]
   },
   {
-    key: 'meal-advance-owner',
+    key: 'advance-payment-other-person',
     category: '报销与日常',
-    title: '个人垫付餐饮（法人）',
+    title: '个人垫付（换人示例）',
     businessType: '日常费用',
-    remark: '摘要前加【餐饮】，与采购区分，便于月底汇总',
+    remark: '只需改括号内姓名，其余格式不变',
     entries: [
-      { summary: '【餐饮】3月客户接待（法人垫付）', accountCode: '5602', debit: 860, credit: 0 },
-      { summary: '法人垫付待报销', accountCode: '2241', debit: 0, credit: 860 }
-    ]
-  },
-  {
-    key: 'purchase-advance-staff',
-    category: '报销与日常',
-    title: '个人垫付采购（同事）',
-    businessType: '日常费用',
-    remark: '同事个人支付，摘要注明垫付人姓名便于月底核对',
-    entries: [
-      { summary: '【采购】3月项目耗材（张三垫付）', accountCode: '5602', debit: 1200, credit: 0 },
-      { summary: '张三垫付待报销', accountCode: '2241', debit: 0, credit: 1200 }
-    ]
-  },
-  {
-    key: 'meal-advance-staff',
-    category: '报销与日常',
-    title: '个人垫付餐饮（同事）',
-    businessType: '日常费用',
-    remark: '同事垫付餐饮，摘要写清姓名',
-    entries: [
-      { summary: '【餐饮】3月团队聚餐（张三垫付）', accountCode: '5602', debit: 420, credit: 0 },
-      { summary: '张三垫付待报销', accountCode: '2241', debit: 0, credit: 420 }
-    ]
-  },
-  {
-    key: 'reimburse-owner-summary',
-    category: '报销与日常',
-    title: '月底汇总还垫付（法人·采购+餐饮）',
-    businessType: '日常费用',
-    remark: '按费用类型分行冲销 2241，贷方一笔打款；金额从明细账核对后填入',
-    entries: [
-      { summary: '归还3月采购垫付-法人', accountCode: '2241', debit: 3800, credit: 0 },
-      { summary: '归还3月餐饮垫付-法人', accountCode: '2241', debit: 860, credit: 0 },
-      { summary: '公账转法人（3月报销汇总）', accountCode: '1002', debit: 0, credit: 4660 }
-    ]
-  },
-  {
-    key: 'reimburse-staff-summary',
-    category: '报销与日常',
-    title: '月底汇总还垫付（同事·采购+餐饮）',
-    businessType: '日常费用',
-    remark: '同事同理：采购、餐饮分行借 2241，再一笔贷银行存款',
-    entries: [
-      { summary: '归还3月采购垫付-张三', accountCode: '2241', debit: 1200, credit: 0 },
-      { summary: '归还3月餐饮垫付-张三', accountCode: '2241', debit: 420, credit: 0 },
-      { summary: '公账转张三（3月报销汇总）', accountCode: '1002', debit: 0, credit: 1620 }
+      { summary: '【福利费】晚餐（zqn垫付）', accountCode: '5602', debit: 259, credit: 0 },
+      { summary: '【福利费】晚餐（zqn垫付）', accountCode: '2241', debit: 0, credit: 259 }
     ]
   },
   {
@@ -153,7 +108,7 @@ export const VOUCHER_EXAMPLES = [
     businessType: '销售收入',
     invoiceType: 'ordinary',
     taxAmount: 3000,
-    remark: '价税分离；普票税额月底可减免结转',
+    remark: '价税分离；普票税额月底可参与减免结转',
     entries: [
       { summary: '收到XX项目开发款（含税）', accountCode: '1002', debit: 103000, credit: 0 },
       { summary: '确认主营业务收入', accountCode: '5001', debit: 0, credit: 100000 },
@@ -175,14 +130,35 @@ export const VOUCHER_EXAMPLES = [
     ]
   },
   {
-    key: 'tax-exemption-carry',
-    category: '税务',
-    title: '月底普票增值税减免结转',
-    businessType: '税费缴纳',
-    remark: '也可在工作台一键生成；专票不参与此项结转',
+    key: 'wecom-withdraw',
+    category: '主营收入',
+    title: '企业微信提现到公账',
+    businessType: '销售收入',
+    invoiceType: 'ordinary',
+    taxAmount: 9.11,
+    remark:
+      '商户提现回流公账：借 1002，贷 5001 + 多笔 2221（按发票拆分税额）；金额仅为演示，请按实际对账单修改',
     entries: [
-      { summary: '2026年3月普票增值税减免结转', accountCode: '2221', debit: 3000, credit: 0 },
-      { summary: '2026年3月免税收入', accountCode: '5301', debit: 0, credit: 3000 }
+      { summary: '【提现】企业微信提现到公账', accountCode: '1002', debit: 2994, credit: 0 },
+      { summary: '确认收入（微信提现）', accountCode: '5001', debit: 0, credit: 2984.89 },
+      { summary: '应交增值税（有明确客户，开票 20）', accountCode: '2221', debit: 0, credit: 0.2 },
+      { summary: '应交增值税（有明确客户，开票 900）', accountCode: '2221', debit: 0, credit: 8.91 }
+    ]
+  },
+  {
+    key: 'wechat-pay-withdraw',
+    category: '主营收入',
+    title: '微信支付商户提现到公账',
+    businessType: '销售收入',
+    invoiceType: 'ordinary',
+    taxAmount: 1.16,
+    remark:
+      '微信支付商户平台提现：借 1002，贷 5001 + 多笔 2221；金额仅为演示，请按实际对账单与发票修改',
+    entries: [
+      { summary: '【提现】微信支付商户平台提现到公账', accountCode: '1002', debit: 1558, credit: 0 },
+      { summary: '确认收入（微信提现）', accountCode: '5001', debit: 0, credit: 1556.84 },
+      { summary: '应交增值税（有明确客户，开票 58.42）', accountCode: '2221', debit: 0, credit: 0.58 },
+      { summary: '应交增值税（有明确客户，开票 58）', accountCode: '2221', debit: 0, credit: 0.58 }
     ]
   },
   {

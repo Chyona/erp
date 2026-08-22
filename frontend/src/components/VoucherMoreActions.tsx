@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { Voucher } from '../services/voucher';
 import { confirmWarning } from '../utils/confirmAction';
 import { useApp } from '../context/AppContext';
+import { isCarryForwardVoucher } from '../utils/carryForwardVoucher';
 
 const { Text } = Typography;
 
@@ -19,6 +20,11 @@ export default function VoucherMoreActions({ voucher, onRefresh }) {
 
   const voucherType = voucher.voucherType || '记';
   const locked = voucher.status === Voucher.STATUS.LOCKED;
+  const carryForward = isCarryForwardVoucher(voucher);
+
+  if (carryForward) {
+    return null;
+  }
 
   const notifyDataChanged = () => {
     refresh();
@@ -135,10 +141,11 @@ export default function VoucherMoreActions({ voucher, onRefresh }) {
     },
     {
       key: 'insert',
+      disabled: locked,
       label: (
         <Space size={4}>
           插入凭证
-          <Tooltip title="在指定凭证号之前插入一张新凭证，其后凭证字号依次后移">
+          <Tooltip title="在指定凭证号之前插入一张新凭证，其后字号顺次后移。已审核凭证前可以插入；已申报结项凭证前不可插入。">
             <QuestionCircleOutlined className="voucher-more-actions__help" />
           </Tooltip>
         </Space>
@@ -214,7 +221,7 @@ export default function VoucherMoreActions({ voucher, onRefresh }) {
         />
         <Text>
           {' '}
-          号之前插入一张新凭证，原凭证及其之后的凭证将被顺次后移一个凭证号
+          号之前插入一张新凭证，原凭证及其之后的凭证将被顺次后移一个凭证号。已审核凭证前可以插入；已申报结项凭证前不可插入。
         </Text>
       </Modal>
     </>

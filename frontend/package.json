@@ -3,8 +3,10 @@
   "private": true,
   "version": "2.0.0",
   "type": "module",
+  "packageManager": "pnpm@11.10.0",
   "scripts": {
     "dev": "vite",
+    "dev:mock": "VITE_USE_MOCK=true vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"
@@ -13,12 +15,15 @@
     "@ant-design/icons": "^5.5.1",
     "antd": "^5.22.0",
     "dayjs": "^1.11.13",
+    "exceljs": "^4.4.0",
+    "jszip": "^3.10.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.28.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@types/node": "^26.2.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",

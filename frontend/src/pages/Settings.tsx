@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Button, Form, Input, Select, Typography, App, Card, Popconfirm, Space } from 'antd';
-import { DB } from '../services/db';
+import { Button, Form, Input, Select, Typography, App, Card, Popconfirm, Space, Table } from 'antd';
+import { ErpApi } from '../services/erpApi';
 import { Voucher } from '../services/voucher';
+import { TaxDeclaration } from '../services/taxDeclaration';
+import { formatQuarterLabel } from '../utils/reportPeriod';
 import { useApp } from '../context/AppContext';
 
 const { Title } = Typography;
@@ -16,20 +18,33 @@ const FIELDS = [
 
 export default function Settings() {
   const { message } = App.useApp();
-  const { setCompanyName, refresh } = useApp();
+  const { setCompanyName, refresh, refreshKey } = useApp();
   const [form] = Form.useForm();
   const [deleteVoucherNo, setDeleteVoucherNo] = useState('');
+  const [declaredQuarters, setDeclaredQuarters] = useState<
+    Awaited<ReturnType<typeof TaxDeclaration.getDeclaredQuarters>>
+  >([]);
+
+  const loadDeclaredQuarters = async () => {
+    setDeclaredQuarters(await TaxDeclaration.getDeclaredQuarters());
+  };
+
+  useEffect(() => {
+    loadDeclaredQuarters();
+  }, [refreshKey]);
 
   useEffect(() => {
     (async () => {
+      const all = await ErpApi.getAll('settings');
+      const map = new Map(all.map((s) => [s.key, s.value]));
       const values: Record<string, string> = {};
       for (const f of FIELDS) {
-        values[f] = String((await DB.getSetting(f)) ?? '');
+        values[f] = String(map.get(f) ?? '');
       }
       if (!values.defaultSignatory) {
         values.defaultSignatory =
-          String((await DB.getSetting('defaultPreparedBy')) ?? '') ||
-          String((await DB.getSetting('defaultReviewedBy')) ?? '') ||
+          String(map.get('defaultPreparedBy') ?? '') ||
+          String(map.get('defaultReviewedBy') ?? '') ||
           '';
       }
       form.setFieldsValue(values);
@@ -37,13 +52,14 @@ export default function Settings() {
   }, [form]);
 
   const handleSave = async (values) => {
-    for (const f of FIELDS) {
-      await DB.setSetting(f, (values[f] || '').trim());
-    }
     const signatory = (values.defaultSignatory || '').trim();
-    await DB.setSetting('defaultPreparedBy', signatory);
-    await DB.setSetting('defaultReviewedBy', signatory);
-    await DB.addAuditLog('修改', '系统设置', '企业信息更新');
+    const items = [
+      ...FIELDS.map((f) => ({ key: f, value: (values[f] || '').trim() })),
+      { key: 'defaultPreparedBy', value: signatory },
+      { key: 'defaultReviewedBy', value: signatory }
+    ];
+    await ErpApi.setSettingsBatch(items);
+    await ErpApi.addAuditLog('修改', '系统设置', '企业信息更新');
     setCompanyName(values.companyName || '');
     message.success('设置已保存');
     refresh();
@@ -94,7 +110,7 @@ export default function Settings() {
 
       <Card title="凭证维护" style={{ maxWidth: 720, marginTop: 24 }}>
         <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
-          按凭证字号删除本地数据（含已锁定凭证及附件），删除后不可恢复。
+          按凭证字号删除本地数据（含已结项凭证及附件），删除后不可恢复。
         </Typography.Paragraph>
         <Space.Compact style={{ width: '100%', maxWidth: 420 }}>
           <Input
@@ -130,6 +146,62 @@ export default function Settings() {
             </Button>
           </Popconfirm>
         </Space.Compact>
+      </Card>
+
+      <Card title="已申报季度" style={{ maxWidth: 720, marginTop: 24 }}>
+        <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
+          已申报的季度数据不可增删改、不可反结转。仅在确需更正时可取消申报标记。
+        </Typography.Paragraph>
+        <Table
+          size="small"
+          bordered
+          rowKey="periodKey"
+          pagination={false}
+          locale={{ emptyText: '暂无已申报季度' }}
+          dataSource={declaredQuarters}
+          columns={[
+            {
+              title: '季度',
+              dataIndex: 'periodKey',
+              render: (_, record) => formatQuarterLabel(record.year, record.quarter)
+            },
+            {
+              title: '申报时间',
+              dataIndex: 'declaredAt',
+              render: (value: string) => new Date(value).toLocaleString('zh-CN')
+            },
+            {
+              title: '操作',
+              width: 120,
+              render: (_, record) => (
+                <Popconfirm
+                  title="取消申报标记？"
+                  description={`取消后 ${formatQuarterLabel(record.year, record.quarter)} 将可再次修改凭证和反结转。`}
+                  okText="确认取消"
+                  cancelText="保留"
+                  onConfirm={async () => {
+                    try {
+                      await TaxDeclaration.unmarkQuarterDeclared({
+                        type: 'quarter',
+                        year: record.year,
+                        quarter: record.quarter
+                      });
+                      message.success('已取消申报标记');
+                      await loadDeclaredQuarters();
+                      refresh();
+                    } catch (err) {
+                      message.error((err as Error).message);
+                    }
+                  }}
+                >
+                  <Button type="link" danger size="small">
+                    取消标记
+                  </Button>
+                </Popconfirm>
+              )
+            }
+          ]}
+        />
       </Card>
     </div>
   );

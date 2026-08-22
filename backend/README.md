@@ -24,7 +24,7 @@ base/
 
 配置加载优先级（从高到低）：
 
-1. 环境变量 `APP_*`（容器部署时使用）
+1. 环境变量（如 `DATABASE_*`、`COS_*`，容器部署时使用）
 2. 外部配置文件（`-config` 参数指定）
 3. 内嵌默认配置 `internal/config/config.yaml`（本地调试默认使用）
 
@@ -36,6 +36,12 @@ base/
 | 数据库地址 | `127.0.0.1:5432` |
 | 数据库名 | `base_db` |
 | 数据库用户 | `postgres` / `postgres` |
+
+## ERP 前端对接
+
+前端通过 `frontend/src/services/erpApi.ts`（`ErpApi`）访问 **`/openapi/erp/v1`**（科目/凭证/附件元数据/审计/设置、`/app/init`、备份导入；附件文件走 COS）。接口说明见 `docs/ERP_API.md`。
+
+健康检查：`GET /health`（无 `/openapi` 前缀）。
 
 ## 初始化
 
@@ -89,7 +95,7 @@ go run ./cmd/envinit seed     # 填充种子数据
 
 ```bash
 # 环境变量
-APP_DATABASE_PASSWORD=your_password go run ./cmd/envinit init
+DATABASE_PASSWORD=your_password go run ./cmd/envinit init
 
 # 外部配置文件（任意路径的 yaml）
 go run ./cmd/envinit init -config /path/to/your.yaml
@@ -114,7 +120,7 @@ go run ./cmd/webserver -config /path/to/your.yaml
 或通过环境变量覆盖，例如：
 
 ```bash
-APP_SERVER_MODE=debug go run ./cmd/webserver
+SERVER_MODE=debug go run ./cmd/webserver
 ```
 
 ### 验证服务

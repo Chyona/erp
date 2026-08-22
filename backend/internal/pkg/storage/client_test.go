@@ -10,9 +10,10 @@ import (
 
 // mockStorageProvider 用于测试 Client 与 storageProvider 的解耦。
 type mockStorageProvider struct {
-	providerType ProviderType
-	uploadFileFn func(ctx context.Context, localPath, objectKey string) (string, error)
+	providerType   ProviderType
+	uploadFileFn   func(ctx context.Context, localPath, objectKey string) (string, error)
 	uploadReaderFn func(ctx context.Context, r io.Reader, objectKey string, size int64) (string, error)
+	deleteObjectFn func(ctx context.Context, objectKey string) error
 }
 
 func (m *mockStorageProvider) Type() ProviderType {
@@ -31,6 +32,17 @@ func (m *mockStorageProvider) UploadReader(ctx context.Context, r io.Reader, obj
 		return m.uploadReaderFn(ctx, r, objectKey, size)
 	}
 	return "https://mock.example.com/" + objectKey, nil
+}
+
+func (m *mockStorageProvider) ObjectURL(objectKey string) string {
+	return "https://mock.example.com/" + objectKey
+}
+
+func (m *mockStorageProvider) DeleteObject(ctx context.Context, objectKey string) error {
+	if m.deleteObjectFn != nil {
+		return m.deleteObjectFn(ctx, objectKey)
+	}
+	return nil
 }
 
 func TestClient_UploadFile(t *testing.T) {

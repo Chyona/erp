@@ -1,5 +1,5 @@
 import { Card, Tabs } from 'antd';
-import TaxExemptionPanel from './TaxExemptionPanel';
+import MonthEndClosingPanel from './MonthEndClosingPanel';
 import MonthEndReimbursementPanel from './MonthEndReimbursementPanel';
 
 export default function WorkbenchPanel() {
@@ -9,9 +9,9 @@ export default function WorkbenchPanel() {
         className="workbench-panel__tabs"
         items={[
           {
-            key: 'tax-exemption',
-            label: '普票结转',
-            children: <TaxExemptionPanel />
+            key: 'month-end-closing',
+            label: '季末结转',
+            children: <MonthEndClosingPanel />
           },
           {
             key: 'reimbursement',

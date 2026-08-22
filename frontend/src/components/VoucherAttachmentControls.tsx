@@ -43,6 +43,7 @@ export default function VoucherAttachmentControls({
             icon={<PaperClipOutlined />}
             className="voucher-sheet__upload"
             disabled={!canModify}
+            title="可一次选择多个文件"
           >
             上传附件
           </Button>

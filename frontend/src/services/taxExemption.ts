@@ -1,7 +1,9 @@
-import { DB } from './db';
+import { ErpApi } from './erpApi';
 import { Accounts } from './accounts';
 import { Voucher } from './voucher';
+import { TaxDeclaration } from './taxDeclaration';
 import { INVOICE_TYPE } from '../constants/invoice';
+import type { TaxExemptionTaxLine, Voucher as VoucherRecord } from '../types';
 import {
   formatTaxExemptionPeriod,
   reportPeriodEndDate,
@@ -13,9 +15,26 @@ function roundMoney(n) {
   return Math.round((parseFloat(n) || 0) * 100) / 100;
 }
 
+/** 销售凭证增值税：汇总分录中 2221 贷方合计（同一凭证可能有多条税额分录） */
+function sumSalesTaxCredits(voucher) {
+  let tax = 0;
+  for (const e of voucher.entries || []) {
+    if (e.accountCode === '2221') {
+      tax += parseFloat(String(e.credit)) || 0;
+    }
+  }
+  return roundMoney(tax);
+}
+
+function resolveSalesTaxAmount(voucher) {
+  const fromEntries = sumSalesTaxCredits(voucher);
+  if (fromEntries > 0) return fromEntries;
+  return roundMoney(voucher.taxAmount);
+}
+
 /** 销售凭证：价税合计=含税收款，不含税金额=主营业务收入，税额=增值税 */
 function getSalesInvoiceAmounts(voucher) {
-  const tax = roundMoney(voucher.taxAmount);
+  const tax = resolveSalesTaxAmount(voucher);
   const entries = voucher.entries || [];
 
   const revenueEntry = entries.find((e) => e.accountCode === '5001');
@@ -47,6 +66,50 @@ function getVoucherEntrySummary(voucher) {
   const first = entries.find((e) => e.summary?.trim());
   if (first) return first.summary.trim();
   return entries.map((e) => e.summary).filter(Boolean).join('；');
+}
+
+/** 展开销售凭证中的 2221 贷方分录，每条税额单独一行 */
+function expandSalesTaxLines(voucher: VoucherRecord): TaxExemptionTaxLine[] {
+  const lines: TaxExemptionTaxLine[] = [];
+  const entries = voucher.entries || [];
+
+  entries.forEach((e, index) => {
+    if (e.accountCode !== '2221') return;
+    const amount = roundMoney(parseFloat(String(e.credit)) || 0);
+    if (amount <= 0) return;
+    lines.push({
+      id: `${voucher.id}-${index}`,
+      voucherId: voucher.id,
+      voucherNo: voucher.voucherNo,
+      date: voucher.date,
+      taxAmount: amount,
+      entrySummary: e.summary?.trim() || getVoucherEntrySummary(voucher),
+      remark: voucher.remark?.trim() || '',
+      entryIndex: index
+    });
+  });
+
+  if (!lines.length) {
+    const tax = roundMoney(voucher.taxAmount);
+    if (tax > 0) {
+      lines.push({
+        id: `${voucher.id}-tax`,
+        voucherId: voucher.id,
+        voucherNo: voucher.voucherNo,
+        date: voucher.date,
+        taxAmount: tax,
+        entrySummary: getVoucherEntrySummary(voucher),
+        remark: voucher.remark?.trim() || '',
+        entryIndex: -1
+      });
+    }
+  }
+
+  return lines;
+}
+
+function uniqueVoucherIds(lines: TaxExemptionTaxLine[]) {
+  return [...new Set(lines.map((line) => line.voucherId))];
 }
 
 function enrichSalesVoucher(voucher, extra = {}) {
@@ -121,7 +184,7 @@ function isCarryForwardActive(voucher, voucherById) {
 /** 结转凭证被手动删除后，清除销售凭证上的失效结转标记 */
 async function repairOrphanTaxExemptionLinks(vouchers) {
   const voucherById = new Map(vouchers.map((v) => [v.id, v]));
-  let repaired = 0;
+  const toSave = [];
 
   for (const voucher of vouchers) {
     if (!voucher.taxExemptionDone) continue;
@@ -129,11 +192,11 @@ async function repairOrphanTaxExemptionLinks(vouchers) {
 
     voucher.taxExemptionDone = false;
     voucher.taxExemptionVoucherId = '';
-    await DB.put('vouchers', voucher);
-    repaired += 1;
+    toSave.push(voucher);
   }
 
-  return repaired;
+  await ErpApi.putMany('vouchers', toSave);
+  return toSave.length;
 }
 
 /** 指定期间（按月 / 按季）普票 / 专票减免结转汇总 */
@@ -150,8 +213,8 @@ export async function getPeriodSummary(period) {
     (v) => voucherInReportPeriod(v.date, period) && v.status !== Voucher.STATUS.DRAFT
   );
 
-  const ordinaryPending = [];
-  const ordinaryDone = [];
+  const ordinaryPending: TaxExemptionTaxLine[] = [];
+  const ordinaryDone: TaxExemptionTaxLine[] = [];
   const specialInvoices = [];
   const ordinaryWithoutTax = [];
 
@@ -164,21 +227,25 @@ export async function getPeriodSummary(period) {
     }
 
     if (v.invoiceType === INVOICE_TYPE.ORDINARY) {
-      const tax = roundMoney(v.taxAmount);
-      if (tax <= 0) {
+      const taxLines = expandSalesTaxLines(v);
+      if (!taxLines.length) {
         ordinaryWithoutTax.push(enrichSalesVoucher(v));
         continue;
       }
       if (isCarryForwardActive(v, voucherById)) {
-        ordinaryDone.push(enrichSalesVoucher(v, { taxAmount: tax }));
+        ordinaryDone.push(...taxLines);
       } else {
-        ordinaryPending.push(enrichSalesVoucher(v, { taxAmount: tax }));
+        ordinaryPending.push(...taxLines);
       }
     }
   }
 
   const linkedCfIds = [
-    ...new Set(ordinaryDone.map((v) => v.taxExemptionVoucherId).filter(Boolean))
+    ...new Set(
+      ordinaryDone
+        .map((line) => voucherById.get(line.voucherId)?.taxExemptionVoucherId)
+        .filter(Boolean)
+    )
   ];
   const relatedCarryForwardVouchers = collectRelatedCarryForwardVouchers(
     vouchers,
@@ -191,7 +258,7 @@ export async function getPeriodSummary(period) {
   const exactCarryForwardVoucher =
     vouchers.find((v) => matchesCarryForward(v, periodKey, periodType)) || null;
 
-  const pendingTaxTotal = ordinaryPending.reduce((sum, v) => sum + v.taxAmount, 0);
+  const pendingTaxTotal = ordinaryPending.reduce((sum, line) => sum + line.taxAmount, 0);
 
   return {
     period,
@@ -199,6 +266,8 @@ export async function getPeriodSummary(period) {
     periodType,
     ordinaryPending,
     ordinaryDone,
+    ordinaryPendingVoucherCount: uniqueVoucherIds(ordinaryPending).length,
+    ordinaryDoneVoucherCount: uniqueVoucherIds(ordinaryDone).length,
     ordinaryWithoutTax,
     specialInvoices,
     pendingTaxTotal: roundMoney(pendingTaxTotal),
@@ -224,6 +293,7 @@ export async function createCarryForward(period, { approve = true } = {}) {
   }
 
   const totalTax = summary.pendingTaxTotal;
+  const pendingVoucherIds = uniqueVoucherIds(summary.ordinaryPending);
   const accounts = await Accounts.getAll();
   const acc2221 = accounts.find((a) => a.code === '2221');
   const acc5301 = accounts.find((a) => a.code === '5301');
@@ -231,7 +301,7 @@ export async function createCarryForward(period, { approve = true } = {}) {
     throw new Error('缺少 2221 应交税费 或 5301 营业外收入 科目');
   }
 
-  const signatory = String((await DB.getSetting('defaultSignatory')) ?? '');
+  const signatory = String((await ErpApi.getSetting('defaultSignatory')) ?? '');
   const scopeLabel = period.type === 'quarter' ? '季度' : '月度';
 
   const voucherData = {
@@ -245,18 +315,18 @@ export async function createCarryForward(period, { approve = true } = {}) {
     taxExemptionPeriodType: period.type,
     taxExemptionPeriod: summary.periodKey,
     invoiceNumbers: '',
-    remark: `${scopeLabel}普票增值税减免结转，含 ${summary.ordinaryPending.length} 笔销售凭证`,
+    remark: `${scopeLabel}普票增值税减免结转，${pendingVoucherIds.length} 张凭证 ${summary.ordinaryPending.length} 条税额`,
     entries: [
-      {
-        summary: `${periodLabel}普票增值税减免结转`,
+      ...summary.ordinaryPending.map((line) => ({
+        summary: `${periodLabel}免税结转-${line.entrySummary || acc2221.name}`,
         accountId: acc2221.id,
         accountCode: acc2221.code,
         accountName: acc2221.name,
-        debit: totalTax,
+        debit: line.taxAmount,
         credit: 0
-      },
+      })),
       {
-        summary: `${periodLabel}免税收入`,
+        summary: `${periodLabel}免税结转-${acc5301.name}`,
         accountId: acc5301.id,
         accountCode: acc5301.code,
         accountName: acc5301.name,
@@ -273,29 +343,46 @@ export async function createCarryForward(period, { approve = true } = {}) {
 
   const saved = await Voucher.save(voucherData as import('../types').VoucherInput, approve);
 
-  for (const v of summary.ordinaryPending) {
-    const source = await Voucher.getById(v.id);
+  const linked = [];
+  for (const voucherId of pendingVoucherIds) {
+    const source = await Voucher.getById(voucherId);
     if (!source) continue;
     source.taxExemptionDone = true;
     source.taxExemptionVoucherId = saved.id;
-    await DB.put('vouchers', source);
+    linked.push(source);
   }
+  await ErpApi.putMany('vouchers', linked);
 
-  await DB.addAuditLog(
+  await ErpApi.addAuditLog(
     approve ? '新建并审核' : '新建草稿',
     '普票减免结转',
-    `${saved.voucherNo} ${totalTax.toFixed(2)} 元，${summary.ordinaryPending.length} 笔（${periodLabel}）`
+    `${saved.voucherNo} ${totalTax.toFixed(2)} 元，${summary.ordinaryPending.length} 条税额 / ${pendingVoucherIds.length} 张凭证（${periodLabel}）`
   );
 
   return {
     voucher: saved,
     count: summary.ordinaryPending.length,
+    voucherCount: pendingVoucherIds.length,
     totalTax
   };
 }
 
 /** 反结转：删除减免结转凭证，并恢复来源销售凭证的待结转状态 */
 export async function reverseCarryForward(period, carryForwardId) {
+  if (period.type === 'quarter' && period.quarter) {
+    if (
+      await TaxDeclaration.isQuarterDeclared({
+        type: 'quarter',
+        year: period.year,
+        quarter: period.quarter
+      })
+    ) {
+      throw new Error(
+        `${formatTaxExemptionPeriod(period)} 已申报，不可反结转。${TaxDeclaration.DECLARED_QUARTER_READONLY_TIP}`
+      );
+    }
+  }
+
   let cf;
   if (carryForwardId) {
     cf = await Voucher.getById(carryForwardId);
@@ -319,16 +406,16 @@ export async function reverseCarryForward(period, carryForwardId) {
   for (const v of linked) {
     v.taxExemptionDone = false;
     v.taxExemptionVoucherId = '';
-    await DB.put('vouchers', v);
   }
+  await ErpApi.putMany('vouchers', linked);
 
   if (cf.status === Voucher.STATUS.LOCKED) {
-    await Voucher.forceRemove(cf.id);
+    await Voucher.forceRemove(cf.id, { allowCarryForwardBypass: true });
   } else {
-    await Voucher.remove(cf.id);
+    await Voucher.remove(cf.id, { allowCarryForwardBypass: true });
   }
 
-  await DB.addAuditLog(
+  await ErpApi.addAuditLog(
     '反结转',
     '普票减免结转',
     `删除 ${cf.voucherNo}，恢复 ${linked.length} 笔销售凭证待结转状态（${periodLabel}）`

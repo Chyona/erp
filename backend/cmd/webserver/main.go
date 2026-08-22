@@ -13,6 +13,8 @@ import (
 	v1handler "erp/internal/handler/v1"
 	v2handler "erp/internal/handler/v2"
 	"erp/internal/middleware"
+	"erp/internal/pkg/llm"
+	"erp/internal/pkg/storage"
 	"erp/internal/repository"
 	"erp/internal/service"
 	routesv1 "erp/internal/routes/v1"
@@ -27,6 +29,10 @@ import (
 func main() {
 	configPath := flag.String("config", "", "外部配置文件路径（可选）")
 	flag.Parse()
+
+	// 本地 backend/.env（含 APP_LLM_*），不覆盖已有环境变量
+	_ = bootstrap.LoadDotEnv(".env")
+	_ = bootstrap.LoadDotEnv("backend/.env")
 
 	cfg, err := config.Load(*configPath)
 	if err != nil {
@@ -51,9 +57,29 @@ func main() {
 	v1AccountHandler := v1handler.NewAccountHandler(accountService)
 	v2AccountHandler := v2handler.NewAccountHandler(accountService)
 
+	erpRepo := repository.NewErpRepository(db)
+	var storeClient *storage.Client
+	if sc, err := storage.NewClientFromAppConfig(cfg.Storage); err != nil {
+		logger.Warn("对象存储未就绪，附件上传不可用", zap.Error(err))
+	} else {
+		storeClient = sc
+		logger.Info("对象存储已启用", zap.String("provider", string(sc.ProviderType())), zap.String("basePath", sc.BasePath()))
+	}
+	erpService := service.NewErpService(erpRepo, storeClient)
+	erpHandler := v1handler.NewErpHandler(erpService)
+	appService := service.NewAppService(erpRepo)
+	appHandler := v1handler.NewAppHandler(appService)
+	llmClient := llm.NewClient(cfg.LLM)
+	importHandler := v1handler.NewImportHandler(llmClient)
+	if llmClient.Enabled() {
+		logger.Info("大模型已启用", zap.String("visionModel", llmClient.VisionModel()))
+	} else {
+		logger.Warn("未配置 APP_LLM_API_KEY，截图导入将无法使用大模型识别")
+	}
+
 	gin.SetMode(cfg.Server.Mode)
 	r := gin.New()
-	r.Use(gin.Recovery(), middleware.RequestLogger(logger))
+	r.Use(gin.Recovery(), middleware.CORS(), middleware.RequestLogger(logger))
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
@@ -62,6 +88,9 @@ func main() {
 	api := r.Group("/openapi/base")
 	routesv1.RegisterRoutes(api.Group("/v1"), v1AccountHandler)
 	routesv2.RegisterRoutes(api.Group("/v2"), v2AccountHandler)
+
+	erpAPI := r.Group("/openapi/erp/v1")
+	routesv1.RegisterErpRoutes(erpAPI, erpHandler, appHandler, importHandler)
 
 	docs.SwaggerInfo.Host = cfg.Server.Addr()
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))

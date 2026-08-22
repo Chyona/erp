@@ -10,10 +10,11 @@ import {
   SettingOutlined
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { DB } from '../services/db';
+import { ErpApi } from '../services/erpApi';
 import { ExportUtil } from '../services/export';
 import { useApp } from '../context/AppContext';
 import { confirmWarning } from '../utils/confirmAction';
+import { APP_CONFIG } from '../config/app';
 
 const { Sider, Header, Content } = Layout;
 
@@ -40,14 +41,14 @@ export default function MainLayout() {
       (location.pathname === '/' ? '/' : location.pathname);
 
   const handleBackup = async () => {
-    const data = await DB.exportAll();
+    const data = await ErpApi.exportAll();
     const json = JSON.stringify(data, null, 2);
     ExportUtil.downloadBlob(
       json,
       `凭证系统备份_${new Date().toISOString().slice(0, 10)}.json`,
       'application/json'
     );
-    await DB.addAuditLog('备份', '全库', `${data.vouchers.length} 条凭证`);
+    await ErpApi.addAuditLog('备份', '全库', `${data.vouchers.length} 条凭证`);
     message.success('备份文件已下载');
   };
 
@@ -69,8 +70,8 @@ export default function MainLayout() {
         const text = await file.text();
         const data = JSON.parse(text);
         if (!data.vouchers) throw new Error('无效的备份文件');
-        await DB.importAll(data);
-        await DB.addAuditLog('恢复', '全库', `从备份恢复 ${data.vouchers.length} 条凭证`);
+        await ErpApi.importAll(data);
+        await ErpApi.addAuditLog('恢复', '全库', `从备份恢复 ${data.vouchers.length} 条凭证`);
         message.success('数据恢复成功');
         refresh();
         navigate('/');
@@ -86,8 +87,8 @@ export default function MainLayout() {
       <Sider width={220} theme="dark" className="app-sider">
         <div className="sidebar-logo">
           <span className="logo-icon">📒</span>
-          <Typography.Title level={5} style={{ color: '#fff', margin: 0 }}>
-            电子凭证
+          <Typography.Title level={5} style={{ color: '#fff', margin: 0 }} title={APP_CONFIG.name}>
+            {APP_CONFIG.shortName}
           </Typography.Title>
         </div>
         <Menu
@@ -99,7 +100,7 @@ export default function MainLayout() {
           className="sidebar-menu"
         />
         <div className="sidebar-footer">
-          <small>数据本地存储 · 不上传云端</small>
+          <small>{APP_CONFIG.footer}</small>
         </div>
       </Sider>
       <Layout className="app-main">

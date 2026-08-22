@@ -11,6 +11,7 @@ import {
 } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { TaxExemption } from '../services/taxExemption';
+import { ProfitLossClosing } from '../services/profitLossClosing';
 import { INVOICE_TYPE_LABEL } from '../constants/invoice';
 import { useApp } from '../context/AppContext';
 import { confirmDanger } from '../utils/confirmAction';
@@ -38,34 +39,62 @@ const amountColumns: ColumnsType<any> = [
   {
     title: '价税合计',
     dataIndex: 'grossAmount',
-    width: 108,
+    width: 110,
     align: 'right',
     render: renderMoney
   },
   {
     title: '不含税金额',
     dataIndex: 'netAmount',
-    width: 108,
+    width: 110,
     align: 'right',
     render: renderMoney
   },
   {
     title: '税额',
     dataIndex: 'taxAmount',
-    width: 96,
+    width: 110,
     align: 'right',
     render: renderTaxAmount
   }
 ];
 
+const PENDING_TAX_FIXED_COLS = {
+  voucherNo: 68,
+  date: 88,
+  taxAmount: 72
+} as const;
+
 const summaryColumn = {
   title: '摘要',
   dataIndex: 'entrySummary',
-  ellipsis: true,
-  width: 320
+  ellipsis: true
 };
 
-export default function TaxExemptionPanel() {
+const pendingTaxDetailColumns: ColumnsType<any> = [
+  {
+    title: '凭证号',
+    dataIndex: 'voucherNo',
+    width: PENDING_TAX_FIXED_COLS.voucherNo,
+    align: 'center'
+  },
+  { title: '日期', dataIndex: 'date', width: PENDING_TAX_FIXED_COLS.date },
+  {
+    title: '税额',
+    dataIndex: 'taxAmount',
+    width: PENDING_TAX_FIXED_COLS.taxAmount,
+    align: 'right',
+    render: renderTaxAmount
+  },
+  summaryColumn,
+  { title: '备注', dataIndex: 'remark', ellipsis: true }
+];
+
+export default function TaxExemptionPanel({
+  onGoProfitLossClosing
+}: {
+  onGoProfitLossClosing?: () => void;
+}) {
   const { message, modal } = App.useApp();
   const { refreshKey, refresh } = useApp();
   const navigate = useNavigate();
@@ -98,6 +127,13 @@ export default function TaxExemptionPanel() {
       return;
     }
 
+    const plConflict = await ProfitLossClosing.getProfitLossClosingConflictMessage({
+      type: period.type as 'month' | 'quarter',
+      year: period.year,
+      month: period.month,
+      quarter: period.quarter
+    });
+
     const ok = await confirmDanger(modal, {
       title: '生成普票减免结转凭证',
       content: (
@@ -108,9 +144,14 @@ export default function TaxExemptionPanel() {
             message="此操作将生成正式会计凭证并标记来源销售凭证为已结转，请仔细核对后再执行。"
             style={{ marginBottom: 12 }}
           />
+          {plConflict ? (
+            <Alert type="warning" showIcon message={plConflict} style={{ marginBottom: 12 }} />
+          ) : null}
           <p>
-            期间：{periodLabel}，共{' '}
-            <strong>{summary.ordinaryPending.length}</strong> 笔普票销售凭证
+            期间：{periodLabel}，共 <strong>{summary.ordinaryPending.length}</strong> 条税额分录
+            {summary.ordinaryPendingVoucherCount
+              ? `（${summary.ordinaryPendingVoucherCount} 张凭证）`
+              : ''}
           </p>
           <p>
             结转税额：<strong>¥{summary.pendingTaxTotal.toFixed(2)}</strong>
@@ -165,7 +206,7 @@ export default function TaxExemptionPanel() {
             <strong>{cf.voucherNo}</strong>
           </p>
           <p style={{ marginBottom: 0, color: '#64748b', fontSize: 12 }}>
-            关联的销售凭证将恢复为待结转；若结转凭证已锁定也会一并删除。
+            关联的销售凭证将恢复为待结转；若结转凭证已结项也会一并删除。
           </p>
         </div>
       ),
@@ -191,18 +232,7 @@ export default function TaxExemptionPanel() {
   const relatedCarryForwardVouchers = summary?.relatedCarryForwardVouchers || [];
   const hasExactCarryForward = Boolean(summary?.exactCarryForwardVoucher);
 
-  const pendingColumns: ColumnsType<any> = [
-    { title: '凭证号', dataIndex: 'voucherNo', width: 100 },
-    { title: '日期', dataIndex: 'date', width: 110 },
-    {
-      title: '发票类型',
-      width: 72,
-      render: () => <Tag color="blue">{INVOICE_TYPE_LABEL.ordinary}</Tag>
-    },
-    ...amountColumns,
-    summaryColumn,
-    { title: '备注', dataIndex: 'remark', ellipsis: true }
-  ];
+  const pendingColumns = pendingTaxDetailColumns;
 
   const specialColumns: ColumnsType<any> = [
     { title: '凭证号', dataIndex: 'voucherNo', width: 100 },
@@ -226,7 +256,7 @@ export default function TaxExemptionPanel() {
         type="info"
         showIcon
         style={{ marginBottom: 16 }}
-        message="普票销售凭证填写增值税额后，可按月或按季在此汇总结转；专票不参与减免结转，需正常缴纳。"
+        message="普票销售凭证填写增值税额后，在此汇总结转（贷 5301 营业外收入）。默认按月，与损益结转一致；若改为按季汇总，请在季度内逐月完成损益结转前先处理当月普票，或等季度末一并操作。"
       />
 
       <Space wrap style={{ marginBottom: 16 }} align="start">
@@ -271,14 +301,30 @@ export default function TaxExemptionPanel() {
 
       <div className="tax-exemption-panel__stats">
         <Text>
-          待结转普票：<strong>{summary?.ordinaryPending.length || 0}</strong> 笔，税额{' '}
+          待结转普票：<strong>{summary?.ordinaryPending.length || 0}</strong> 条，税额{' '}
           <span className="tax-exemption-panel__tax-total">
             ¥{(summary?.pendingTaxTotal || 0).toFixed(2)}
           </span>
         </Text>
         <Text type="secondary">
-          已结转 {summary?.ordinaryDone.length || 0} 笔 · 专票{' '}
+          已结转 {summary?.ordinaryDoneVoucherCount || 0} 张凭证 · 专票{' '}
           {summary?.specialInvoices.length || 0} 笔（不结转）
+          {!summary?.ordinaryPending.length &&
+            summary?.exactCarryForwardVoucher &&
+            onGoProfitLossClosing ? (
+            <>
+              {' '}
+              ·{' '}
+              <Button
+                type="link"
+                size="small"
+                onClick={onGoProfitLossClosing}
+                style={{ padding: 0, height: 'auto' }}
+              >
+                下一步：损益结转
+              </Button>
+            </>
+          ) : null}
         </Text>
       </div>
 
@@ -296,7 +342,7 @@ export default function TaxExemptionPanel() {
           type="info"
           showIcon
           style={{ margin: '12px 0' }}
-          message={`该${period.type === 'quarter' ? '季度' : '月份'}范围内已有 ${summary.ordinaryDone.length} 笔普票在其他期间结转，当前仅汇总未结转部分`}
+          message={`该${period.type === 'quarter' ? '季度' : '月份'}范围内已有 ${summary.ordinaryDoneVoucherCount} 张普票凭证在其他期间结转，当前仅汇总未结转部分`}
         />
       )}
 
@@ -314,11 +360,12 @@ export default function TaxExemptionPanel() {
           <Text strong style={{ display: 'block', margin: '12px 0 8px' }}>
             待结转普票明细
           </Text>
-          <div className="app-table">
+          <div className="app-table pending-tax-detail-table">
             <Table
               size="small"
               bordered
               rowKey="id"
+              tableLayout="fixed"
               columns={pendingColumns}
               dataSource={summary.ordinaryPending}
               pagination={false}

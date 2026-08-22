@@ -20,6 +20,7 @@ type Config struct {
 	Database DatabaseConfig `mapstructure:"database"`
 	Logger   LoggerConfig   `mapstructure:"logger"`
 	Storage  StorageConfig  `mapstructure:"storage"`
+	LLM      LLMConfig      `mapstructure:"llm"`
 }
 
 // ServerConfig HTTP 服务相关配置。
@@ -85,6 +86,15 @@ type TOSStorageConfig struct {
 	Endpoint        string `mapstructure:"endpoint"`
 }
 
+// LLMConfig OpenAI 兼容大模型（DashScope 等），环境变量前缀 APP_LLM_*。
+type LLMConfig struct {
+	APIKey      string `mapstructure:"api_key"`
+	BaseURL     string `mapstructure:"base_url"`
+	Model       string `mapstructure:"model"`
+	FlashModel  string `mapstructure:"flash_model"`
+	VisionModel string `mapstructure:"vision_model"`
+}
+
 // DSN 生成 PostgreSQL 连接字符串。
 func (d DatabaseConfig) DSN() string {
 	return fmt.Sprintf(
@@ -99,7 +109,7 @@ func (s ServerConfig) Addr() string {
 }
 
 // Load 加载配置。
-// 优先级：环境变量 APP_* > 外部配置文件（-config）> 内嵌 config.yaml。
+// 优先级：环境变量 > 外部配置文件（-config）> 内嵌 config.yaml。
 func Load(configPath string) (*Config, error) {
 	v := viper.New()
 	v.SetEnvPrefix("APP")
@@ -131,122 +141,139 @@ func Load(configPath string) (*Config, error) {
 	return &cfg, nil
 }
 
-// applyEnvOverrides 用已设置的环境变量 APP_* 覆盖配置（仅当环境变量存在时生效）。
+// applyEnvOverrides 用已设置的环境变量覆盖配置（仅当环境变量存在时生效）。
 func applyEnvOverrides(cfg *Config) {
-	if val, ok := os.LookupEnv("APP_SERVER_HOST"); ok {
+	if val, ok := os.LookupEnv("SERVER_HOST"); ok {
 		cfg.Server.Host = val
 	}
-	if val, ok := os.LookupEnv("APP_SERVER_PORT"); ok {
+	if val, ok := os.LookupEnv("SERVER_PORT"); ok {
 		if port, err := strconv.Atoi(val); err == nil {
 			cfg.Server.Port = port
 		}
 	}
-	if val, ok := os.LookupEnv("APP_SERVER_MODE"); ok {
+	if val, ok := os.LookupEnv("SERVER_MODE"); ok {
 		cfg.Server.Mode = val
 	}
 
-	if val, ok := os.LookupEnv("APP_DATABASE_HOST"); ok {
+	if val, ok := os.LookupEnv("DATABASE_HOST"); ok {
 		cfg.Database.Host = val
 	}
-	if val, ok := os.LookupEnv("APP_DATABASE_PORT"); ok {
+	if val, ok := os.LookupEnv("DATABASE_PORT"); ok {
 		if port, err := strconv.Atoi(val); err == nil {
 			cfg.Database.Port = port
 		}
 	}
-	if val, ok := os.LookupEnv("APP_DATABASE_USER"); ok {
+	if val, ok := os.LookupEnv("DATABASE_USER"); ok {
 		cfg.Database.User = val
 	}
-	if val, ok := os.LookupEnv("APP_DATABASE_PASSWORD"); ok {
+	if val, ok := os.LookupEnv("DATABASE_PASSWORD"); ok {
 		cfg.Database.Password = val
 	}
-	if val, ok := os.LookupEnv("APP_DATABASE_DBNAME"); ok {
+	if val, ok := os.LookupEnv("DATABASE_DBNAME"); ok {
 		cfg.Database.DBName = val
 	}
-	if val, ok := os.LookupEnv("APP_DATABASE_SSLMODE"); ok {
+	if val, ok := os.LookupEnv("DATABASE_SSLMODE"); ok {
 		cfg.Database.SSLMode = val
 	}
-	if val, ok := os.LookupEnv("APP_DATABASE_TIMEZONE"); ok {
+	if val, ok := os.LookupEnv("DATABASE_TIMEZONE"); ok {
 		cfg.Database.Timezone = val
 	}
-	if val, ok := os.LookupEnv("APP_DATABASE_MAX_IDLE_CONNS"); ok {
+	if val, ok := os.LookupEnv("DATABASE_MAX_IDLE_CONNS"); ok {
 		if n, err := strconv.Atoi(val); err == nil {
 			cfg.Database.MaxIdleConns = n
 		}
 	}
-	if val, ok := os.LookupEnv("APP_DATABASE_MAX_OPEN_CONNS"); ok {
+	if val, ok := os.LookupEnv("DATABASE_MAX_OPEN_CONNS"); ok {
 		if n, err := strconv.Atoi(val); err == nil {
 			cfg.Database.MaxOpenConns = n
 		}
 	}
 
-	if val, ok := os.LookupEnv("APP_LOGGER_LEVEL"); ok {
+	if val, ok := os.LookupEnv("LOGGER_LEVEL"); ok {
 		cfg.Logger.Level = val
 	}
-	if val, ok := os.LookupEnv("APP_LOGGER_FORMAT"); ok {
+	if val, ok := os.LookupEnv("LOGGER_FORMAT"); ok {
 		cfg.Logger.Format = val
 	}
-	if val, ok := os.LookupEnv("APP_LOGGER_FILENAME"); ok {
+	if val, ok := os.LookupEnv("LOGGER_FILENAME"); ok {
 		cfg.Logger.Filename = val
 	}
-	if val, ok := os.LookupEnv("APP_LOGGER_MAX_SIZE"); ok {
+	if val, ok := os.LookupEnv("LOGGER_MAX_SIZE"); ok {
 		if n, err := strconv.Atoi(val); err == nil {
 			cfg.Logger.MaxSize = n
 		}
 	}
-	if val, ok := os.LookupEnv("APP_LOGGER_MAX_BACKUPS"); ok {
+	if val, ok := os.LookupEnv("LOGGER_MAX_BACKUPS"); ok {
 		if n, err := strconv.Atoi(val); err == nil {
 			cfg.Logger.MaxBackups = n
 		}
 	}
 
-	if val, ok := os.LookupEnv("APP_STORAGE_BASE_PATH"); ok {
+	if val, ok := os.LookupEnv("STORAGE_BASE_PATH"); ok {
 		cfg.Storage.BasePath = val
 	}
-	if val, ok := os.LookupEnv("APP_STORAGE_SIGNED_URL_EXPIRE_DAYS"); ok {
+	if val, ok := os.LookupEnv("STORAGE_SIGNED_URL_EXPIRE_DAYS"); ok {
 		if n, err := strconv.Atoi(val); err == nil {
 			cfg.Storage.SignedURLExpireDays = n
 		}
 	}
 
-	if val, ok := os.LookupEnv("APP_STORAGE_COS_SECRET_ID"); ok {
+	if val, ok := os.LookupEnv("COS_SECRET_ID"); ok {
 		cfg.Storage.COS.SecretID = val
 	}
-	if val, ok := os.LookupEnv("APP_STORAGE_COS_SECRET_KEY"); ok {
+	if val, ok := os.LookupEnv("COS_SECRET_KEY"); ok {
 		cfg.Storage.COS.SecretKey = val
 	}
-	if val, ok := os.LookupEnv("APP_STORAGE_COS_BUCKET_NAME"); ok {
+	if val, ok := os.LookupEnv("COS_BUCKET_NAME"); ok {
 		cfg.Storage.COS.BucketName = val
 	}
-	if val, ok := os.LookupEnv("APP_STORAGE_COS_REGION"); ok {
+	if val, ok := os.LookupEnv("COS_REGION"); ok {
 		cfg.Storage.COS.Region = val
 	}
 
-	if val, ok := os.LookupEnv("APP_STORAGE_OSS_ACCESS_KEY_ID"); ok {
+	if val, ok := os.LookupEnv("OSS_ACCESS_KEY_ID"); ok {
 		cfg.Storage.OSS.AccessKeyID = val
 	}
-	if val, ok := os.LookupEnv("APP_STORAGE_OSS_ACCESS_KEY_SECRET"); ok {
+	if val, ok := os.LookupEnv("OSS_ACCESS_KEY_SECRET"); ok {
 		cfg.Storage.OSS.AccessKeySecret = val
 	}
-	if val, ok := os.LookupEnv("APP_STORAGE_OSS_BUCKET_NAME"); ok {
+	if val, ok := os.LookupEnv("OSS_BUCKET_NAME"); ok {
 		cfg.Storage.OSS.BucketName = val
 	}
-	if val, ok := os.LookupEnv("APP_STORAGE_OSS_ENDPOINT"); ok {
+	if val, ok := os.LookupEnv("OSS_ENDPOINT"); ok {
 		cfg.Storage.OSS.Endpoint = val
 	}
 
-	if val, ok := os.LookupEnv("APP_STORAGE_TOS_ACCESS_KEY_ID"); ok {
+	if val, ok := os.LookupEnv("TOS_ACCESS_KEY_ID"); ok {
 		cfg.Storage.TOS.AccessKeyID = val
 	}
-	if val, ok := os.LookupEnv("APP_STORAGE_TOS_ACCESS_KEY_SECRET"); ok {
+	if val, ok := os.LookupEnv("TOS_ACCESS_KEY_SECRET"); ok {
 		cfg.Storage.TOS.AccessKeySecret = val
 	}
-	if val, ok := os.LookupEnv("APP_STORAGE_TOS_BUCKET_NAME"); ok {
+	if val, ok := os.LookupEnv("TOS_BUCKET_NAME"); ok {
 		cfg.Storage.TOS.BucketName = val
 	}
-	if val, ok := os.LookupEnv("APP_STORAGE_TOS_REGION"); ok {
+	if val, ok := os.LookupEnv("TOS_REGION"); ok {
 		cfg.Storage.TOS.Region = val
 	}
-	if val, ok := os.LookupEnv("APP_STORAGE_TOS_ENDPOINT"); ok {
+	if val, ok := os.LookupEnv("TOS_ENDPOINT"); ok {
 		cfg.Storage.TOS.Endpoint = val
+	}
+
+	// APP_LLM_*（与用户提供的环境变量名一致）
+	if val, ok := os.LookupEnv("APP_LLM_API_KEY"); ok {
+		cfg.LLM.APIKey = val
+	}
+	if val, ok := os.LookupEnv("APP_LLM_BASE_URL"); ok {
+		cfg.LLM.BaseURL = val
+	}
+	if val, ok := os.LookupEnv("APP_LLM_MODEL"); ok {
+		cfg.LLM.Model = val
+	}
+	if val, ok := os.LookupEnv("APP_LLM_FLASH_MODEL"); ok {
+		cfg.LLM.FlashModel = val
+	}
+	if val, ok := os.LookupEnv("APP_LLM_VISION_MODEL"); ok {
+		cfg.LLM.VisionModel = val
 	}
 }

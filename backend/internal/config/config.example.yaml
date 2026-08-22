@@ -1,5 +1,5 @@
 # 应用默认配置（本地 go run 直接使用，不含生产密钥）
-# 优先级：环境变量 APP_* > 外部配置文件（-config）> 本文件
+# 优先级：环境变量 > 外部配置文件（-config）> 本文件
 server:
   host: "0.0.0.0"
   port: 30000
@@ -42,3 +42,12 @@ storage:
     bucket_name: ""
     region: ""
     endpoint: ""
+
+# OpenAI 兼容大模型（可用环境变量 APP_LLM_* 覆盖）
+llm:
+  api_key: ""
+  base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+  model: "qwen3.7-max"
+  flash_model: ""
+  # 截图识别需视觉模型；未配置时代码默认 qwen-vl-max
+  vision_model: "qwen-vl-max"

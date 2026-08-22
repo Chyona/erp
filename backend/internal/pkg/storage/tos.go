@@ -64,6 +64,11 @@ func (p *tosProvider) objectURL(objectKey string) string {
 	return fmt.Sprintf("https://%s.%s/%s", p.bucketName, p.endpoint, objectKey)
 }
 
+// ObjectURL 实现 storageProvider，返回未签名公开地址。
+func (p *tosProvider) ObjectURL(objectKey string) string {
+	return p.objectURL(objectKey)
+}
+
 // presignedURL 生成带有效期的 GET 签名链接。
 func (p *tosProvider) presignedURL(objectKey string) (string, error) {
 	expireSec := int64(signedURLExpireDuration(p.signedURLExpireDays, ProviderTOS).Seconds())
@@ -188,6 +193,21 @@ func (p *tosProvider) UploadReader(ctx context.Context, r io.Reader, objectKey s
 		return "", fmt.Errorf("TOS 上传失败: %w", err)
 	}
 	return p.accessURL(objectKey)
+}
+
+// DeleteObject 删除 TOS 对象；对象不存在视为成功。
+func (p *tosProvider) DeleteObject(ctx context.Context, objectKey string) error {
+	_, err := p.client.DeleteObjectV2(ctx, &tos.DeleteObjectV2Input{
+		Bucket: p.bucketName,
+		Key:    objectKey,
+	})
+	if err == nil {
+		return nil
+	}
+	if tosErr, ok := err.(*tos.TosServerError); ok && tosErr.StatusCode == 404 {
+		return nil
+	}
+	return fmt.Errorf("TOS 删除对象失败: %w", err)
 }
 
 // resolveTOSEndpoint 解析 TOS 访问端点（含 https 协议，符合官方 SDK 要求）。

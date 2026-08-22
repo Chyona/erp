@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Button,
   Card,
@@ -15,17 +15,21 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { Voucher } from '../services/voucher';
 import type { Attachment, VoucherStatus } from '../types';
-import { DB } from '../services/db';
+import { ErpApi } from '../services/erpApi';
 import { useApp } from '../context/AppContext';
 import { confirmDanger, confirmWarning } from '../utils/confirmAction';
 import BusinessTypeHint from '../components/BusinessTypeHint';
 import VoucherEntrySheet from '../components/VoucherEntrySheet';
 import VoucherSheetTools from '../components/VoucherSheetTools';
 import VoucherFormActions from '../components/VoucherFormActions';
+import VoucherExamples from '../components/VoucherExamples';
 import { buildAttachmentFileName } from '../utils/attachmentName';
 import { INVOICE_TYPE, INVOICE_TYPE_OPTIONS } from '../constants/invoice';
+import { isCarryForwardVoucher, CARRY_FORWARD_VOUCHER_READONLY_TIP } from '../utils/carryForwardVoucher';
 import {
   expectedCarryForwardDate,
+  expectedProfitLossClosingDate,
+  formatStoredProfitLossClosingPeriod,
   formatStoredTaxExemptionPeriod
 } from '../utils/reportPeriod';
 
@@ -83,6 +87,10 @@ export default function VoucherForm() {
   const [entries, setEntries] = useState<FormEntry[]>([emptyEntry(), emptyEntry()]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [attachmentPanelOpen, setAttachmentPanelOpen] = useState(false);
+  const attachmentsRef = useRef<Attachment[]>([]);
+  const uploadQueueRef = useRef(Promise.resolve());
+  const uploadToastRef = useRef({ count: 0, timer: 0 as ReturnType<typeof setTimeout> | 0 });
+  attachmentsRef.current = attachments;
   const [voucherNumber, setVoucherNumber] = useState('');
   const [voucherStatus, setVoucherStatus] = useState<VoucherStatus>(Voucher.STATUS.DRAFT);
   const [reviewedBy, setReviewedBy] = useState('');
@@ -91,8 +99,10 @@ export default function VoucherForm() {
   const [adjacent, setAdjacent] = useState({ older: null, newer: null });
   const [eyeCare, setEyeCare] = useState(() => localStorage.getItem(EYE_CARE_KEY) === '1');
   const [carryForwardPeriodLabel, setCarryForwardPeriodLabel] = useState('');
+  const [carryForwardReadOnly, setCarryForwardReadOnly] = useState(false);
 
-  const readOnly = isEdit && !Voucher.canEditVoucher(voucherStatus);
+  const readOnly =
+    isEdit && (carryForwardReadOnly || !Voucher.canEditVoucher(voucherStatus));
 
   const voucherDate = Form.useWatch('voucherDate', form);
   const businessType = Form.useWatch('businessType', form);
@@ -137,9 +147,17 @@ export default function VoucherForm() {
         navigate('/vouchers');
         return;
       }
+      if (isCarryForwardVoucher(v)) {
+        setCarryForwardReadOnly(true);
+        message.warning(CARRY_FORWARD_VOUCHER_READONLY_TIP);
+      }
       form.setFieldsValue({
         voucherDate: dayjs(
-          v.isTaxExemptionCarryForward ? expectedCarryForwardDate(v) || v.date : v.date
+          v.isTaxExemptionCarryForward
+            ? expectedCarryForwardDate(v) || v.date
+            : v.isProfitLossClosing
+              ? expectedProfitLossClosingDate(v) || v.date
+              : v.date
         ),
         attachmentCount: v.attachmentCount || 0,
         businessType: v.businessType || '其他',
@@ -152,7 +170,11 @@ export default function VoucherForm() {
       setVoucherNumber(v.voucherNumber);
       setVoucherStatus(v.status || Voucher.STATUS.DRAFT);
       setCarryForwardPeriodLabel(
-        v.isTaxExemptionCarryForward ? formatStoredTaxExemptionPeriod(v) : ''
+        v.isTaxExemptionCarryForward
+          ? formatStoredTaxExemptionPeriod(v)
+          : v.isProfitLossClosing
+            ? formatStoredProfitLossClosingPeriod(v)
+            : ''
       );
       setReviewedBy(v.reviewedBy || v.postedBy || '');
       setIsRedLetter(Voucher.isRedLetterVoucher(v));
@@ -204,7 +226,7 @@ export default function VoucherForm() {
   const openVoucher = (voucher) => {
     if (!voucher) return;
     if (voucher.status === Voucher.STATUS.LOCKED) {
-      message.info('已锁定凭证请在凭证列表中查看');
+      message.info('已结项凭证请在凭证列表中查看');
       return;
     }
     navigate(`/vouchers/${voucher.id}/edit`);
@@ -251,9 +273,9 @@ export default function VoucherForm() {
   };
 
   const loadDefaultSignatory = async () =>
-    (await DB.getSetting('defaultSignatory')) ||
-    (await DB.getSetting('defaultPreparedBy')) ||
-    (await DB.getSetting('defaultReviewedBy')) ||
+    (await ErpApi.getSetting('defaultSignatory')) ||
+    (await ErpApi.getSetting('defaultPreparedBy')) ||
+    (await ErpApi.getSetting('defaultReviewedBy')) ||
     '';
 
   const clearForm = async () => {
@@ -279,8 +301,11 @@ export default function VoucherForm() {
       if (!ok) return;
     }
 
-    for (const att of attachments) {
-      await DB.remove('attachments', att.id);
+    if (attachments.length) {
+      await ErpApi.removeMany(
+        'attachments',
+        attachments.map((att) => att.id)
+      );
     }
 
     const signatory = await loadDefaultSignatory();
@@ -374,6 +399,20 @@ export default function VoucherForm() {
     });
   };
 
+  const removeAttachmentsFromPanel = (indices: number[]) => {
+    if (!Voucher.canModifyAttachments(voucherStatus)) {
+      message.warning(Voucher.ATTACHMENT_READONLY_TIP);
+      return;
+    }
+    const removeSet = new Set(indices || []);
+    setAttachments((prev) => {
+      const next = prev.filter((_, idx) => !removeSet.has(idx));
+      if (next.length === 0) setAttachmentPanelOpen(false);
+      form.setFieldValue('attachmentCount', next.length);
+      return next;
+    });
+  };
+
   const toggleAttachmentPanel = () => {
     if (attachments.length === 0) return;
     setAttachmentPanelOpen((open) => !open);
@@ -385,7 +424,7 @@ export default function VoucherForm() {
     totals
   });
 
-  const handleUpload = async ({ file, onSuccess, onError }) => {
+  const handleUpload = ({ file, onSuccess, onError }) => {
     if (!Voucher.canModifyAttachments(voucherStatus)) {
       message.warning(Voucher.ATTACHMENT_READONLY_TIP);
       onError(new Error(Voucher.ATTACHMENT_READONLY_TIP));
@@ -396,21 +435,43 @@ export default function VoucherForm() {
       onError(new Error('文件过大'));
       return;
     }
-    try {
-      const fileName = buildAttachmentFileName({
-        ...getAttachmentNameContext(),
-        originalName: file.name,
-        index: attachments.length
+
+    const noteSuccess = () => {
+      uploadToastRef.current.count += 1;
+      if (uploadToastRef.current.timer) clearTimeout(uploadToastRef.current.timer);
+      uploadToastRef.current.timer = setTimeout(() => {
+        const n = uploadToastRef.current.count;
+        uploadToastRef.current.count = 0;
+        uploadToastRef.current.timer = 0;
+        if (n > 0) message.success(n > 1 ? `已上传 ${n} 个附件` : '附件上传成功');
+      }, 280);
+    };
+
+    uploadQueueRef.current = uploadQueueRef.current
+      .catch(() => undefined)
+      .then(async () => {
+        const fileName = buildAttachmentFileName({
+          ...getAttachmentNameContext(),
+          originalName: file.name,
+          index: attachmentsRef.current.length
+        });
+        const att = await Voucher.saveAttachment(
+          file,
+          fileName,
+          voucherDate ? voucherDate.format('YYYY-MM-DD') : undefined
+        );
+        const next = [...attachmentsRef.current, att];
+        attachmentsRef.current = next;
+        setAttachments(next);
+        form.setFieldValue('attachmentCount', next.length);
+        setAttachmentPanelOpen(true);
+        noteSuccess();
+        onSuccess();
+      })
+      .catch((err) => {
+        message.error(err?.message || '附件上传失败');
+        onError(err);
       });
-      const att = await Voucher.saveAttachment(file, fileName);
-      setAttachments((prev) => [...prev, att]);
-      form.setFieldValue('attachmentCount', attachments.length + 1);
-      setAttachmentPanelOpen(true);
-      onSuccess();
-    } catch (err) {
-      message.error(err.message || '附件上传失败');
-      onError(err);
-    }
   };
 
   const resetForNewVoucher = async () => {
@@ -444,6 +505,9 @@ export default function VoucherForm() {
       let isTaxExemptionCarryForward = false;
       let taxExemptionPeriod = '';
       let taxExemptionPeriodType = 'month';
+      let isProfitLossClosing = false;
+      let profitLossClosingPeriod = '';
+      let profitLossClosingPeriodType = 'month';
 
       if (isEdit) {
         const existing = await Voucher.getById(id);
@@ -452,6 +516,9 @@ export default function VoucherForm() {
         isTaxExemptionCarryForward = existing?.isTaxExemptionCarryForward || false;
         taxExemptionPeriod = existing?.taxExemptionPeriod || '';
         taxExemptionPeriodType = existing?.taxExemptionPeriodType || 'month';
+        isProfitLossClosing = existing?.isProfitLossClosing || false;
+        profitLossClosingPeriod = existing?.profitLossClosingPeriod || '';
+        profitLossClosingPeriodType = existing?.profitLossClosingPeriodType || 'month';
       }
 
       const voucherData = {
@@ -464,6 +531,11 @@ export default function VoucherForm() {
                 taxExemptionPeriod,
                 taxExemptionPeriodType
               })
+            : isProfitLossClosing && profitLossClosingPeriod
+              ? expectedProfitLossClosingDate({
+                  profitLossClosingPeriod,
+                  profitLossClosingPeriodType
+                })
             : values.voucherDate.format('YYYY-MM-DD'),
         attachmentCount: attachments.length,
         businessType: values.businessType,
@@ -482,6 +554,9 @@ export default function VoucherForm() {
         isTaxExemptionCarryForward,
         taxExemptionPeriod,
         taxExemptionPeriodType,
+        isProfitLossClosing,
+        profitLossClosingPeriod,
+        profitLossClosingPeriodType,
         entries,
         invoiceNumbers: values.invoiceNumbers?.trim() || '',
         remark: values.remark?.trim() || '',
@@ -593,13 +668,10 @@ export default function VoucherForm() {
     <VoucherFormActions
       readOnly={readOnly}
       canUnapprove={isEdit && voucherStatus === Voucher.STATUS.APPROVED}
-      accounts={accounts}
       onSave={() => save()}
       onSaveAndNew={() => save({ continueNew: true })}
       onCancel={() => navigate('/vouchers')}
       onUnapprove={handleUnapprove}
-      onApplyExample={applyExample}
-      getTemplateSnapshot={getTemplateSnapshot}
     />
   );
 
@@ -630,12 +702,28 @@ export default function VoucherForm() {
       <div className="page-header voucher-form-page__toolbar">
         <div className="voucher-form-page__toolbar-start">{formActions}</div>
         <div className="voucher-form-page__toolbar-end">
+          {/* 模板属辅助填单，放右侧与护眼/翻页同组，不与保存主操作抢注意力 */}
+          {!readOnly ? (
+            <VoucherExamples
+              accounts={accounts}
+              onApply={applyExample}
+              getSnapshot={getTemplateSnapshot}
+            />
+          ) : null}
           {sheetTools}
         </div>
       </div>
 
       <div className="page-form-body">
         <Card loading={loading} className={`voucher-form-card${readOnly ? ' voucher-form-card--readonly' : ''}`}>
+          {carryForwardReadOnly ? (
+            <Alert
+              type="info"
+              showIcon
+              message={CARRY_FORWARD_VOUCHER_READONLY_TIP}
+              style={{ marginBottom: 16 }}
+            />
+          ) : null}
           <Form form={form} layout="vertical" className="voucher-form">
             <Form.Item name="voucherDate" hidden rules={[{ required: true, message: '请选择日期' }]}>
               <DatePicker />
@@ -667,6 +755,7 @@ export default function VoucherForm() {
               onRemoveEntry={removeEntry}
               onUpload={handleUpload}
               onRemoveAttachment={removeAttachmentFromPanel}
+              onRemoveAttachments={removeAttachmentsFromPanel}
               canModifyAttachments={Voucher.canModifyAttachments(voucherStatus)}
               readOnly={readOnly}
               redLetter={isRedLetter}

@@ -1,77 +1,81 @@
-# 记账电子凭证系统
+# 记账电子凭证系统（前端）
 
-纯前端记账电子凭证管理系统，数据存储在浏览器本地（IndexedDB），无需服务器，适合中小企业日常记账与税务查账资料留存。
-
-**v2.0** 已迁移至 **React + Vite + Ant Design**。
-
-## 功能特性
-
-- **凭证管理**：新建、编辑、审核、锁定、删除记账凭证
-- **借贷平衡校验**：自动校验借贷是否相等，防止账务错误
-- **原始凭证附件**：支持上传发票、收据、PDF 等扫描件
-- **会计科目**：内置常用科目表，可自定义增删改
-- **明细账查询**：按科目查询期间发生额及余额
-- **打印凭证**：标准格式记账凭证，可直接打印
-- **CSV 导出**：凭证和明细账导出 Excel 可读格式
-- **审计日志**：所有操作自动记录，便于查账追溯
-- **数据备份/恢复**：JSON 全量备份，防止数据丢失
-- **校验码**：每张凭证生成唯一校验码，便于完整性核对
+React + Vite + Ant Design。业务数据通过 HTTP 访问后端 `/openapi/erp/v1`（开发可走代理或本地 Mock）。
 
 ## 快速开始
 
 ```bash
-# 安装依赖
-npm install
-
-# 开发模式（热更新）
-npm run dev
-
-# 生产构建
-npm run build
-
-# 预览构建结果
-npm run preview
+cp .env.example .env   # 首次：复制本地环境变量
+pnpm install
+pnpm dev               # 代理到真实后端（默认 http://127.0.0.1:30000）
+# 或
+pnpm dev:mock          # 不启后端，使用内存 Mock
 ```
 
-开发服务器默认运行在 http://localhost:5173
+开发服务器默认：http://localhost:5173
 
-构建后的静态文件在 `dist/` 目录，可部署到任意静态服务器，或通过 `npm run preview` 本地预览。
+## 环境变量
 
-## 使用方法
+| 文件 | 用途 | 是否提交 |
+|------|------|----------|
+| `.env` | 本地开发 | 否 |
+| `.env.example` | 本地示例 | 是 |
+| `.env.production` | 生产构建公开配置（无代理/密钥） | 是 |
 
-1. 运行 `npm run dev` 启动应用
-2. 首次使用请进入 **系统设置** 填写企业名称和统一社会信用代码
-3. 在 **新建凭证** 中录入分录，上传原始凭证附件
-4. 保存并审核后，可 **锁定凭证** 防止篡改
-5. 定期使用 **备份数据** 导出 JSON 文件异地保存
+```bash
+cp .env.example .env
+```
 
-> 从 v1 升级：IndexedDB 数据库名不变（`AccountingVoucherDB`），原有本地数据会自动保留。
+Vite 加载规则（文件不存在则跳过，不报错）：
 
-## 技术栈
+1. `pnpm dev` → `mode=development`，读本机 `.env`（含代理 / Mock，不提交）
+2. `pnpm build` → `mode=production`，读已提交的 `.env.production`  
+   （CI 通常没有 `.env`；本机若有 `.env`，会先读，再被 `.env.production` 同名项覆盖）
 
-- **React 18** + **Vite 6**
-- **Ant Design 5** — UI 组件
-- **React Router 6** — 路由
-- **IndexedDB** — 本地数据存储（支持大容量附件）
+| 变量 | 说明 | 默认 |
+|------|------|------|
+| `VITE_APP_NAME` | 系统全称（浏览器标题） | `记账电子凭证系统` |
+| `VITE_APP_SHORT_NAME` | 侧栏短名称 | `电子凭证` |
+| `VITE_APP_DESCRIPTION` | 系统简介 | — |
+| `VITE_APP_FOOTER` | 侧栏底部文案 | — |
+| `VITE_API_BASE_URL` | 前端请求的 API 根路径 | `/openapi/erp/v1` |
+| `VITE_PROXY_TARGET` | 仅本地 `.env`：Vite 开发代理目标 | `http://127.0.0.1:30000` |
+| `VITE_USE_MOCK` | `true` 时启用 Mock | `false` |
 
-## 项目结构
+说明：`VITE_PROXY_TARGET` 只写在本地 `.env`，**不要**写入可提交的 `.env.production`。
+
+- 联调后端：`.env` 中 `VITE_USE_MOCK=false`，先启动 `backend` 的 `go run ./cmd/webserver`
+- 纯前端：`pnpm dev:mock`（临时设置 `VITE_USE_MOCK=true`，无需改 `.env`）
+
+## 代理与 Mock
+
+- **代理**：`vite.config.ts` 将 `/openapi`、`/health` 转发到 `VITE_PROXY_TARGET`
+- **Mock**：`mock/` 目录提供与后端一致的 JSON 信封与 CRUD（科目/凭证/附件/审计/设置、`/app/init`、导入导出）
 
 ```
-accounting-voucher/
-├── index.html              # Vite 入口
-├── vite.config.js
-├── package.json
-├── src/
-│   ├── main.jsx
-│   ├── App.jsx
-│   ├── layouts/MainLayout.jsx
-│   ├── pages/              # 页面组件
-│   ├── components/         # 通用组件
-│   ├── services/           # 业务逻辑 & IndexedDB
-│   └── context/            # 全局状态
-└── README.md
+frontend/
+├── .env / .env.example
+├── .env.production
+├── vite.config.ts          # 代理 / Mock 切换
+├── mock/
+│   ├── erpStore.ts         # 内存数据
+│   ├── erpHandlers.ts      # 路由处理
+│   └── vitePluginErpMock.ts
+└── src/services/
+    ├── apiClient.ts
+    └── erpApi.ts           # ERP 后端 API 客户端（/openapi/erp/v1）
 ```
+
+## 常用脚本
+
+| 命令 | 说明 |
+|------|------|
+| `pnpm dev` | 开发（代理后端） |
+| `pnpm dev:mock` | 开发（Mock） |
+| `pnpm build` | 生产构建 |
+| `pnpm preview` | 预览构建产物 |
+| `pnpm typecheck` | TypeScript 检查 |
 
 ## 免责声明
 
-本系统为辅助记账工具，不构成专业财务或税务建议。请结合企业实际情况使用，重要财务决策请咨询专业会计师。
+本系统为辅助记账工具，不构成专业财务或税务建议。

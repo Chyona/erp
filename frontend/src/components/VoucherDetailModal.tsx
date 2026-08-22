@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Modal, Button, Space, App, Popconfirm } from 'antd';
+import { Modal, Button, Space, App, Popconfirm, Alert } from 'antd';
 import { FilePdfOutlined } from '@ant-design/icons';
 import { Voucher } from '../services/voucher';
 import { ExportUtil, getCompanyInfo } from '../services/export';
 import { confirmWarning } from '../utils/confirmAction';
 import { useApp } from '../context/AppContext';
-
-function isPdfAttachment(att) {
-  return att.type === 'application/pdf' || /\.pdf$/i.test(att.name || '');
-}
+import { isCarryForwardVoucher, CARRY_FORWARD_VOUCHER_READONLY_TIP } from '../utils/carryForwardVoucher';
+import { CarryForwardBadge } from './StatusBadge';
+import AttachmentPreviewModal, { isPdfAttachment } from './AttachmentPreviewModal';
 
 function AttachmentThumbnail({ attachment, onClick }) {
   const isPdf = isPdfAttachment(attachment);
@@ -24,57 +23,11 @@ function AttachmentThumbnail({ attachment, onClick }) {
         {isPdf ? (
           <FilePdfOutlined className="attachment-thumb__pdf-icon" />
         ) : (
-          <img src={attachment.data} alt="" className="attachment-thumb__img" />
+          <img src={attachment.url} alt="" className="attachment-thumb__img" />
         )}
       </div>
       <span className="attachment-thumb__name">{attachment.name}</span>
     </button>
-  );
-}
-
-function AttachmentPreviewModal({ attachment, open, onClose }) {
-  if (!attachment) return null;
-
-  const isPdf = isPdfAttachment(attachment);
-
-  return (
-    <Modal
-      title={attachment.name}
-      open={open}
-      onCancel={onClose}
-      footer={
-        <Space>
-          <Button href={attachment.data} download={attachment.name}>
-            下载
-          </Button>
-          <Button type="primary" onClick={onClose}>
-            关闭
-          </Button>
-        </Space>
-      }
-      width={920}
-      destroyOnHidden
-      className="attachment-preview-modal"
-    >
-      {isPdf ? (
-        <>
-          <iframe
-            title={attachment.name}
-            src={`${attachment.data}#toolbar=1&navpanes=0`}
-            className="attachment-preview-modal__pdf-frame"
-          />
-          <p className="attachment-preview-modal__hint">
-            若无法预览，请点击「下载」后本地查看
-          </p>
-        </>
-      ) : (
-        <img
-          src={attachment.data}
-          alt={attachment.name}
-          className="attachment-preview-modal__image"
-        />
-      )}
-    </Modal>
   );
 }
 
@@ -167,14 +120,14 @@ export default function VoucherDetailModal({
   const handleLock = async () => {
     if (!voucher) return;
     const ok = await confirmWarning(modal, {
-      title: '确定锁定凭证？',
-      content: `凭证 ${voucher.voucherNo} 锁定后将不可修改和删除，仅可查看和打印。`,
-      okText: '确定锁定'
+      title: '确定结项？',
+      content: `凭证 ${voucher.voucherNo} 结项后将不可修改和删除，仅可查看和打印。`,
+      okText: '确定结项'
     });
     if (!ok) return;
     try {
       await Voucher.lock(voucher.id);
-      message.success('凭证已锁定');
+      message.success('凭证已结项');
       onLocked?.();
       onClose();
     } catch (err) {
@@ -200,65 +153,79 @@ export default function VoucherDetailModal({
     }
   };
 
+  const carryForward = Boolean(voucher && isCarryForwardVoucher(voucher));
+
   return (
     <>
       <Modal
-        title={voucher ? `凭证 ${voucher.voucherNo}` : '凭证详情'}
+        title={
+          voucher ? (
+            <Space size={8}>
+              <span>{`凭证 ${voucher.voucherNo}`}</span>
+              <CarryForwardBadge voucher={voucher} />
+            </Space>
+          ) : (
+            '凭证详情'
+          )
+        }
         open={open}
         onCancel={onClose}
         width={800}
+        className="voucher-detail-modal"
+        wrapClassName="voucher-detail-modal-wrap"
         footer={
         <Space>
           <Button onClick={handlePrint} disabled={!voucher}>
             打印凭证
           </Button>
-          {voucher?.status === Voucher.STATUS.APPROVED && (
+          {!carryForward && voucher?.status === Voucher.STATUS.APPROVED && (
             <Button danger onClick={handleUnapprove} disabled={!voucher}>
               反审核
             </Button>
           )}
-          {voucher?.status === 'locked' ? (
-            <Popconfirm
-              title="确定强制删除已锁定凭证？"
-              description={
-                voucher
-                  ? `凭证 ${voucher.voucherNo} 及关联附件删除后不可恢复。`
-                  : undefined
-              }
-              okText="强制删除"
-              cancelText="取消"
-              okButtonProps={{ danger: true }}
-              onConfirm={handleForceDelete}
-              disabled={!voucher}
-            >
-              <Button danger disabled={!voucher}>
-                强制删除
-              </Button>
-            </Popconfirm>
-          ) : (
-            <>
+          {!carryForward &&
+            (voucher?.status === 'locked' ? (
               <Popconfirm
-                title="确定删除该凭证？"
+                title="确定强制删除已结项凭证？"
                 description={
                   voucher
                     ? `凭证 ${voucher.voucherNo} 及关联附件删除后不可恢复。`
                     : undefined
                 }
-                okText="确定删除"
+                okText="强制删除"
                 cancelText="取消"
                 okButtonProps={{ danger: true }}
-                onConfirm={handleDelete}
+                onConfirm={handleForceDelete}
                 disabled={!voucher}
               >
                 <Button danger disabled={!voucher}>
-                  删除凭证
+                  强制删除
                 </Button>
               </Popconfirm>
-              <Button onClick={handleLock} disabled={!voucher}>
-                锁定凭证
-              </Button>
-            </>
-          )}
+            ) : (
+              <>
+                <Popconfirm
+                  title="确定删除该凭证？"
+                  description={
+                    voucher
+                      ? `凭证 ${voucher.voucherNo} 及关联附件删除后不可恢复。`
+                      : undefined
+                  }
+                  okText="确定删除"
+                  cancelText="取消"
+                  okButtonProps={{ danger: true }}
+                  onConfirm={handleDelete}
+                  disabled={!voucher}
+                >
+                  <Button danger disabled={!voucher}>
+                    删除凭证
+                  </Button>
+                </Popconfirm>
+                <Button onClick={handleLock} disabled={!voucher}>
+                  凭证结项
+                </Button>
+              </>
+            ))}
           <Button type="primary" onClick={onClose}>
             关闭
           </Button>
@@ -266,6 +233,9 @@ export default function VoucherDetailModal({
         }
         loading={loading}
       >
+        {carryForward ? (
+          <Alert type="info" showIcon message={CARRY_FORWARD_VOUCHER_READONLY_TIP} style={{ marginBottom: 16 }} />
+        ) : null}
         {voucher && (
           <>
             <div

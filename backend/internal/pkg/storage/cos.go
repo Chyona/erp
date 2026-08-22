@@ -63,6 +63,11 @@ func (p *cosProvider) objectURL(objectKey string) string {
 	return fmt.Sprintf("https://%s.cos.%s.myqcloud.com/%s", p.bucketName, p.region, objectKey)
 }
 
+// ObjectURL 实现 storageProvider，返回未签名公开地址。
+func (p *cosProvider) ObjectURL(objectKey string) string {
+	return p.objectURL(objectKey)
+}
+
 // presignedURL 生成带有效期的 GET 签名链接。
 func (p *cosProvider) presignedURL(ctx context.Context, objectKey string) (string, error) {
 	expire := signedURLExpireDuration(p.signedURLExpireDays, ProviderCOS)
@@ -118,4 +123,16 @@ func (p *cosProvider) UploadReader(ctx context.Context, r io.Reader, objectKey s
 	}
 
 	return p.UploadFile(ctx, tmpPath, objectKey)
+}
+
+// DeleteObject 删除 COS 对象；对象不存在视为成功。
+func (p *cosProvider) DeleteObject(ctx context.Context, objectKey string) error {
+	_, err := p.client.Object.Delete(ctx, objectKey)
+	if err == nil {
+		return nil
+	}
+	if cos.IsNotFoundError(err) {
+		return nil
+	}
+	return fmt.Errorf("COS 删除对象失败: %w", err)
 }
