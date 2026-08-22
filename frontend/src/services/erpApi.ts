@@ -18,7 +18,7 @@ import type {
   StoreName,
   Voucher
 } from '../types';
-import { apiRequest, pingBackend } from './apiClient';
+import { apiRequest } from './apiClient';
 
 type StoreRecordMap = {
   vouchers: Voucher;
@@ -78,7 +78,7 @@ let opened = false;
 
 async function open(): Promise<void> {
   if (opened) return;
-  await pingBackend();
+  // 线上 /health 为容器内探活，不对前端开放；连通性由后续业务接口（如 /app/init）判定
   opened = true;
 }
 
