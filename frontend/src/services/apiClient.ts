@@ -20,14 +20,6 @@ export function getApiBase(): string {
   return API_BASE.replace(/\/$/, '');
 }
 
-export function getServerOrigin(): string {
-  const base = getApiBase();
-  if (base.startsWith('http://') || base.startsWith('https://')) {
-    return new URL(base).origin;
-  }
-  return '';
-}
-
 export async function apiRequest<T>(
   method: string,
   path: string,
@@ -71,13 +63,4 @@ export async function apiUploadForm<T>(path: string, form: FormData): Promise<T>
   }
 
   return json.data;
-}
-
-export async function pingBackend(): Promise<void> {
-  const origin = getServerOrigin();
-  const healthUrl = origin ? `${origin}/health` : '/health';
-  const res = await fetch(healthUrl);
-  if (!res.ok) {
-    throw new ApiError(`无法连接服务器（错误码 ${res.status}）`);
-  }
 }
