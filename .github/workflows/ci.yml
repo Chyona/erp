@@ -6,6 +6,36 @@ on:
       - 'v*'  # 匹配所有以 v 开头的 tag，如 v1.0.0
 
 jobs:
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+    - name: 准备代码
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: 检测 frontend 是否有变更
+      id: filter
+      run: |
+        CURRENT="${GITHUB_REF_NAME}"
+        PREV="$(git tag -l 'v*' --sort=-v:refname | awk -v cur="$CURRENT" '$0 != cur { print; exit }')"
+        if [ -z "$PREV" ]; then
+          echo "无上一版本 tag，将打包 frontend"
+          echo "frontend=true" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        echo "对比范围: $PREV -> $CURRENT (frontend/)"
+        if git diff --quiet "$PREV" "$CURRENT" -- frontend/; then
+          echo "frontend/ 无变更，跳过打包"
+          echo "frontend=false" >> "$GITHUB_OUTPUT"
+        else
+          echo "frontend/ 有变更，需要打包"
+          echo "frontend=true" >> "$GITHUB_OUTPUT"
+        fi
+
   backend:
     name: Build And Push Docker Image
     runs-on: ubuntu-latest
@@ -49,6 +79,8 @@ jobs:
 
   frontend:
     name: Build Frontend Dist
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
