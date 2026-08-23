@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -68,6 +69,29 @@ func (s *stubErpService) ClearChartAccounts(ctx context.Context) error { return 
 
 func (s *stubErpService) ListVouchers(ctx context.Context) ([]model.Voucher, error) {
 	return s.vouchers, s.err
+}
+func (s *stubErpService) ListVouchersPage(ctx context.Context, q service.VoucherListQuery) ([]model.Voucher, int64, error) {
+	if s.err != nil {
+		return nil, 0, s.err
+	}
+	items := s.vouchers
+	total := int64(len(items))
+	page, pageSize := q.Page, q.PageSize
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 100
+	}
+	start := (page - 1) * pageSize
+	if start >= len(items) {
+		return []model.Voucher{}, total, nil
+	}
+	end := start + pageSize
+	if end > len(items) {
+		end = len(items)
+	}
+	return items[start:end], total, nil
 }
 func (s *stubErpService) GetVoucher(ctx context.Context, id string) (*model.Voucher, error) {
 	if s.notFound {
@@ -269,6 +293,49 @@ func TestErpHandler_ChartAccounts(t *testing.T) {
 	r.ServeHTTP(w, httptest.NewRequest(http.MethodDelete, "/accounts", nil))
 	if w.Code != 200 {
 		t.Fatalf("ClearChartAccounts status = %d", w.Code)
+	}
+}
+
+func TestErpHandler_ListVouchersPaginated(t *testing.T) {
+	vouchers := make([]model.Voucher, 0, 15)
+	for i := 1; i <= 15; i++ {
+		vouchers = append(vouchers, model.Voucher{
+			ID:        fmt.Sprintf("v%d", i),
+			VoucherNo: fmt.Sprintf("记-%03d", i),
+			Date:      "2026-08-15",
+			Status:    "draft",
+		})
+	}
+	stub := &stubErpService{vouchers: vouchers}
+	h := NewErpHandler(stub, nil)
+	r := gin.New()
+	r.GET("/vouchers", h.ListVouchers)
+
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/vouchers?page=1&page_size=10&start_date=2026-08-01&end_date=2026-08-31", nil))
+	if w.Code != 200 {
+		t.Fatalf("ListVouchers paginated status = %d body=%s", w.Code, w.Body.String())
+	}
+	var body struct {
+		Code int `json:"code"`
+		Data struct {
+			List     []model.Voucher `json:"list"`
+			Total    int64           `json:"total"`
+			Page     int             `json:"page"`
+			PageSize int             `json:"page_size"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if len(body.Data.List) != 10 {
+		t.Fatalf("list len = %d, want 10", len(body.Data.List))
+	}
+	if body.Data.Total != 15 {
+		t.Fatalf("total = %d, want 15", body.Data.Total)
+	}
+	if body.Data.Page != 1 || body.Data.PageSize != 10 {
+		t.Fatalf("page = %d page_size = %d, want 1/10", body.Data.Page, body.Data.PageSize)
 	}
 }
 

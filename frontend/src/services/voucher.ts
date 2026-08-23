@@ -1,13 +1,9 @@
 import { ErpApi } from './erpApi';
-import { apiUploadForm } from './apiClient';
+import { apiRequest, apiUploadForm } from './apiClient';
 import { Accounts } from './accounts';
 import { getCurrentOperatorName } from '../context/AuthContext';
 import { buildAttachmentDisplayName } from '../utils/attachmentName';
 import {
-  matchSignatory,
-  matchVoucherAmount,
-  parseCodeRanges,
-  parseNumberRanges,
   parseVoucherNum as parseVoucherNumber
 } from '../utils/voucherFilter';
 import {
@@ -23,6 +19,7 @@ import {
 } from '../utils/reportPeriod';
 import { formatVoucherAuditDetail, formatVoucherBatchAuditDetail } from '../utils/auditDetail';
 import { syncSalesVoucherMeta } from '../utils/salesInvoiceTax';
+import { applyVoucherFilters, compareVouchersDesc } from '../utils/voucherListFilter';
 import type {
   Attachment,
   LedgerResult,
@@ -89,17 +86,8 @@ function isRedLetterVoucher(voucher: Pick<VoucherRecord, 'reversedFromId' | 'rev
   return summary.startsWith('冲销');
 }
 
-/** 凭证列表排序：日期倒序 → 字号倒序 */
-function compareVouchersDesc(a, b) {
-  const dateCmp = b.date.localeCompare(a.date);
-  if (dateCmp !== 0) return dateCmp;
-
-  const numA = parseVoucherNum(a.voucherNumber);
-  const numB = parseVoucherNum(b.voucherNumber);
-  if (numB !== numA) return numB - numA;
-
-  return (b.voucherNo || '').localeCompare(a.voucherNo || '');
-}
+/** 凭证列表排序：日期倒序 → 字号倒序（见 voucherListFilter） */
+export { compareVouchersDesc };
 
 function parseVoucherNum(value) {
   return parseInt(value, 10) || 0;
@@ -659,69 +647,79 @@ async function removeByVoucherNo(voucherNo, options: VoucherMutationOptions = {}
 }
 
 async function getAll(filters: VoucherFilters = {}) {
-  let vouchers = [...(await ErpApi.getAll('vouchers'))];
-  vouchers.sort(compareVouchersDesc);
+  const vouchers = await ErpApi.getAll('vouchers');
+  return applyVoucherFilters(vouchers, filters);
+}
 
-  if (filters.startDate) vouchers = vouchers.filter((v) => v.date >= filters.startDate!);
-  if (filters.endDate) vouchers = vouchers.filter((v) => v.date <= filters.endDate!);
-  if (filters.status) vouchers = vouchers.filter((v) => v.status === filters.status);
-  if (filters.voucherType) {
-    vouchers = vouchers.filter((v) => v.voucherType === filters.voucherType);
+type VoucherListPageResult = {
+  list: VoucherRecord[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
+function buildVoucherListQuery(filters: VoucherFilters, page: number, pageSize: number) {
+  const params = new URLSearchParams();
+  params.set('page', String(page));
+  params.set('page_size', String(pageSize));
+  if (filters.startDate) params.set('start_date', filters.startDate);
+  if (filters.endDate) params.set('end_date', filters.endDate);
+  if (filters.status) params.set('status', String(filters.status));
+  if (filters.voucherType) params.set('voucher_type', filters.voucherType);
+  if (filters.voucherNumber) params.set('voucher_number', filters.voucherNumber);
+  if (filters.summary) params.set('summary', filters.summary);
+  if (filters.accountCode) params.set('account_code', filters.accountCode);
+  if (filters.amountMin != null && filters.amountMin !== '') {
+    params.set('amount_min', String(filters.amountMin));
   }
-
-  const numberRanges = parseNumberRanges(filters.voucherNumber || '');
-  if (numberRanges) {
-    vouchers = vouchers.filter((v) => numberRanges.includes(parseVoucherNumber(v.voucherNumber)));
+  if (filters.amountMax != null && filters.amountMax !== '') {
+    params.set('amount_max', String(filters.amountMax));
   }
+  if (filters.businessType) params.set('business_type', filters.businessType);
+  if (filters.signatory) params.set('signatory', filters.signatory);
+  if (filters.remark) params.set('remark', filters.remark);
+  if (filters.keyword) params.set('keyword', filters.keyword);
+  return params.toString();
+}
 
-  const summaryKw = (filters.summary || '').trim().toLowerCase();
-  if (summaryKw) {
-    vouchers = vouchers.filter((v) =>
-      v.entries.some((e) => (e.summary || '').toLowerCase().includes(summaryKw))
+async function listPage(
+  filters: VoucherFilters = {},
+  { page = 1, pageSize = 100 }: { page?: number; pageSize?: number } = {}
+): Promise<VoucherListPageResult> {
+  const qs = buildVoucherListQuery(filters, page, pageSize);
+  const data = await apiRequest<
+    | VoucherRecord[]
+    | { list: VoucherRecord[]; total: number; page: number; page_size: number }
+  >('GET', `/vouchers?${qs}`);
+
+  if (Array.isArray(data)) {
+    const { list, total, page: safePage, pageSize: safeSize } = paginateVoucherList(
+      applyVoucherFilters(data, filters),
+      page,
+      pageSize
     );
+    return { list, total, page: safePage, pageSize: safeSize };
   }
 
-  const codeRanges = parseCodeRanges(filters.accountCode || '');
-  if (codeRanges) {
-    vouchers = vouchers.filter((v) =>
-      v.entries.some((e) => {
-        const code = String(e.accountCode || '').trim();
-        return code && codeRanges.includes(code);
-      })
-    );
-  }
+  return {
+    list: data.list || [],
+    total: data.total ?? 0,
+    page: data.page ?? page,
+    pageSize: data.page_size ?? pageSize
+  };
+}
 
-  if (filters.amountMin || filters.amountMax) {
-    vouchers = vouchers.filter((v) => matchVoucherAmount(v, filters.amountMin, filters.amountMax));
-  }
-
-  if (filters.businessType) {
-    vouchers = vouchers.filter((v) => v.businessType === filters.businessType);
-  }
-
-  if (filters.signatory) {
-    vouchers = vouchers.filter((v) => matchSignatory(v, filters.signatory!));
-  }
-
-  const remarkKw = (filters.remark || '').trim().toLowerCase();
-  if (remarkKw) {
-    vouchers = vouchers.filter((v) => (v.remark || '').toLowerCase().includes(remarkKw));
-  }
-
-  if (filters.keyword) {
-    const kw = filters.keyword.toLowerCase();
-    vouchers = vouchers.filter(
-      (v) =>
-        v.voucherNo.toLowerCase().includes(kw) ||
-        (v.remark && v.remark.toLowerCase().includes(kw)) ||
-        v.entries.some(
-          (e) =>
-            e.summary.toLowerCase().includes(kw) ||
-            (e.accountName && e.accountName.toLowerCase().includes(kw))
-        )
-    );
-  }
-  return vouchers;
+function paginateVoucherList(items: VoucherRecord[], page: number, pageSize: number) {
+  const safePage = Math.max(1, page);
+  const safeSize = Math.max(1, Math.min(pageSize, 100));
+  const total = items.length;
+  const start = (safePage - 1) * safeSize;
+  return {
+    list: start >= total ? [] : items.slice(start, start + safeSize),
+    total,
+    page: safePage,
+    pageSize: safeSize
+  };
 }
 
 async function getById(id) {
@@ -1135,6 +1133,7 @@ export const Voucher = {
   forceRemove,
   removeByVoucherNo,
   getAll,
+  listPage,
   getById,
   getAdjacentVoucher,
   getFormAdjacent,

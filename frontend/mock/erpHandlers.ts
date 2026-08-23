@@ -574,6 +574,38 @@ export async function handleErpMockRequest(
     // vouchers
     if (path === '/vouchers') {
       if (method === 'GET') {
+        const pageRaw = u.searchParams.get('page');
+        if (pageRaw) {
+          const page = Math.max(1, Number(pageRaw) || 1);
+          const pageSize = Math.max(1, Math.min(Number(u.searchParams.get('page_size') || '100') || 100, 100));
+          const filters = {
+            startDate: u.searchParams.get('start_date') || '',
+            endDate: u.searchParams.get('end_date') || '',
+            status: u.searchParams.get('status') || '',
+            voucherType: u.searchParams.get('voucher_type') || '',
+            voucherNumber: u.searchParams.get('voucher_number') || '',
+            summary: u.searchParams.get('summary') || '',
+            accountCode: u.searchParams.get('account_code') || '',
+            amountMin: u.searchParams.get('amount_min') || '',
+            amountMax: u.searchParams.get('amount_max') || '',
+            businessType: u.searchParams.get('business_type') || '',
+            signatory: u.searchParams.get('signatory') || '',
+            remark: u.searchParams.get('remark') || '',
+            keyword: u.searchParams.get('keyword') || ''
+          };
+          const { applyVoucherFilters, paginateVouchers } = await import(
+            '../src/utils/voucherListFilter'
+          );
+          const filtered = applyVoucherFilters([...store.vouchers.values()], filters);
+          const paged = paginateVouchers(filtered, page, pageSize);
+          ok(res, {
+            list: paged.list,
+            total: paged.total,
+            page: paged.page,
+            page_size: paged.pageSize
+          });
+          return true;
+        }
         ok(res, [...store.vouchers.values()]);
         return true;
       }

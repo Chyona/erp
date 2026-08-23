@@ -31,6 +31,7 @@ type ErpService interface {
 	ClearChartAccounts(ctx context.Context) error
 
 	ListVouchers(ctx context.Context) ([]model.Voucher, error)
+	ListVouchersPage(ctx context.Context, q VoucherListQuery) ([]model.Voucher, int64, error)
 	GetVoucher(ctx context.Context, id string) (*model.Voucher, error)
 	SaveVoucher(ctx context.Context, voucher *model.Voucher) (*model.Voucher, error)
 	SaveVouchersBatch(ctx context.Context, vouchers []model.Voucher) ([]model.Voucher, error)

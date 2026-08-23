@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Table, Button, Space, Typography, App, Upload, Tooltip, Checkbox, Popover } from 'antd';
+import { Table, Button, Space, Typography, App, Upload, Tooltip, Checkbox, Popover, Pagination } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import ScrollTable from './ScrollTable';
 import { DeleteOutlined, EyeOutlined, PaperClipOutlined } from '@ant-design/icons';
@@ -16,6 +16,52 @@ import VoucherAttachmentColumn from './VoucherAttachmentColumn';
 import { confirmDeleteWithPassword } from '../utils/confirmDeleteWithPassword';
 
 const { Link } = Typography;
+
+const VOUCHER_LIST_SCROLL_MIN_SELECTABLE = 1646;
+const VOUCHER_LIST_SCROLL_MIN = 1606;
+const VOUCHER_LIST_FIXED_LEFT_SPAN_SELECTABLE = 3;
+const VOUCHER_LIST_FIXED_LEFT_SPAN = 2;
+
+function formatTotalAmount(value: number) {
+  const num = parseFloat(String(value));
+  if (!num) return '';
+  return num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function renderVoucherTotalsSummaryRow(
+  selectable: boolean,
+  debit: number,
+  credit: number
+) {
+  const fixedLeftSpan = selectable
+    ? VOUCHER_LIST_FIXED_LEFT_SPAN_SELECTABLE
+    : VOUCHER_LIST_FIXED_LEFT_SPAN;
+  const base = fixedLeftSpan;
+  const lastIdx = selectable ? 13 : 12;
+
+  return (
+    <Table.Summary.Row className="voucher-grouped-table__row--total">
+      <Table.Summary.Cell index={0} colSpan={fixedLeftSpan} align="center">
+        合计
+      </Table.Summary.Cell>
+      <Table.Summary.Cell index={base} />
+      <Table.Summary.Cell index={base + 1} />
+      <Table.Summary.Cell index={base + 2} align="right">
+        {formatTotalAmount(debit)}
+      </Table.Summary.Cell>
+      <Table.Summary.Cell index={base + 3} align="right">
+        {formatTotalAmount(credit)}
+      </Table.Summary.Cell>
+      <Table.Summary.Cell index={base + 4} />
+      <Table.Summary.Cell index={base + 5} />
+      <Table.Summary.Cell index={base + 6} />
+      <Table.Summary.Cell index={base + 7} />
+      <Table.Summary.Cell index={base + 8} />
+      <Table.Summary.Cell index={base + 9} />
+      <Table.Summary.Cell index={lastIdx} className="voucher-grouped-table__total-tail" />
+    </Table.Summary.Row>
+  );
+}
 
 function buildGroupedRows(vouchers, showSubtotal) {
   const rows = [];
@@ -69,15 +115,10 @@ function renderMultilineText(value: string | undefined, splitPattern = /[,，、
     .map((item) => item.trim())
     .filter(Boolean);
   if (!parts.length) return '';
-  if (parts.length === 1) return parts[0];
+  const text = parts.join('、');
   return (
-    <span className="voucher-grouped-table__multiline">
-      {parts.map((part, index) => (
-        <span key={index}>
-          {index > 0 ? <br /> : null}
-          {part}
-        </span>
-      ))}
+    <span className="voucher-grouped-table__multiline" title={text}>
+      {text}
     </span>
   );
 }
@@ -87,28 +128,38 @@ export default function VoucherTable({
   compact = false,
   scrollable = false,
   selectable = false,
+  serverPagination = false,
   selectedIds = [],
   onSelectedIdsChange,
   onView,
   showSubtotal = true,
-  loading = false
+  loading = false,
+  pagination: paginationProp,
+  onPaginationChange
 }: {
   vouchers: VoucherRecord[];
   compact?: boolean;
   scrollable?: boolean;
   selectable?: boolean;
+  serverPagination?: boolean;
   selectedIds?: string[];
   onSelectedIdsChange?: (ids: string[]) => void;
   onView: (id: string) => void;
   showSubtotal?: boolean;
   loading?: boolean;
+  pagination?: { current: number; pageSize: number; total: number };
+  onPaginationChange?: (page: number, pageSize: number) => void;
 }) {
   const navigate = useNavigate();
   const { message, modal } = App.useApp();
   const { refresh } = useApp();
   const { canMutateVoucher, canAccessOwnVoucher, role } = useAuth();
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(100);
+  const [internalPage, setInternalPage] = useState(1);
+  const [internalPageSize, setInternalPageSize] = useState(100);
+  const page = paginationProp?.current ?? internalPage;
+  const pageSize = paginationProp?.pageSize ?? internalPageSize;
+  const total = paginationProp?.total ?? vouchers.length;
+  const useServerPagination = serverPagination && Boolean(paginationProp && onPaginationChange);
   const [uploadingId, setUploadingId] = useState('');
   const [attachPanelVoucher, setAttachPanelVoucher] = useState<VoucherRecord | null>(null);
   const [attachPanelItems, setAttachPanelItems] = useState<Attachment[]>([]);
@@ -132,14 +183,16 @@ export default function VoucherTable({
   };
 
   useEffect(() => {
-    setPage(1);
-  }, [vouchers]);
+    if (!useServerPagination) {
+      setInternalPage(1);
+    }
+  }, [vouchers, useServerPagination]);
 
   const pagedVouchers = useMemo(() => {
-    if (compact) return vouchers;
+    if (compact || useServerPagination) return vouchers;
     const start = (page - 1) * pageSize;
     return vouchers.slice(start, start + pageSize);
-  }, [vouchers, page, pageSize, compact]);
+  }, [vouchers, page, pageSize, compact, useServerPagination]);
 
   const groupedRows = useMemo(
     () => (compact ? [] : buildGroupedRows(pagedVouchers, showSubtotal)),
@@ -236,7 +289,7 @@ export default function VoucherTable({
   const renderActions = (voucher) => {
     const mutable = canMutateVoucher(voucher) && !isCarryForwardVoucher(voucher);
     return (
-      <Space size={0} direction="vertical" align="center" className="voucher-grouped-table__actions">
+      <Space size={0} align="center" wrap={false} className="voucher-grouped-table__actions">
         <Button
           type="text"
           size="small"
@@ -472,16 +525,15 @@ export default function VoucherTable({
         accept="image/*,.pdf"
         customRequest={(options) => handleListUpload(voucher, options)}
       >
-        <Button
-          type="link"
-          size="small"
-          icon={<PaperClipOutlined />}
-          loading={uploadingId === voucher.id}
-          className="voucher-grouped-table__upload"
-          title="可一次选择多个文件"
-        >
-          上传附件
-        </Button>
+        <Tooltip title="上传附件">
+          <Button
+            type="link"
+            size="small"
+            icon={<PaperClipOutlined />}
+            loading={uploadingId === voucher.id}
+            className="voucher-grouped-table__upload"
+          />
+        </Tooltip>
       </Upload>
     ) : (
       <Tooltip title={Voucher.ATTACHMENT_READONLY_TIP}>
@@ -491,14 +543,12 @@ export default function VoucherTable({
           icon={<PaperClipOutlined />}
           disabled
           className="voucher-grouped-table__upload voucher-grouped-table__upload--disabled"
-        >
-          上传附件
-        </Button>
+        />
       </Tooltip>
     );
 
     return (
-      <Space size={2} direction="vertical" className="voucher-grouped-table__attach">
+      <Space size={4} align="center" wrap={false} className="voucher-grouped-table__attach">
         {count > 0 && (
           <Popover
             open={panelOpen}
@@ -587,9 +637,8 @@ export default function VoucherTable({
     {
       title: '摘要',
       key: 'summary',
-      width: 160,
+      width: 220,
       ellipsis: true,
-      fixed: 'left',
       render: (_, record) =>
         record.rowType === 'subtotal' ? (
           <span className="voucher-grouped-table__subtotal-label">金额小计</span>
@@ -631,10 +680,13 @@ export default function VoucherTable({
     {
       title: '备注',
       key: 'remark',
+      width: 270,
       ellipsis: true,
       onCell: (record) => mergeCell(record.groupRowSpan),
       render: (_, record) => (
-        <span className="voucher-grouped-table__multiline">{record.voucher.remark || ''}</span>
+        <span className="voucher-grouped-table__multiline" title={record.voucher.remark || ''}>
+          {record.voucher.remark || ''}
+        </span>
       )
     },
     {
@@ -680,7 +732,7 @@ export default function VoucherTable({
     {
       title: '操作',
       key: 'actions',
-      width: 60,
+      width: 76,
       align: 'center',
       fixed: 'right',
       onCell: (record) => mergeCell(record.groupRowSpan),
@@ -726,56 +778,79 @@ export default function VoucherTable({
     );
   }
 
+  const handlePaginationChange = (nextPage: number, nextSize?: number) => {
+    const resolvedSize = nextSize ?? pageSize;
+    if (useServerPagination && onPaginationChange) {
+      onPaginationChange(nextPage, resolvedSize);
+      return;
+    }
+    setInternalPage(nextPage);
+    setInternalPageSize(resolvedSize);
+  };
+
+  const voucherPaginationConfig = {
+    current: page,
+    pageSize,
+    total,
+    showSizeChanger: true,
+    pageSizeOptions: ['10', '20', '50', '100'],
+    showTotal: (count: number) => `共 ${count} 张凭证`,
+    onChange: handlePaginationChange,
+    onShowSizeChange: handlePaginationChange
+  };
+
   const tableProps = {
     className: 'voucher-grouped-table',
     rowKey: 'key',
     loading,
     columns: groupedColumns as ColumnsType<any>,
     dataSource: groupedRows,
-    pagination: {
-      current: page,
-      pageSize,
-      total: vouchers.length,
-      showSizeChanger: true,
-      pageSizeOptions: [10, 20, 50, 100],
-      showTotal: (total) => `共 ${total} 张凭证`,
-      onChange: (nextPage, nextSize) => {
-        setPage(nextPage);
-        setPageSize(nextSize);
-      }
-    },
+    // 服务端按「凭证」分页时，dataSource 是展开后的分录行，不能再让 Table 按行二次切片
+    pagination: useServerPagination ? false : voucherPaginationConfig,
     rowClassName: (record) =>
       record.rowType === 'subtotal' ? 'voucher-grouped-table__row--subtotal' : '',
     locale: { emptyText: '暂无凭证数据' },
     size: 'small',
     bordered: true,
+    tableLayout: 'fixed',
     summary: () =>
       groupedRows.length ? (
-        <Table.Summary fixed>
-          <Table.Summary.Row className="voucher-grouped-table__row--total">
-            <Table.Summary.Cell index={0} colSpan={selectable ? 5 : 4} align="center">
-              合计
-            </Table.Summary.Cell>
-            <Table.Summary.Cell index={selectable ? 5 : 4} align="right">
-              {formatAmount(pageTotals.debit)}
-            </Table.Summary.Cell>
-            <Table.Summary.Cell index={selectable ? 6 : 5} align="right">
-              {formatAmount(pageTotals.credit)}
-            </Table.Summary.Cell>
-            <Table.Summary.Cell index={selectable ? 7 : 6} colSpan={selectable ? 8 : 7} />
-          </Table.Summary.Row>
+        <Table.Summary fixed={scrollable || undefined}>
+          {renderVoucherTotalsSummaryRow(selectable, pageTotals.debit, pageTotals.credit)}
         </Table.Summary>
       ) : null
   };
+
+  const paginationFooter =
+    useServerPagination && total > 0 ? (
+      <div className="table-scroll-footer">
+        <Pagination className="voucher-grouped-table__pagination" {...voucherPaginationConfig} />
+      </div>
+    ) : null;
+
+  const listChromeFooter = paginationFooter ? (
+    <div className="voucher-table-chrome">{paginationFooter}</div>
+  ) : null;
+
+  const tableScrollX = selectable ? VOUCHER_LIST_SCROLL_MIN_SELECTABLE : VOUCHER_LIST_SCROLL_MIN;
 
   if (scrollable) {
     return (
       <ScrollTable
         {...(tableProps as Record<string, unknown>)}
-        scroll={{ x: selectable ? 1630 : 1590 }}
+        fillPage
+        bodyClassName="page-table-body--voucher-list"
+        scroll={{ x: tableScrollX }}
+        scrollBarBelowSummary
+        footer={listChromeFooter}
       />
     );
   }
 
-  return <Table {...(tableProps as Record<string, unknown>)} />;
+  return (
+    <>
+      <Table {...(tableProps as Record<string, unknown>)} />
+      {listChromeFooter}
+    </>
+  );
 }

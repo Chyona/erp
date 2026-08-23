@@ -67,21 +67,30 @@ export default function VoucherList() {
   const [showSubtotal, setShowSubtotal] = useState(true);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(100);
+  const [total, setTotal] = useState(0);
   const { loading: listLoading, run: runListLoad } = useAsyncLoading(true);
 
   const activeFilterCount = useMemo(() => countActiveFilters(filters), [filters]);
 
-  const sortedVouchers = useMemo(
-    () => [...vouchers].sort(Voucher.compareVouchersDesc),
-    [vouchers]
-  );
-
-  const loadList = async (nextFilters: VoucherFilters = filters) => {
+  const loadList = async (
+    nextFilters: VoucherFilters = filters,
+    nextPage = page,
+    nextPageSize = pageSize
+  ) => {
     await runListLoad(async () => {
-      const list = await Voucher.getAll(nextFilters);
-      setVouchers(list);
-      setSelectedIds((prev) => prev.filter((id) => list.some((v) => v.id === id)));
+      const result = await Voucher.listPage(nextFilters, { page: nextPage, pageSize: nextPageSize });
+      setVouchers(result.list);
+      setTotal(result.total);
+      setPage(result.page);
+      setPageSize(result.pageSize);
+      setSelectedIds((prev) => prev.filter((id) => result.list.some((v) => v.id === id)));
     });
+  };
+
+  const handlePaginationChange = (nextPage: number, nextPageSize: number) => {
+    void loadList(filters, nextPage, nextPageSize);
   };
 
   useEffect(() => {
@@ -92,7 +101,7 @@ export default function VoucherList() {
     const next = { ...filters, ...patch };
     setFilters(next);
     setDraftFilters(next);
-    loadList(next);
+    loadList(next, 1, pageSize);
     if (options.closePanel) setFilterOpen(false);
   };
 
@@ -119,7 +128,7 @@ export default function VoucherList() {
     };
     setDraftFilters(next);
     setFilters(next);
-    loadList(next);
+    loadList(next, 1, pageSize);
   };
 
   const handleRefresh = () => {
@@ -339,23 +348,28 @@ export default function VoucherList() {
         </div>
       </div>
 
-      <VoucherTable
-        scrollable
-        selectable
-        loading={listLoading}
-        vouchers={sortedVouchers}
-        showSubtotal={showSubtotal}
-        selectedIds={selectedIds}
-        onSelectedIdsChange={setSelectedIds}
-        onView={setViewId}
-      />
+      <div className="page-table-layout__table">
+        <VoucherTable
+          scrollable
+          selectable
+          serverPagination
+          loading={listLoading}
+          vouchers={vouchers}
+          showSubtotal={showSubtotal}
+          selectedIds={selectedIds}
+          onSelectedIdsChange={setSelectedIds}
+          onView={setViewId}
+          pagination={{ current: page, pageSize, total }}
+          onPaginationChange={handlePaginationChange}
+        />
+      </div>
 
       <VoucherDetailModal
         voucherId={viewId}
         open={!!viewId}
         onClose={() => setViewId(null)}
         onVoucherChange={setViewId}
-        navigationIds={sortedVouchers.map((v) => v.id)}
+        navigationIds={vouchers.map((v) => v.id)}
       />
 
       <VoucherImportModal

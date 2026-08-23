@@ -9,6 +9,7 @@ import (
 	"erp/internal/middleware"
 	"erp/internal/model"
 	"erp/internal/pkg/response"
+	"erp/internal/pkg/utils"
 	"erp/internal/service"
 	"github.com/gin-gonic/gin"
 )
@@ -303,8 +304,43 @@ func (h *ErpHandler) DeleteChartAccountsBatch(c *gin.Context) {
 	response.Success(c, gin.H{"action": "delete", "count": len(req.IDs), "ids": req.IDs})
 }
 
-// ListVouchers GET /vouchers — 列出全部凭证。
+// ListVouchers GET /vouchers — 列出凭证；带 page 参数时返回分页结果。
 func (h *ErpHandler) ListVouchers(c *gin.Context) {
+	if c.Query("page") != "" {
+		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+		pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "100"))
+		page, pageSize = utils.DefaultPage(page, pageSize)
+		q := service.VoucherListQuery{
+			Page:          page,
+			PageSize:      pageSize,
+			StartDate:     c.Query("start_date"),
+			EndDate:       c.Query("end_date"),
+			Status:        c.Query("status"),
+			VoucherType:   c.Query("voucher_type"),
+			VoucherNumber: c.Query("voucher_number"),
+			Summary:       c.Query("summary"),
+			AccountCode:   c.Query("account_code"),
+			AmountMin:     c.Query("amount_min"),
+			AmountMax:     c.Query("amount_max"),
+			BusinessType:  c.Query("business_type"),
+			Signatory:     c.Query("signatory"),
+			Remark:        c.Query("remark"),
+			Keyword:       c.Query("keyword"),
+		}
+		items, total, err := h.erpService.ListVouchersPage(c.Request.Context(), q)
+		if err != nil {
+			response.InternalError(c, err.Error())
+			return
+		}
+		response.Success(c, response.PageData{
+			List:     items,
+			Total:    total,
+			Page:     page,
+			PageSize: pageSize,
+		})
+		return
+	}
+
 	items, err := h.erpService.ListVouchers(c.Request.Context())
 	if err != nil {
 		response.InternalError(c, err.Error())
