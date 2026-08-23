@@ -4,6 +4,7 @@ package service
 import (
 	"context"
 	"errors"
+	"net/mail"
 	"strings"
 
 	"erp/internal/model"
@@ -54,19 +55,21 @@ func (s *accountService) CreateAccount(ctx context.Context, username, email, pas
 	if username == "" {
 		return nil, errors.New("请填写用户名")
 	}
-	if email == "" {
-		return nil, errors.New("请填写邮箱")
-	}
 
 	if _, err := s.accountRepo.GetByUsername(ctx, username); err == nil {
 		return nil, errors.New("该用户名已被使用，请换一个用户名")
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
-	if _, err := s.accountRepo.GetByEmail(ctx, email); err == nil {
-		return nil, errors.New("该邮箱已被使用，请换一个邮箱")
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err
+	if email != "" {
+		if _, err := mail.ParseAddress(email); err != nil {
+			return nil, errors.New("邮箱格式不正确")
+		}
+		if _, err := s.accountRepo.GetByEmail(ctx, email); err == nil {
+			return nil, errors.New("该邮箱已被使用，请换一个邮箱")
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
 	}
 
 	if role == "" {
@@ -86,7 +89,7 @@ func (s *accountService) CreateAccount(ctx context.Context, username, email, pas
 
 	account := &model.Account{
 		Username:           username,
-		Email:              email,
+		Email:              optionalStringPtr(email),
 		Password:           hashed,
 		Nickname:           nickname,
 		Role:               rbac.NormalizeRole(role),
@@ -148,16 +151,18 @@ func (s *accountService) UpdateAccount(ctx context.Context, id uint, patch Updat
 	}
 	if patch.Email != nil {
 		email := strings.TrimSpace(*patch.Email)
-		if email == "" {
-			return nil, errors.New("请填写邮箱")
+		if email != "" {
+			if _, err := mail.ParseAddress(email); err != nil {
+				return nil, errors.New("邮箱格式不正确")
+			}
+			existing, err := s.accountRepo.GetByEmail(ctx, email)
+			if err == nil && existing.ID != id {
+				return nil, errors.New("该邮箱已被使用，请换一个邮箱")
+			} else if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, err
+			}
 		}
-		existing, err := s.accountRepo.GetByEmail(ctx, email)
-		if err == nil && existing.ID != id {
-			return nil, errors.New("该邮箱已被使用，请换一个邮箱")
-		} else if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, err
-		}
-		account.Email = email
+		account.Email = optionalStringPtr(email)
 	}
 	if patch.Phone != nil {
 		account.Phone = strings.TrimSpace(*patch.Phone)
@@ -369,4 +374,12 @@ func resolveAccountRole(account *model.Account) string {
 		return rbac.RoleAdmin
 	}
 	return rbac.NormalizeRole(raw)
+}
+
+func optionalStringPtr(raw string) *string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil
+	}
+	return &raw
 }

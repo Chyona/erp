@@ -3,7 +3,7 @@
 CREATE TABLE IF NOT EXISTS account (
     id          BIGSERIAL PRIMARY KEY,
     username    VARCHAR(64)  NOT NULL UNIQUE,
-    email       VARCHAR(128) NOT NULL UNIQUE,
+    email       VARCHAR(128),
     password    VARCHAR(255) NOT NULL,
     nickname    VARCHAR(64),
     open_id     VARCHAR(128),
@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS account (
     deleted_at  TIMESTAMPTZ
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_account_email ON account (email) WHERE email IS NOT NULL AND email <> '';
 CREATE INDEX IF NOT EXISTS idx_account_deleted_at ON account (deleted_at);
 CREATE INDEX IF NOT EXISTS idx_account_open_id ON account (open_id);
 CREATE INDEX IF NOT EXISTS idx_account_role ON account (role);

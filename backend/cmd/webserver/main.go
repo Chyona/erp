@@ -21,7 +21,6 @@ import (
 	"erp/internal/seeder"
 	"erp/internal/service"
 	routesv1 "erp/internal/routes/v1"
-	routesv2 "erp/internal/routes/v2"
 
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
@@ -108,13 +107,12 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
-	api := r.Group("/openapi/base")
-	routesv1.RegisterRoutes(api.Group("/v1"), v1AccountHandler, v1AuthHandler, jwtManager)
-	routesv2.RegisterRoutes(api.Group("/v2"), v2AccountHandler)
-
 	erpAPI := r.Group("/openapi/erp/v1")
-	erpAPI.Use(middleware.Auth(jwtManager), middleware.RequirePasswordSetupDone(), middleware.DenyReadonlyOnMutate())
-	routesv1.RegisterErpRoutes(erpAPI, erpHandler, appHandler, importHandler)
+	routesv1.RegisterRoutes(erpAPI, v1AccountHandler, v1AuthHandler, v2AccountHandler, jwtManager)
+
+	erpData := erpAPI.Group("")
+	erpData.Use(middleware.Auth(jwtManager), middleware.RequirePasswordSetupDone(), middleware.DenyReadonlyOnMutate())
+	routesv1.RegisterErpRoutes(erpData, erpHandler, appHandler, importHandler)
 
 	docs.SwaggerInfo.Host = cfg.Server.Addr()
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))

@@ -130,8 +130,8 @@ SERVER_MODE=debug go run ./cmd/webserver
 # 健康检查
 curl http://localhost:30000/health
 
-# 查询账号列表
-curl http://localhost:30000/openapi/base/v1/accounts
+# 查询系统用户列表（需管理员 Token）
+curl http://localhost:30000/openapi/erp/v1/users
 ```
 
 ### Swagger 文档
@@ -147,7 +147,7 @@ http://localhost:30000/swagger/index.html
 登录接口（无需 Token）：
 
 ```bash
-curl -X POST http://localhost:30000/openapi/base/v1/auth/login \
+curl -X POST http://localhost:30000/openapi/erp/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username":"admin","password":"admin"}'
 ```
@@ -155,7 +155,7 @@ curl -X POST http://localhost:30000/openapi/base/v1/auth/login \
 返回的 `token` 用于访问 ERP 与账号管理接口，示例：
 
 ```bash
-curl -X PUT http://localhost:30000/openapi/base/v1/accounts/1 \
+curl -X PUT http://localhost:30000/openapi/erp/v1/users/1 \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"nickname":"新昵称"}'
@@ -188,9 +188,10 @@ CI 在推送 `v*` tag 时按同样路径打包并推送到 Docker Hub：`{DOCKER
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/openapi/base/v1/accounts` | 账号列表 |
-| POST | `/openapi/base/v1/accounts` | 创建账号 |
-| GET | `/openapi/base/v1/accounts/:id` | 账号详情 |
-| PUT | `/openapi/base/v1/accounts/:id` | 更新账号（需鉴权） |
-| DELETE | `/openapi/base/v1/accounts/:id` | 删除账号（需鉴权） |
-| GET | `/openapi/base/v2/accounts/:id/profile` | 账号概要（v2） |
+| POST | `/openapi/erp/v1/auth/login` | 登录 |
+| POST | `/openapi/erp/v1/users` | 创建系统用户 |
+| GET | `/openapi/erp/v1/users` | 系统用户列表 |
+| GET | `/openapi/erp/v1/users/:id` | 系统用户详情 |
+| PUT | `/openapi/erp/v1/users/:id` | 更新系统用户（需鉴权） |
+| DELETE | `/openapi/erp/v1/users/:id` | 删除系统用户（需鉴权） |
+| GET | `/openapi/erp/v1/users/:id/profile` | 系统用户概要 |

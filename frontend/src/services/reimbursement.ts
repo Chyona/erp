@@ -2,7 +2,7 @@ import { ErpApi } from './erpApi';
 import { Accounts } from './accounts';
 import { Voucher } from './voucher';
 import { TaxDeclaration } from './taxDeclaration';
-import { getCurrentOperatorName } from '../context/AuthContext';
+import { getCurrentOperatorName, getCurrentOperatorNickname } from '../context/AuthContext';
 import {
   formatQuarterLabel,
   formatTaxExemptionPeriod,
@@ -212,6 +212,7 @@ export async function createReimbursementVoucher(period, person, { approve = tru
   }
 
   const signatory = getCurrentOperatorName();
+  const reviewer = getCurrentOperatorNickname();
   const periodLabel = formatTaxExemptionPeriod(period);
   const entries = [];
 
@@ -248,7 +249,7 @@ export async function createReimbursementVoucher(period, person, { approve = tru
     entries,
     attachmentIds: [],
     preparedBy: signatory,
-    reviewedBy: signatory,
+    reviewedBy: reviewer,
     postedBy: signatory,
     cashierBy: signatory
   };

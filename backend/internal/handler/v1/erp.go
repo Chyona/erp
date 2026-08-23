@@ -48,23 +48,8 @@ func requireExport(c *gin.Context) bool {
 	return true
 }
 
-func (h *ErpHandler) requireAdminDeletePassword(c *gin.Context, password string) bool {
-	actor := middleware.GetActor(c)
-	if actor == nil || !actor.IsAdmin() {
-		return true
-	}
-	if strings.TrimSpace(password) == "" {
-		response.BadRequest(c, "删除操作请输入登录密码确认")
-		return false
-	}
-	if h.accountService == nil {
-		response.InternalError(c, "账号服务未就绪")
-		return false
-	}
-	if err := h.accountService.VerifyPassword(c.Request.Context(), actor.AccountID, password); err != nil {
-		response.Forbidden(c, err.Error())
-		return false
-	}
+// requireAdminDeletePassword 保留兼容 confirmPassword 字段；已登录管理员凭 JWT 即可删除，不再二次验密。
+func (h *ErpHandler) requireAdminDeletePassword(c *gin.Context, _ string) bool {
 	return true
 }
 

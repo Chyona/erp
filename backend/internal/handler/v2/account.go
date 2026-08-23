@@ -26,7 +26,7 @@ func NewAccountHandler(accountService service.AccountService) *AccountHandler {
 // @Produce      json
 // @Param        id   path      int  true  "账号 ID"
 // @Success      200  {object}  response.Body
-// @Router       /v2/accounts/{id}/profile [get]
+// @Router       /v1/users/{id}/profile [get]
 func (h *AccountHandler) GetAccountProfile(c *gin.Context) {
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {

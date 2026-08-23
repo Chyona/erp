@@ -83,32 +83,32 @@ export default function AccountsPage() {
 
   const columns = [
     { title: '编码', dataIndex: 'code', width: 100 },
-    { title: '名称', dataIndex: 'name' },
-    { title: '类别', dataIndex: 'category', width: 120 },
+    { title: '名称', dataIndex: 'name', width: 160 },
+    { title: '类别', dataIndex: 'category', width: 160 },
     {
       title: '余额方向',
       dataIndex: 'direction',
-      width: 100,
+      width: 160,
       render: (d) => (d === 'debit' ? '借方' : '贷方')
     },
     ...(canWrite
       ? [
-          {
-            title: '操作',
-            key: 'actions',
-            width: 160,
-            render: (_, record) => (
-              <>
-                <Button size="small" onClick={() => openModal(record)} style={{ marginRight: 8 }}>
-                  编辑
-                </Button>
-                <Button size="small" danger onClick={() => handleDelete(record)}>
-                  删除
-                </Button>
-              </>
-            )
-          }
-        ]
+        {
+          title: '操作',
+          key: 'actions',
+          width: 160,
+          render: (_, record) => (
+            <>
+              <Button size="small" onClick={() => openModal(record)} style={{ marginRight: 8 }}>
+                编辑
+              </Button>
+              <Button size="small" danger onClick={() => handleDelete(record)}>
+                删除
+              </Button>
+            </>
+          )
+        }
+      ]
       : [])
   ];
 

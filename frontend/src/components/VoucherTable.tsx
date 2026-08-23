@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Table, Button, Space, Typography, App, Upload, Tooltip, Checkbox, Popover, Pagination } from 'antd';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { Table, Button, Space, Typography, App, Upload, Tooltip, Checkbox, Popover, Pagination, Empty } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import ScrollTable from './ScrollTable';
 import { DeleteOutlined, EyeOutlined, PaperClipOutlined } from '@ant-design/icons';
@@ -17,8 +17,8 @@ import { confirmDeleteWithPassword } from '../utils/confirmDeleteWithPassword';
 
 const { Link } = Typography;
 
-const VOUCHER_LIST_SCROLL_MIN_SELECTABLE = 1646;
-const VOUCHER_LIST_SCROLL_MIN = 1606;
+const VOUCHER_LIST_SCROLL_MIN_SELECTABLE = 1676;
+const VOUCHER_LIST_SCROLL_MIN = 1636;
 const VOUCHER_LIST_FIXED_LEFT_SPAN_SELECTABLE = 3;
 const VOUCHER_LIST_FIXED_LEFT_SPAN = 2;
 
@@ -107,6 +107,57 @@ function formatAmount(value: number | string, voucher?: Pick<VoucherRecord, 'rev
 
 function mergeCell(rowSpan) {
   return rowSpan > 0 ? { rowSpan } : { rowSpan: 0 };
+}
+
+const VOUCHER_LIST_EMPTY_ROW = { key: '__voucher_list_empty__', rowType: 'empty' as const };
+
+const VOUCHER_MIDDLE_COLUMN_KEYS = new Set([
+  'summary',
+  'account',
+  'debit',
+  'credit',
+  'remark',
+  'attachments',
+  'invoiceNumbers',
+  'preparedBy',
+  'reviewedBy',
+  'status'
+]);
+
+function isEmptyPlaceholderRow(record: { rowType?: string } | null | undefined) {
+  return record?.rowType === 'empty';
+}
+
+function emptyPlaceholderCell(colKey: string) {
+  if (colKey === 'summary') {
+    return { colSpan: VOUCHER_MIDDLE_COLUMN_KEYS.size };
+  }
+  if (VOUCHER_MIDDLE_COLUMN_KEYS.has(colKey) && colKey !== 'summary') {
+    return { colSpan: 0 };
+  }
+  return {};
+}
+
+function resolveCellProps(
+  record: { rowType?: string; groupRowSpan?: number },
+  colKey: string,
+  mergeGroup = false
+) {
+  if (isEmptyPlaceholderRow(record)) {
+    return emptyPlaceholderCell(colKey);
+  }
+  if (mergeGroup) {
+    return mergeCell(record.groupRowSpan);
+  }
+  return {};
+}
+
+function renderEmptyPlaceholder() {
+  return (
+    <div className="app-table-empty">
+      <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无凭证数据" />
+    </div>
+  );
 }
 
 function renderMultilineText(value: string | undefined, splitPattern = /[,，、;\s]+/) {
@@ -525,15 +576,16 @@ export default function VoucherTable({
         accept="image/*,.pdf"
         customRequest={(options) => handleListUpload(voucher, options)}
       >
-        <Tooltip title="上传附件">
-          <Button
-            type="link"
-            size="small"
-            icon={<PaperClipOutlined />}
-            loading={uploadingId === voucher.id}
-            className="voucher-grouped-table__upload"
-          />
-        </Tooltip>
+        <Button
+          type="link"
+          size="small"
+          icon={<PaperClipOutlined />}
+          loading={uploadingId === voucher.id}
+          className="voucher-grouped-table__upload"
+          title="可一次选择多个文件"
+        >
+          上传附件
+        </Button>
       </Upload>
     ) : (
       <Tooltip title={Voucher.ATTACHMENT_READONLY_TIP}>
@@ -543,7 +595,9 @@ export default function VoucherTable({
           icon={<PaperClipOutlined />}
           disabled
           className="voucher-grouped-table__upload voucher-grouped-table__upload--disabled"
-        />
+        >
+          上传附件
+        </Button>
       </Tooltip>
     );
 
@@ -595,8 +649,9 @@ export default function VoucherTable({
           width: 40,
           align: 'center',
           fixed: 'left',
-          onCell: (record) => mergeCell(record.groupRowSpan),
+          onCell: (record) => resolveCellProps(record, 'select'),
           render: (_, record) => {
+            if (isEmptyPlaceholderRow(record)) return null;
             const voucher = record.voucher;
             const rowSelectable =
               (voucher.status === Voucher.STATUS.DRAFT ||
@@ -618,40 +673,46 @@ export default function VoucherTable({
       key: 'voucherNo',
       width: 90,
       fixed: 'left',
-      onCell: (record) => mergeCell(record.groupRowSpan),
-      render: (_, record) =>
-        canOpenVoucherLink(record.voucher) ? (
+      onCell: (record) => resolveCellProps(record, 'voucherNo', true),
+      render: (_, record) => {
+        if (isEmptyPlaceholderRow(record)) return null;
+        return canOpenVoucherLink(record.voucher) ? (
           <Link onClick={() => openVoucherPage(record.voucher)}>{record.voucher.voucherNo}</Link>
         ) : (
           record.voucher.voucherNo
-        )
+        );
+      }
     },
     {
       title: '日期',
       dataIndex: ['voucher', 'date'],
       width: 110,
       fixed: 'left',
-      onCell: (record) => mergeCell(record.groupRowSpan),
-      render: (_, record) => record.voucher.date
+      onCell: (record) => resolveCellProps(record, 'date', true),
+      render: (_, record) => (isEmptyPlaceholderRow(record) ? null : record.voucher.date)
     },
     {
       title: '摘要',
       key: 'summary',
       width: 220,
       ellipsis: true,
-      render: (_, record) =>
-        record.rowType === 'subtotal' ? (
-          <span className="voucher-grouped-table__subtotal-label">金额小计</span>
-        ) : (
-          record.entry.summary
-        )
+      onCell: (record) => resolveCellProps(record, 'summary'),
+      render: (_, record) => {
+        if (isEmptyPlaceholderRow(record)) return renderEmptyPlaceholder();
+        if (record.rowType === 'subtotal') {
+          return <span className="voucher-grouped-table__subtotal-label">金额小计</span>;
+        }
+        return record.entry.summary;
+      }
     },
     {
       title: '科目',
       key: 'account',
       width: 140,
       ellipsis: true,
+      onCell: (record) => resolveCellProps(record, 'account'),
       render: (_, record) => {
+        if (isEmptyPlaceholderRow(record)) return null;
         if (record.rowType === 'subtotal') return '';
         const { accountCode, accountName } = record.entry;
         return accountCode ? `${accountCode} ${accountName || ''}`.trim() : '';
@@ -662,72 +723,84 @@ export default function VoucherTable({
       key: 'debit',
       width: 110,
       align: 'right',
-      render: (_, record) =>
-        record.rowType === 'subtotal'
+      onCell: (record) => resolveCellProps(record, 'debit'),
+      render: (_, record) => {
+        if (isEmptyPlaceholderRow(record)) return null;
+        return record.rowType === 'subtotal'
           ? formatAmount(record.voucher.totalDebit, record.voucher)
-          : formatAmount(record.entry.debit, record.voucher)
+          : formatAmount(record.entry.debit, record.voucher);
+      }
     },
     {
       title: '贷方金额',
       key: 'credit',
       width: 110,
       align: 'right',
-      render: (_, record) =>
-        record.rowType === 'subtotal'
+      onCell: (record) => resolveCellProps(record, 'credit'),
+      render: (_, record) => {
+        if (isEmptyPlaceholderRow(record)) return null;
+        return record.rowType === 'subtotal'
           ? formatAmount(record.voucher.totalCredit, record.voucher)
-          : formatAmount(record.entry.credit, record.voucher)
+          : formatAmount(record.entry.credit, record.voucher);
+      }
     },
     {
       title: '备注',
       key: 'remark',
       width: 270,
       ellipsis: true,
-      onCell: (record) => mergeCell(record.groupRowSpan),
-      render: (_, record) => (
+      onCell: (record) => resolveCellProps(record, 'remark', true),
+      render: (_, record) => {
+        if (isEmptyPlaceholderRow(record)) return null;
+        return (
         <span className="voucher-grouped-table__multiline" title={record.voucher.remark || ''}>
           {record.voucher.remark || ''}
         </span>
-      )
+        );
+      }
     },
     {
       title: '附件',
       key: 'attachments',
-      width: 90,
+      width: 120,
       align: 'center',
-      onCell: (record) => mergeCell(record.groupRowSpan),
-      render: (_, record) => renderAttachments(record.voucher)
+      className: 'voucher-grouped-table__attach-col',
+      onCell: (record) => resolveCellProps(record, 'attachments', true),
+      render: (_, record) => (isEmptyPlaceholderRow(record) ? null : renderAttachments(record.voucher))
     },
     {
       title: '发票号',
       key: 'invoiceNumbers',
       width: 160,
-      onCell: (record) => mergeCell(record.groupRowSpan),
-      render: (_, record) => renderMultilineText(record.voucher.invoiceNumbers)
+      onCell: (record) => resolveCellProps(record, 'invoiceNumbers', true),
+      render: (_, record) =>
+        isEmptyPlaceholderRow(record) ? null : renderMultilineText(record.voucher.invoiceNumbers)
     },
     {
       title: '制单人',
       key: 'preparedBy',
       width: 80,
       ellipsis: true,
-      onCell: (record) => mergeCell(record.groupRowSpan),
-      render: (_, record) => record.voucher.preparedBy || ''
+      onCell: (record) => resolveCellProps(record, 'preparedBy', true),
+      render: (_, record) => (isEmptyPlaceholderRow(record) ? null : record.voucher.preparedBy || '')
     },
     {
       title: '审核人',
       key: 'reviewedBy',
       width: 80,
       ellipsis: true,
-      onCell: (record) => mergeCell(record.groupRowSpan),
-      render: (_, record) => record.voucher.reviewedBy || ''
+      onCell: (record) => resolveCellProps(record, 'reviewedBy', true),
+      render: (_, record) => (isEmptyPlaceholderRow(record) ? null : record.voucher.reviewedBy || '')
     },
     {
       title: '状态',
       key: 'status',
       width: 80,
-      onCell: (record) => mergeCell(record.groupRowSpan),
-      render: (_, record) => (
-        <StatusBadge status={record.voucher.status} voucher={record.voucher} />
-      )
+      onCell: (record) => resolveCellProps(record, 'status', true),
+      render: (_, record) =>
+        isEmptyPlaceholderRow(record) ? null : (
+          <StatusBadge status={record.voucher.status} voucher={record.voucher} />
+        )
     },
     {
       title: '操作',
@@ -735,8 +808,8 @@ export default function VoucherTable({
       width: 76,
       align: 'center',
       fixed: 'right',
-      onCell: (record) => mergeCell(record.groupRowSpan),
-      render: (_, record) => renderActions(record.voucher)
+      onCell: (record) => resolveCellProps(record, 'actions', true),
+      render: (_, record) => (isEmptyPlaceholderRow(record) ? null : renderActions(record.voucher))
     }
   ];
 
@@ -799,16 +872,21 @@ export default function VoucherTable({
     onShowSizeChange: handlePaginationChange
   };
 
+  const isEmpty = groupedRows.length === 0;
+  const displayRows = isEmpty ? [VOUCHER_LIST_EMPTY_ROW] : groupedRows;
+
   const tableProps = {
     className: 'voucher-grouped-table',
     rowKey: 'key',
     loading,
     columns: groupedColumns as ColumnsType<any>,
-    dataSource: groupedRows,
+    dataSource: displayRows,
     // 服务端按「凭证」分页时，dataSource 是展开后的分录行，不能再让 Table 按行二次切片
     pagination: useServerPagination ? false : voucherPaginationConfig,
-    rowClassName: (record) =>
-      record.rowType === 'subtotal' ? 'voucher-grouped-table__row--subtotal' : '',
+    rowClassName: (record) => {
+      if (isEmptyPlaceholderRow(record)) return 'voucher-grouped-table__row--empty';
+      return record.rowType === 'subtotal' ? 'voucher-grouped-table__row--subtotal' : '';
+    },
     locale: { emptyText: '暂无凭证数据' },
     size: 'small',
     bordered: true,
@@ -840,6 +918,7 @@ export default function VoucherTable({
         {...(tableProps as Record<string, unknown>)}
         fillPage
         bodyClassName="page-table-body--voucher-list"
+        wrapStyle={{ '--voucher-list-scroll-x': `${tableScrollX}px` } as CSSProperties}
         scroll={{ x: tableScrollX }}
         scrollBarBelowSummary
         footer={listChromeFooter}

@@ -42,7 +42,7 @@ func EnsureBuiltinAdmin(db *gorm.DB, logger *zap.Logger) error {
 		}
 		account = model.Account{
 			Username:           builtinAdminUsername,
-			Email:              builtinAdminEmail,
+			Email:              strPtr(builtinAdminEmail),
 			Password:           hashed,
 			Nickname:           builtinAdminNickname,
 			Role:               rbac.RoleAdmin,
@@ -122,4 +122,11 @@ func EnsureAccountRoles(db *gorm.DB, logger *zap.Logger) error {
 		return res.Error
 	}
 	return nil
+}
+
+func strPtr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }

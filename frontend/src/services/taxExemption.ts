@@ -4,7 +4,7 @@ import { Voucher } from './voucher';
 import { TaxDeclaration } from './taxDeclaration';
 import { INVOICE_TYPE } from '../constants/invoice';
 import { syncSalesVoucherMeta } from '../utils/salesInvoiceTax';
-import { getCurrentOperatorName } from '../context/AuthContext';
+import { getCurrentOperatorName, getCurrentOperatorNickname } from '../context/AuthContext';
 import type { TaxExemptionTaxLine, Voucher as VoucherRecord } from '../types';
 import {
   formatTaxExemptionPeriod,
@@ -305,6 +305,7 @@ export async function createCarryForward(period, { approve = true } = {}) {
   }
 
   const signatory = getCurrentOperatorName();
+  const reviewer = getCurrentOperatorNickname();
   const scopeLabel = period.type === 'quarter' ? '季度' : '月度';
 
   const voucherData = {
@@ -339,7 +340,7 @@ export async function createCarryForward(period, { approve = true } = {}) {
     ],
     attachmentIds: [],
     preparedBy: signatory,
-    reviewedBy: signatory,
+    reviewedBy: reviewer,
     postedBy: signatory,
     cashierBy: signatory
   };

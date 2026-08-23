@@ -1,7 +1,7 @@
 import { ApiError } from './apiClient';
 import { sanitizeUserMessage, toUserMessage } from '../utils/userMessage';
 
-const AUTH_API_BASE = '/openapi/base/v1';
+const AUTH_API_BASE = '/openapi/erp/v1';
 
 export type LoginResult = {
   token: string;

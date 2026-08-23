@@ -254,7 +254,7 @@ func (s *erpService) applyVoucherWritePolicy(ctx context.Context, voucher *model
 		if strings.TrimSpace(voucher.PreparedBy) == "" {
 			voucher.PreparedBy = actor.DisplayName()
 		}
-		if voucher.Status == "approved" && strings.TrimSpace(voucher.ReviewedBy) == "" {
+		if voucher.Status == "approved" {
 			voucher.ReviewedBy = actor.DisplayName()
 		}
 		return nil
@@ -274,6 +274,12 @@ func (s *erpService) applyVoucherWritePolicy(ctx context.Context, voucher *model
 		voucher.PreparedBy = existing.PreparedBy
 	} else if strings.TrimSpace(voucher.PreparedBy) == "" {
 		voucher.PreparedBy = actor.DisplayName()
+	}
+	// 审核人：草稿→已审核时写入当前操作人昵称；反审核时清空
+	if voucher.Status == "approved" && existing.Status != "approved" {
+		voucher.ReviewedBy = actor.DisplayName()
+	} else if voucher.Status == "draft" && existing.Status == "approved" {
+		voucher.ReviewedBy = ""
 	}
 	return nil
 }

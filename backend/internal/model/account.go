@@ -11,7 +11,7 @@ import (
 type Account struct {
 	ID        uint           `gorm:"primaryKey" json:"id"`
 	Username  string         `gorm:"size:64;uniqueIndex;not null" json:"username"`
-	Email     string         `gorm:"size:128;uniqueIndex;not null" json:"email"`
+	Email     *string        `gorm:"size:128" json:"email"`
 	Password  string         `gorm:"size:255;not null" json:"-"`
 	Nickname  string         `gorm:"size:64" json:"nickname"`
 	OpenID    string         `gorm:"column:open_id;size:128;index" json:"open_id"` // 第三方授权 OpenId

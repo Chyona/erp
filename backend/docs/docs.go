@@ -15,7 +15,7 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/v1/accounts": {
+        "/v1/users": {
             "get": {
                 "description": "分页查询账号",
                 "produces": [
@@ -87,7 +87,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/v1/accounts/{id}": {
+        "/v1/users/{id}": {
             "get": {
                 "description": "根据 ID 查询账号",
                 "produces": [
@@ -188,7 +188,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/v2/accounts/{id}/profile": {
+        "/v1/users/{id}/profile": {
             "get": {
                 "description": "v2 版本账号概要接口",
                 "produces": [
@@ -279,7 +279,7 @@ const docTemplate = `{
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
 	Host:             "localhost:30000",
-	BasePath:         "/openapi/base",
+        BasePath:         "/openapi/erp/v1",
 	Schemes:          []string{},
 	Title:            "Base API",
 	Description:      "基于 Gin + PostgreSQL 的基础 API 服务",

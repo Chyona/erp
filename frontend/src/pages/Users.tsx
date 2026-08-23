@@ -26,6 +26,20 @@ import { Navigate } from 'react-router-dom';
 
 const { Title } = Typography;
 
+/** 邮箱选填：有内容时才校验格式，空值/纯空格不校验 */
+const optionalEmailRules = [
+  {
+    validator: (_: unknown, value: unknown) => {
+      const email = String(value ?? '').trim();
+      if (!email) return Promise.resolve();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return Promise.reject(new Error('请填写有效邮箱'));
+      }
+      return Promise.resolve();
+    }
+  }
+];
+
 const ROLE_OPTIONS: { value: Role; label: string }[] = [
   { value: 'admin', label: ROLE_LABEL.admin },
   { value: 'user', label: ROLE_LABEL.user },
@@ -77,11 +91,12 @@ export default function Users() {
   }
 
   const handleCreate = async () => {
-    const values = await form.validateFields();
     try {
+      const values = await form.validateFields();
+      const email = String(values.email ?? '').trim();
       await createSystemAccount({
         username: values.username.trim(),
-        email: values.email.trim(),
+        ...(email ? { email } : {}),
         password: values.password,
         nickname: (values.nickname || '').trim(),
         role: values.role
@@ -91,17 +106,19 @@ export default function Users() {
       form.resetFields();
       await load();
     } catch (err) {
+      if ((err as { errorFields?: unknown[] })?.errorFields) return;
       message.error(toUserMessage(err, '创建失败'));
     }
   };
 
   const handleEditProfile = async () => {
     if (!editTarget) return;
-    const values = await editForm.validateFields();
     try {
+      const values = await editForm.validateFields();
+      const email = String(values.email ?? '').trim();
       await updateSystemAccount(editTarget.id, {
         nickname: (values.nickname || '').trim(),
-        email: values.email.trim(),
+        email,
         phone: (values.phone || '').trim(),
         remark: (values.remark || '').trim()
       });
@@ -110,6 +127,7 @@ export default function Users() {
       editForm.resetFields();
       await load();
     } catch (err) {
+      if ((err as { errorFields?: unknown[] })?.errorFields) return;
       message.error(toUserMessage(err, '更新失败'));
     }
   };
@@ -163,7 +181,16 @@ export default function Users() {
         dataSource={rows}
         pagination={false}
         columns={[
-          { title: '用户名', dataIndex: 'username' },
+          {
+            title: '用户名',
+            dataIndex: 'username',
+            render: (username: string) => (
+              <Space size={4}>
+                {username}
+                {username === 'admin' ? <Tag color="blue">内置</Tag> : null}
+              </Space>
+            )
+          },
           { title: '昵称', dataIndex: 'nickname' },
           { title: '邮箱', dataIndex: 'email' },
           {
@@ -291,7 +318,7 @@ export default function Users() {
           <Form.Item name="username" label="用户名" rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="email" label="邮箱" rules={[{ required: true, type: 'email' }]}>
+          <Form.Item name="email" label="邮箱" rules={optionalEmailRules}>
             <Input />
           </Form.Item>
           <Form.Item
@@ -322,11 +349,7 @@ export default function Users() {
           <Form.Item name="nickname" label="昵称">
             <Input placeholder="显示名称" />
           </Form.Item>
-          <Form.Item
-            name="email"
-            label="邮箱"
-            rules={[{ required: true, type: 'email', message: '请填写有效邮箱' }]}
-          >
+          <Form.Item name="email" label="邮箱" rules={optionalEmailRules}>
             <Input />
           </Form.Item>
           <Form.Item name="phone" label="手机">

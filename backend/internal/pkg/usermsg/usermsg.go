@@ -74,6 +74,9 @@ func Sanitize(raw string) string {
 		}
 		switch m[2] {
 		case "required":
+			if strings.EqualFold(m[1], "Email") {
+				return "操作失败，请稍后重试"
+			}
 			return "请填写" + field
 		case "email":
 			return "邮箱格式不正确"

@@ -1,12 +1,12 @@
 /**
- * 账号管理 API（/openapi/base/v1/accounts，仅管理员）。
+ * 系统用户管理 API（/openapi/erp/v1/users，仅管理员）。
  */
 import { ApiError } from './apiClient';
 import { getStoredToken } from '../context/AuthContext';
 import { sanitizeUserMessage, toUserMessage } from '../utils/userMessage';
 import type { Role } from '../utils/permissions';
 
-const BASE = '/openapi/base/v1';
+const BASE = '/openapi/erp/v1';
 
 export type SystemAccount = {
   id: number;
@@ -60,17 +60,17 @@ export async function listSystemAccounts(page = 1, pageSize = 100) {
     total: number;
     page: number;
     page_size: number;
-  }>('GET', `/accounts?page=${page}&page_size=${pageSize}`);
+  }>('GET', `/users?page=${page}&page_size=${pageSize}`);
 }
 
 export async function createSystemAccount(input: {
   username: string;
-  email: string;
+  email?: string;
   password: string;
   nickname?: string;
   role: Role;
 }) {
-  return request<SystemAccount>('POST', '/accounts', input);
+  return request<SystemAccount>('POST', '/users', input);
 }
 
 export async function updateSystemAccount(
@@ -84,13 +84,13 @@ export async function updateSystemAccount(
     status?: number;
   }
 ) {
-  return request<SystemAccount>('PUT', `/accounts/${id}`, input);
+  return request<SystemAccount>('PUT', `/users/${id}`, input);
 }
 
 export async function deleteSystemAccount(id: number) {
-  return request<null>('DELETE', `/accounts/${id}`);
+  return request<null>('DELETE', `/users/${id}`);
 }
 
 export async function resetSystemAccountPassword(id: number, password: string) {
-  return request<SystemAccount>('POST', `/accounts/${id}/reset-password`, { password });
+  return request<SystemAccount>('POST', `/users/${id}/reset-password`, { password });
 }

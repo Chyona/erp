@@ -113,8 +113,14 @@ export async function handleErpMockRequest(
     return true;
   }
 
+  if (!pathname.startsWith('/openapi/erp/v1')) {
+    return false;
+  }
+
+  const path = stripBase(pathname);
+
   // —— 认证 ——
-  if (pathname === '/openapi/base/v1/auth/login' && method === 'POST') {
+  if (path === '/auth/login' && method === 'POST') {
     const raw = await readBody(req);
     let body: { username?: string; password?: string } = {};
     try {
@@ -142,7 +148,7 @@ export async function handleErpMockRequest(
     return true;
   }
 
-  if (pathname === '/openapi/base/v1/auth/confirm-password' && method === 'POST') {
+  if (path === '/auth/confirm-password' && method === 'POST') {
     const auth = parseBearer(req);
     if (!auth) {
       fail(res, 401, '请先登录');
@@ -165,7 +171,7 @@ export async function handleErpMockRequest(
     return true;
   }
 
-  if (pathname === '/openapi/base/v1/auth/setup-password' && method === 'POST') {
+  if (path === '/auth/setup-password' && method === 'POST') {
     const auth = parseBearer(req);
     if (!auth) {
       fail(res, 401, '请先登录');
@@ -199,7 +205,7 @@ export async function handleErpMockRequest(
     return true;
   }
 
-  if (pathname === '/openapi/base/v1/auth/skip-password-setup' && method === 'POST') {
+  if (path === '/auth/skip-password-setup' && method === 'POST') {
     const auth = parseBearer(req);
     if (!auth) {
       fail(res, 401, '请先登录');
@@ -223,7 +229,7 @@ export async function handleErpMockRequest(
     return true;
   }
 
-  if (pathname === '/openapi/base/v1/auth/change-password' && method === 'POST') {
+  if (path === '/auth/change-password' && method === 'POST') {
     const auth = parseBearer(req);
     if (!auth) {
       fail(res, 401, '请先登录');
@@ -249,8 +255,8 @@ export async function handleErpMockRequest(
     return true;
   }
 
-  // —— 账号管理（仅管理员）——
-  if (pathname === '/openapi/base/v1/accounts' || pathname.startsWith('/openapi/base/v1/accounts/')) {
+  // —— 系统用户管理（仅管理员）——
+  if (path === '/users' || path.startsWith('/users/')) {
     const auth = parseBearer(req);
     if (!auth) {
       fail(res, 401, '请先登录');
@@ -261,7 +267,7 @@ export async function handleErpMockRequest(
       return true;
     }
 
-    if (pathname === '/openapi/base/v1/accounts' && method === 'GET') {
+    if (path === '/users' && method === 'GET') {
       const list = [...mockUsers]
         .sort((a, b) => {
           if (a.username === 'admin') return -1;
@@ -278,7 +284,7 @@ export async function handleErpMockRequest(
       return true;
     }
 
-    if (pathname === '/openapi/base/v1/accounts' && method === 'POST') {
+    if (path === '/users' && method === 'POST') {
       const body =
         (await parseJSON<{
           username?: string;
@@ -287,15 +293,16 @@ export async function handleErpMockRequest(
           nickname?: string;
           role?: MockRole;
         }>(req)) || {};
-      if (!body.username || !body.email || !body.password) {
-        fail(res, 400, '请填写用户名、邮箱和密码');
+      if (!body.username || !body.password) {
+        fail(res, 400, '请填写用户名和密码');
         return true;
       }
+      const email = (body.email || '').trim();
       if (mockUsers.some((u) => u.username === body.username)) {
         fail(res, 400, '该用户名已被使用，请换一个用户名');
         return true;
       }
-      if (mockUsers.some((u) => u.email === body.email)) {
+      if (email && mockUsers.some((u) => u.email === email)) {
         fail(res, 400, '该邮箱已被使用，请换一个邮箱');
         return true;
       }
@@ -303,7 +310,7 @@ export async function handleErpMockRequest(
       const created = {
         id: nextId,
         username: body.username,
-        email: body.email,
+        email,
         password: body.password,
         nickname: body.nickname || body.username,
         role: (body.role === 'admin' || body.role === 'readonly' ? body.role : 'user') as MockRole,
@@ -315,7 +322,7 @@ export async function handleErpMockRequest(
       return true;
     }
 
-    const resetMatch = pathname.match(/^\/openapi\/base\/v1\/accounts\/(\d+)\/reset-password$/);
+    const resetMatch = path.match(/^\/users\/(\d+)\/reset-password$/);
     if (resetMatch && method === 'POST') {
       const id = Number(resetMatch[1]);
       const idx = mockUsers.findIndex((u) => u.id === id);
@@ -338,7 +345,7 @@ export async function handleErpMockRequest(
       return true;
     }
 
-    const idMatch = pathname.match(/^\/openapi\/base\/v1\/accounts\/(\d+)$/);
+    const idMatch = path.match(/^\/users\/(\d+)$/);
     if (idMatch) {
       const id = Number(idMatch[1]);
       const idx = mockUsers.findIndex((u) => u.id === id);
@@ -369,11 +376,7 @@ export async function handleErpMockRequest(
         if (body.nickname !== undefined) target.nickname = (body.nickname || '').trim();
         if (body.email !== undefined) {
           const email = (body.email || '').trim();
-          if (!email) {
-            fail(res, 400, '请填写邮箱');
-            return true;
-          }
-          if (mockUsers.some((u) => u.email === email && u.id !== id)) {
+          if (email && mockUsers.some((u) => u.email === email && u.id !== id)) {
             fail(res, 400, '该邮箱已被使用，请换一个邮箱');
             return true;
           }
@@ -419,11 +422,6 @@ export async function handleErpMockRequest(
     return true;
   }
 
-  if (!pathname.startsWith('/openapi/erp/v1')) {
-    return false;
-  }
-
-  const path = stripBase(pathname);
   const store = erpMockStore;
   const auth = parseBearer(req);
 

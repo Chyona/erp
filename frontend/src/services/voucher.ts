@@ -1,7 +1,7 @@
 import { ErpApi } from './erpApi';
 import { apiRequest, apiUploadForm } from './apiClient';
 import { Accounts } from './accounts';
-import { getCurrentOperatorName } from '../context/AuthContext';
+import { getCurrentOperatorName, getCurrentOperatorNickname } from '../context/AuthContext';
 import { buildAttachmentDisplayName } from '../utils/attachmentName';
 import {
   parseVoucherNum as parseVoucherNumber
@@ -242,6 +242,7 @@ async function save(voucherData: VoucherInput, approve = false): Promise<Voucher
   await assertVoucherDateMutable(normalized.date);
 
   const operatorName = getCurrentOperatorName();
+  const reviewerName = getCurrentOperatorNickname();
   const isNew = !normalized.id;
   let existing: VoucherRecord | null = null;
   if (isNew) {
@@ -291,9 +292,9 @@ async function save(voucherData: VoucherInput, approve = false): Promise<Voucher
       operatorName;
   }
 
-  // 审核人：仅在审核时写入当前操作人；草稿不写审核人
+  // 审核人：仅在审核时写入当前登录用户昵称；草稿不写审核人
   if (approve) {
-    normalized.reviewedBy = operatorName;
+    normalized.reviewedBy = reviewerName;
   } else {
     normalized.reviewedBy = '';
   }

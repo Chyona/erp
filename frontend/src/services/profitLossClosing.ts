@@ -3,7 +3,7 @@ import { Accounts } from './accounts';
 import { Voucher } from './voucher';
 import { TaxExemption } from './taxExemption';
 import { TaxDeclaration } from './taxDeclaration';
-import { getCurrentOperatorName } from '../context/AuthContext';
+import { getCurrentOperatorName, getCurrentOperatorNickname } from '../context/AuthContext';
 import type { Account, Voucher as VoucherRecord, VoucherEntry } from '../types';
 import {
   formatReportPeriod,
@@ -360,6 +360,7 @@ export async function createClosing(period: ReportPeriod, { approve = true } = {
   }
 
   const signatory = getCurrentOperatorName();
+  const reviewer = getCurrentOperatorNickname();
 
   const voucherData = {
     voucherType: '记',
@@ -376,7 +377,7 @@ export async function createClosing(period: ReportPeriod, { approve = true } = {
     entries: summary.previewEntries,
     attachmentIds: [],
     preparedBy: signatory,
-    reviewedBy: signatory,
+    reviewedBy: reviewer,
     postedBy: signatory,
     cashierBy: signatory
   };

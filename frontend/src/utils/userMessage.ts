@@ -32,8 +32,11 @@ export function sanitizeUserMessage(raw: string, fallback = '操作失败，请�
   if (/^http\s*\d+/i.test(msg) || lower.startsWith('http ')) {
     return '请求失败，请稍后重试';
   }
+  if (msg === '请填写邮箱') return fallback;
   if (/field validation for 'email'/i.test(msg)) {
-    return /required/i.test(msg) ? '请填写邮箱' : '邮箱格式不正确';
+    // 邮箱选填：未填写时不提示校验错误，仅格式有误时提示
+    if (/required/i.test(msg)) return fallback;
+    return '邮箱格式不正确';
   }
   if (/field validation for 'username'/i.test(msg)) {
     return '请填写用户名';

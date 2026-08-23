@@ -166,7 +166,10 @@ go run ./cmd/envinit schema
 go run ./cmd/webserver   # 默认 :30000
 ```
 
-## 与原有 `/openapi/base` 的区别
+## 路由前缀说明
 
-- `/openapi/base/v1/accounts` — 系统登录用户（`account` 表）
-- `/openapi/erp/v1/accounts` — 会计科目（`chart_accounts` 表）
+所有接口统一挂载于 `/openapi/erp/v1`：
+
+- `/openapi/erp/v1/auth/*` — 登录与密码相关
+- `/openapi/erp/v1/users/*` — 系统登录用户（`account` 表）
+- `/openapi/erp/v1/accounts/*` — 会计科目（`chart_accounts` 表）

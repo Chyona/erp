@@ -1,3 +1,5 @@
+import { useRef } from 'react';
+import { useTableHeaderGutter } from '../hooks/useTableHeaderGutter';
 import { formatReportAmount } from '../utils/reportAmount';
 
 function SideCells({ side, record }) {
@@ -75,34 +77,45 @@ function SideCells({ side, record }) {
 }
 
 export default function BalanceSheetView({ rows = [] }) {
+  const viewRef = useRef<HTMLDivElement>(null);
+  useTableHeaderGutter(viewRef, true, [rows.length]);
+
   return (
-    <div className="balance-sheet-view">
-      <table className="balance-sheet-view__table">
-        <thead>
-          <tr>
-            <th className="balance-sheet-view__th balance-sheet-view__th--label">资产</th>
-            <th className="balance-sheet-view__th balance-sheet-view__th--index">行次</th>
-            <th className="balance-sheet-view__th balance-sheet-view__th--amount">期末余额</th>
-            <th className="balance-sheet-view__th balance-sheet-view__th--amount balance-sheet-view__th--split">
-              年初余额
-            </th>
-            <th className="balance-sheet-view__th balance-sheet-view__th--label">
-              负债和所有者权益（或股东权益）
-            </th>
-            <th className="balance-sheet-view__th balance-sheet-view__th--index">行次</th>
-            <th className="balance-sheet-view__th balance-sheet-view__th--amount">期末余额</th>
-            <th className="balance-sheet-view__th balance-sheet-view__th--amount">年初余额</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((record) => (
-            <tr key={record.key} className="balance-sheet-view__row">
-              <SideCells side="asset" record={record} />
-              <SideCells side="liability" record={record} />
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="balance-sheet-view" ref={viewRef}>
+      <div className="balance-sheet-view__scroll">
+        <div className="balance-sheet-view__head">
+          <table className="balance-sheet-view__table">
+            <thead>
+              <tr>
+                <th className="balance-sheet-view__th balance-sheet-view__th--label">资产</th>
+                <th className="balance-sheet-view__th balance-sheet-view__th--index">行次</th>
+                <th className="balance-sheet-view__th balance-sheet-view__th--amount">期末余额</th>
+                <th className="balance-sheet-view__th balance-sheet-view__th--amount balance-sheet-view__th--split">
+                  年初余额
+                </th>
+                <th className="balance-sheet-view__th balance-sheet-view__th--label">
+                  负债和所有者权益（或股东权益）
+                </th>
+                <th className="balance-sheet-view__th balance-sheet-view__th--index">行次</th>
+                <th className="balance-sheet-view__th balance-sheet-view__th--amount">期末余额</th>
+                <th className="balance-sheet-view__th balance-sheet-view__th--amount">年初余额</th>
+              </tr>
+            </thead>
+          </table>
+        </div>
+        <div className="balance-sheet-view__body">
+          <table className="balance-sheet-view__table">
+            <tbody>
+              {rows.map((record) => (
+                <tr key={record.key} className="balance-sheet-view__row">
+                  <SideCells side="asset" record={record} />
+                  <SideCells side="liability" record={record} />
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

@@ -259,7 +259,7 @@ export default function VoucherForm() {
             ? formatStoredProfitLossClosingPeriod(v)
             : ''
       );
-      setReviewedBy(v.reviewedBy || v.postedBy || '');
+      setReviewedBy(v.reviewedBy || '');
       setIsRedLetter(Voucher.isRedLetterVoucher(v));
       setEntries(
         v.entries.map((e) => ({

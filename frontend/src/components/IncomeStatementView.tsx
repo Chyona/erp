@@ -1,3 +1,5 @@
+import { useRef } from 'react';
+import { useTableHeaderGutter } from '../hooks/useTableHeaderGutter';
 import { formatReportAmount } from '../utils/reportAmount';
 
 function labelClass(type, label) {
@@ -17,72 +19,83 @@ function isTotalRow(type, label) {
 }
 
 export default function IncomeStatementView({ rows = [] }) {
+  const viewRef = useRef<HTMLDivElement>(null);
+  useTableHeaderGutter(viewRef, true, [rows.length]);
+
   return (
-    <div className="income-statement-view">
-      <table className="income-statement-view__table">
-        <thead>
-          <tr>
-            <th className="income-statement-view__th income-statement-view__th--label">项目</th>
-            <th className="income-statement-view__th income-statement-view__th--index">行次</th>
-            <th className="income-statement-view__th income-statement-view__th--amount">本期金额</th>
-            <th className="income-statement-view__th income-statement-view__th--amount">
-              本年累计金额
-            </th>
-            <th className="income-statement-view__th income-statement-view__th--fill" />
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => {
-            const totalRow = isTotalRow(row.type, row.label);
-            return (
-            <tr key={row.key} className="income-statement-view__row">
-              <td
-                className={[
-                  'income-statement-view__label',
-                  labelClass(row.type, row.label),
-                  totalRow ? 'income-statement-view__label--total' : ''
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
-              >
-                {row.label}
-              </td>
-              <td
-                className={[
-                  'income-statement-view__index',
-                  totalRow ? 'income-statement-view__index--total' : ''
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
-              >
-                {row.row ?? ''}
-              </td>
-              <td
-                className={[
-                  'income-statement-view__amount',
-                  totalRow ? 'income-statement-view__amount--total' : ''
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
-              >
-                {formatReportAmount(row.periodAmount)}
-              </td>
-              <td
-                className={[
-                  'income-statement-view__amount',
-                  totalRow ? 'income-statement-view__amount--total' : ''
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
-              >
-                {formatReportAmount(row.ytdAmount)}
-              </td>
-              <td className="income-statement-view__fill" />
-            </tr>
-            );
-          })}
-        </tbody>
-      </table>
+    <div className="income-statement-view" ref={viewRef}>
+      <div className="income-statement-view__scroll">
+        <div className="income-statement-view__head">
+          <table className="income-statement-view__table">
+            <thead>
+              <tr>
+                <th className="income-statement-view__th income-statement-view__th--label">项目</th>
+                <th className="income-statement-view__th income-statement-view__th--index">行次</th>
+                <th className="income-statement-view__th income-statement-view__th--amount">本期金额</th>
+                <th className="income-statement-view__th income-statement-view__th--amount">
+                  本年累计金额
+                </th>
+                <th className="income-statement-view__th income-statement-view__th--fill" />
+              </tr>
+            </thead>
+          </table>
+        </div>
+        <div className="income-statement-view__body">
+          <table className="income-statement-view__table">
+            <tbody>
+              {rows.map((row) => {
+                const totalRow = isTotalRow(row.type, row.label);
+                return (
+                  <tr key={row.key} className="income-statement-view__row">
+                    <td
+                      className={[
+                        'income-statement-view__label',
+                        labelClass(row.type, row.label),
+                        totalRow ? 'income-statement-view__label--total' : ''
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                    >
+                      {row.label}
+                    </td>
+                    <td
+                      className={[
+                        'income-statement-view__index',
+                        totalRow ? 'income-statement-view__index--total' : ''
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                    >
+                      {row.row ?? ''}
+                    </td>
+                    <td
+                      className={[
+                        'income-statement-view__amount',
+                        totalRow ? 'income-statement-view__amount--total' : ''
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                    >
+                      {formatReportAmount(row.periodAmount)}
+                    </td>
+                    <td
+                      className={[
+                        'income-statement-view__amount',
+                        totalRow ? 'income-statement-view__amount--total' : ''
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                    >
+                      {formatReportAmount(row.ytdAmount)}
+                    </td>
+                    <td className="income-statement-view__fill" />
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }

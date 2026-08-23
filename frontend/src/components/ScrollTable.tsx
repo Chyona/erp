@@ -1,5 +1,6 @@
 import { Empty, Table, type TableProps } from 'antd';
-import { useRef, type ReactNode } from 'react';
+import { useRef, type CSSProperties, type ReactNode } from 'react';
+import { useTableHeaderGutter } from '../hooks/useTableHeaderGutter';
 import { useTableHorizontalScrollBar } from '../hooks/useTableHorizontalScrollBar';
 import { useTableScrollY } from '../hooks/useTableScrollY';
 
@@ -26,6 +27,7 @@ type ScrollTableProps<T> = Omit<TableProps<T>, 'footer'> & {
   autoHeight?: boolean;
   fillPage?: boolean;
   bodyClassName?: string;
+  wrapStyle?: CSSProperties;
   footer?: ReactNode;
   scrollBarBelowSummary?: boolean;
 };
@@ -35,6 +37,7 @@ export default function ScrollTable<T extends object = Record<string, unknown>>(
   autoHeight = false,
   fillPage = false,
   bodyClassName,
+  wrapStyle,
   footer,
   scrollBarBelowSummary = false,
   bordered = true,
@@ -58,6 +61,12 @@ export default function ScrollTable<T extends object = Record<string, unknown>>(
     scroll?.x
   ]);
 
+  useTableHeaderGutter(
+    wrapRef,
+    useVerticalScroll,
+    [rowCount, props.summary, scrollY, scrollBarBelowSummary]
+  );
+
   const scrollConfig = {
     ...scroll,
     ...(useVerticalScroll && scrollY ? { y: scrollY } : {})
@@ -75,7 +84,7 @@ export default function ScrollTable<T extends object = Record<string, unknown>>(
     .join(' ');
 
   return (
-    <div className={bodyClass} ref={wrapRef}>
+    <div className={bodyClass} ref={wrapRef} style={wrapStyle}>
       <Table
         {...props}
         bordered={bordered}
