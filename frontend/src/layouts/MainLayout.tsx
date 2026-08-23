@@ -1,4 +1,5 @@
-import { Layout, Menu, Button, Typography, App, Space, Modal, Form, Input } from 'antd';
+import { Layout, Menu, Button, Typography, App, Space, Modal, Form, Input, Dropdown, Avatar } from 'antd';
+import type { MenuProps } from 'antd';
 import {
   DashboardOutlined,
   FileTextOutlined,
@@ -11,6 +12,8 @@ import {
   LogoutOutlined,
   TeamOutlined,
   LockOutlined,
+  UserOutlined,
+  DownOutlined,
   SunOutlined,
   MoonOutlined,
   MenuFoldOutlined,
@@ -25,7 +28,6 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { confirmWarning } from '../utils/confirmAction';
 import { APP_CONFIG } from '../config/app';
-import { ROLE_LABEL } from '../utils/permissions';
 import { toUserMessage } from '../utils/userMessage';
 
 const { Sider, Header, Content } = Layout;
@@ -156,6 +158,30 @@ export default function MainLayout() {
     }
   };
 
+  const displayName = user?.nickname || user?.username || '';
+  const userMenuItems: MenuProps['items'] = [
+    {
+      key: 'password',
+      icon: <LockOutlined />,
+      label: '修改密码',
+      onClick: () => {
+        pwdForm.resetFields();
+        setPwdOpen(true);
+      }
+    },
+    { type: 'divider' },
+    {
+      key: 'logout',
+      icon: <LogoutOutlined />,
+      label: '退出',
+      danger: true,
+      onClick: () => {
+        logout();
+        navigate('/login', { replace: true });
+      }
+    }
+  ];
+
   return (
     <Layout className="app-layout">
       <Sider
@@ -207,31 +233,27 @@ export default function MainLayout() {
           <Typography.Text strong>
             {companyName || '请先在设置中填写企业信息'}
           </Typography.Text>
-          <Space>
-            <Typography.Text type="secondary">
-              {user?.nickname || user?.username || ''}
-              {user?.role ? `（${ROLE_LABEL[user.role] || user.role}）` : ''}
-            </Typography.Text>
-            <Button
-              icon={<LockOutlined />}
-              onClick={() => {
-                pwdForm.resetFields();
-                setPwdOpen(true);
-              }}
-            >
-              修改密码
-            </Button>
+          <Space size={12} className="topbar__actions">
             {can('backup') ? <Button onClick={handleBackup}>备份数据</Button> : null}
             {can('restore') ? <Button onClick={handleRestore}>恢复数据</Button> : null}
-            <Button
-              icon={<LogoutOutlined />}
-              onClick={() => {
-                logout();
-                navigate('/login', { replace: true });
-              }}
+            <Dropdown
+              menu={{ items: userMenuItems }}
+              trigger={['hover']}
+              placement="bottomRight"
+              overlayClassName="topbar-user-menu"
             >
-              退出
-            </Button>
+              <button
+                type="button"
+                className="topbar-user"
+                title={`${displayName} · 账户菜单`}
+                aria-label={`${displayName}，打开账户菜单`}
+                aria-haspopup="menu"
+              >
+                <Avatar size={28} icon={<UserOutlined />} className="topbar-user__avatar" />
+                <span className="topbar-user__name">{displayName}</span>
+                <DownOutlined className="topbar-user__caret" aria-hidden="true" />
+              </button>
+            </Dropdown>
           </Space>
         </Header>
         <Content className="main-content">

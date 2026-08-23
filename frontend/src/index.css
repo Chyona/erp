@@ -396,6 +396,65 @@ body,
   flex-shrink: 0;
 }
 
+.topbar__actions {
+  display: flex;
+  align-items: center;
+}
+
+.topbar-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 4px 0 0;
+  margin: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  color: #1f2937;
+  transition: color 0.2s ease;
+  max-width: 220px;
+}
+
+.topbar-user:hover,
+.topbar-user:focus-visible {
+  background: transparent;
+  outline: none;
+}
+
+.topbar-user__avatar {
+  flex-shrink: 0;
+  background: #1890ff !important;
+}
+
+.topbar-user__name {
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar-user__caret {
+  flex-shrink: 0;
+  margin-left: -2px;
+  font-size: 11px;
+  color: #94a3b8;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.topbar-user:hover .topbar-user__caret,
+.topbar-user:focus-visible .topbar-user__caret {
+  color: #1890ff;
+  transform: translateY(1px);
+}
+
+.topbar-user-menu .ant-dropdown-menu {
+  min-width: 140px;
+}
+
 .main-content {
   flex: 1;
   min-height: 0;
