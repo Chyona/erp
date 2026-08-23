@@ -14,6 +14,9 @@ import StatusBadge from './StatusBadge';
 import VoucherMoreActions from './VoucherMoreActions';
 import VoucherAttachmentColumn from './VoucherAttachmentColumn';
 import { confirmDeleteWithPassword } from '../utils/confirmDeleteWithPassword';
+import { isAttachmentDuplicateError } from '../utils/attachmentDuplicate';
+import { useOperatorDisplayLookup } from '../hooks/useOperatorDisplayLookup';
+import { resolveOperatorDisplayName } from '../utils/operatorDisplayName';
 
 const { Link } = Typography;
 
@@ -205,6 +208,7 @@ export default function VoucherTable({
   const { message, modal } = App.useApp();
   const { refresh } = useApp();
   const { canMutateVoucher, canAccessOwnVoucher, role } = useAuth();
+  const operatorLookup = useOperatorDisplayLookup();
   const [internalPage, setInternalPage] = useState(1);
   const [internalPageSize, setInternalPageSize] = useState(100);
   const page = paginationProp?.current ?? internalPage;
@@ -415,6 +419,11 @@ export default function VoucherTable({
           }
           notifyDataChanged();
         } catch (err) {
+          if (isAttachmentDuplicateError(err)) {
+            message.warning(err.message);
+            option.onSuccess?.({});
+            return;
+          }
           message.error((err as Error).message || '附件上传失败');
           option.onError?.(err as Error);
         } finally {
@@ -800,7 +809,14 @@ export default function VoucherTable({
       width: 80,
       ellipsis: true,
       onCell: (record) => resolveCellProps(record, 'preparedBy', true),
-      render: (_, record) => (isEmptyPlaceholderRow(record) ? null : record.voucher.preparedBy || '')
+      render: (_, record) =>
+        isEmptyPlaceholderRow(record)
+          ? null
+          : resolveOperatorDisplayName(
+              record.voucher.preparedBy,
+              operatorLookup,
+              record.voucher.createdByAccountId
+            )
     },
     {
       title: '审核人',
@@ -808,7 +824,10 @@ export default function VoucherTable({
       width: 80,
       ellipsis: true,
       onCell: (record) => resolveCellProps(record, 'reviewedBy', true),
-      render: (_, record) => (isEmptyPlaceholderRow(record) ? null : record.voucher.reviewedBy || '')
+      render: (_, record) =>
+        isEmptyPlaceholderRow(record)
+          ? null
+          : resolveOperatorDisplayName(record.voucher.reviewedBy, operatorLookup)
     },
     {
       title: '状态',

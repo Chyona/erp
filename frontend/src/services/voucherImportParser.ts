@@ -66,7 +66,9 @@ const HEADER_ALIASES = {
   credit: ['贷方金额', '贷方', '贷方发生额', '贷方本币'],
   counterparty: ['往来单位', '对方单位', '客户供应商', '客商', '单位名称'],
   attachmentCount: ['附件数', '附单据数', '附件张数', '单据数'],
-  remark: ['备注', '说明', '附注']
+  remark: ['备注', '说明', '附注'],
+  preparedBy: ['制单人', '制表人', '编制人', '录入人'],
+  reviewedBy: ['审核人', '复核人', '审批人']
 };
 
 const SKIP_ROW_KEYWORDS = ['合计', '总计', '本页小计', '单位：', '单位:', '分录表'];
@@ -561,6 +563,8 @@ function rowsToVouchers(rows, accounts) {
     const counterparty = normalizeText(cell(row, colIndex, 'counterparty'));
     const attachmentCount = parseInt(cell(row, colIndex, 'attachmentCount'), 10) || 0;
     const remark = normalizeText(cell(row, colIndex, 'remark'));
+    const preparedBy = normalizeText(cell(row, colIndex, 'preparedBy'));
+    const reviewedBy = normalizeText(cell(row, colIndex, 'reviewedBy'));
     const parsedNo = parseVoucherNo(voucherNoRaw);
 
     if (!grouped.has(voucherNoRaw)) {
@@ -569,6 +573,8 @@ function rowsToVouchers(rows, accounts) {
         date,
         attachmentCount: 0,
         remark: '',
+        preparedBy: '',
+        reviewedBy: '',
         businessType: '其他',
         invoiceType: INVOICE_TYPE.NONE,
         taxAmount: 0,
@@ -590,6 +596,12 @@ function rowsToVouchers(rows, accounts) {
     voucher.attachmentCount = Math.max(voucher.attachmentCount, attachmentCount);
     appendUnique(voucher._counterparties, counterparty);
     appendUnique(voucher._remarks, remark);
+    if (preparedBy && !voucher.preparedBy) {
+      voucher.preparedBy = preparedBy;
+    }
+    if (reviewedBy && !voucher.reviewedBy) {
+      voucher.reviewedBy = reviewedBy;
+    }
 
     voucher.entries.push({
       summary: buildSummary(summary),

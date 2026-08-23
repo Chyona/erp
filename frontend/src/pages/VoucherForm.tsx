@@ -21,7 +21,12 @@ import type { VoucherFormNavTarget } from '../services/voucher';
 import type { Attachment, VoucherStatus } from '../types';
 import { ErpApi } from '../services/erpApi';
 import { useApp } from '../context/AppContext';
-import { getCurrentOperatorName, useAuth } from '../context/AuthContext';
+import { getCurrentOperatorName, getCurrentOperatorUsername, useAuth } from '../context/AuthContext';
+import { useOperatorDisplayLookup } from '../hooks/useOperatorDisplayLookup';
+import {
+  normalizePreparedByForSave,
+  resolveOperatorDisplayName
+} from '../utils/operatorDisplayName';
 import { confirmDanger, confirmWarning } from '../utils/confirmAction';
 import BusinessTypeHint from '../components/BusinessTypeHint';
 import VoucherEntrySheet from '../components/VoucherEntrySheet';
@@ -33,6 +38,10 @@ import {
   enrichAttachmentDisplayNames
 } from '../utils/attachmentName';
 import { isInvoiceRecognizableFile, mergeInvoiceNumbers, parseInvoiceNumbersList, removeInvoiceNumbers } from '../utils/invoiceNumberExtract';
+import {
+  duplicateAttachmentMessage,
+  findDuplicateAttachment
+} from '../utils/attachmentDuplicate';
 import { recognizeInvoiceNumbersFromFile } from '../services/invoiceNumberRecognition';
 import { syncSalesVoucherMeta } from '../utils/salesInvoiceTax';
 import { INVOICE_TYPE, INVOICE_TYPE_OPTIONS } from '../constants/invoice';
@@ -117,6 +126,7 @@ export default function VoucherForm() {
   const { message, modal } = App.useApp();
   const { accounts, refresh } = useApp();
   const { user, canAccessOwnVoucher, canMutateVoucher } = useAuth();
+  const operatorLookup = useOperatorDisplayLookup();
   const [form] = Form.useForm();
   const [editingId, setEditingId] = useState<string | null>(routeId ?? null);
   const isEdit = editingId !== null;
@@ -247,7 +257,12 @@ export default function VoucherForm() {
         taxAmount: v.taxAmount || undefined,
         invoiceNumbers: v.invoiceNumbers || '',
         remark: v.remark || '',
-        signatory: v.preparedBy || v.reviewedBy || v.postedBy || v.cashierBy || ''
+        signatory:
+          resolveOperatorDisplayName(v.preparedBy, operatorLookup, v.createdByAccountId) ||
+          resolveOperatorDisplayName(v.reviewedBy, operatorLookup) ||
+          v.postedBy ||
+          v.cashierBy ||
+          ''
       });
       setEditingId(v.id);
       setVoucherNumber(v.voucherNumber);
@@ -292,6 +307,7 @@ export default function VoucherForm() {
       canMutateVoucher,
       form,
       message,
+      operatorLookup,
       refreshFormAdjacent
     ]
   );
@@ -841,7 +857,14 @@ export default function VoucherForm() {
       .then(async () => {
         const fileObj = file as File;
         const invoiceLike = isInvoiceRecognizableFile(fileObj);
-        beginAttachmentUploadStatus(`正在上传 ${fileObj.name}…`);
+        beginAttachmentUploadStatus(`正在检查 ${fileObj.name}…`);
+        const duplicate = await findDuplicateAttachment(fileObj, attachmentsRef.current);
+        if (duplicate) {
+          message.warning(duplicateAttachmentMessage(fileObj.name));
+          onSuccess();
+          return;
+        }
+        updateAttachmentUploadStatus(`正在上传 ${fileObj.name}…`);
         try {
           const fileName = buildAttachmentDisplayName({
             ...getAttachmentNameContext(),
@@ -998,10 +1021,24 @@ export default function VoucherForm() {
         invoiceNumbers: values.invoiceNumbers?.trim() || '',
         remark: values.remark?.trim() || '',
         attachmentIds: attachments.map((a) => a.id),
-        preparedBy:
-          existingPreparedBy.trim() ||
-          values.signatory?.trim() ||
-          getCurrentOperatorName()
+        preparedBy: (() => {
+          const operatorName = getCurrentOperatorName();
+          const operatorUsername = getCurrentOperatorUsername();
+          if (existingPreparedBy.trim()) {
+            return normalizePreparedByForSave(
+              existingPreparedBy,
+              operatorName,
+              operatorUsername
+            );
+          }
+          return (
+            normalizePreparedByForSave(
+              values.signatory,
+              operatorName,
+              operatorUsername
+            ) || operatorName
+          );
+        })()
       };
 
       const saved = await Voucher.save(voucherData, false);

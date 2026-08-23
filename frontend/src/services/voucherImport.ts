@@ -6,6 +6,7 @@ import { VoucherImportParser } from './voucherImportParser';
 import { INVOICE_TYPE } from '../constants/invoice';
 import { isCarryForwardImportVoucher } from '../utils/carryForwardVoucher';
 import { imageFileToRows, isImportImageFile } from './voucherImportImage';
+import { getCurrentOperatorName } from '../context/AuthContext';
 
 function fillMergedCells(sheet, rows) {
   const merges = sheet['!merges'] || [];
@@ -232,6 +233,7 @@ async function importVouchers(vouchers, { skipDuplicates = false, approve = fals
   });
 
   const toSave: VoucherRecord[] = [];
+  const importerName = getCurrentOperatorName();
 
   for (const raw of sorted) {
     if (isCarryForwardImportVoucher(raw)) {
@@ -291,8 +293,8 @@ async function importVouchers(vouchers, { skipDuplicates = false, approve = fals
         entries: raw.entries,
         invoiceNumbers: '',
         remark: raw.remark || '',
-        preparedBy: '',
-        reviewedBy: '',
+        preparedBy: String(raw.preparedBy || '').trim() || importerName,
+        reviewedBy: String(raw.reviewedBy || '').trim() || importerName,
         postedBy: '',
         cashierBy: '',
         totalDebit: totals.debit,

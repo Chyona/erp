@@ -1920,6 +1920,7 @@ body,
   width: 100%;
   align-items: center;
   flex-wrap: nowrap;
+  flex-direction: column;
 }
 
 .voucher-grouped-table__attach .ant-space-item {

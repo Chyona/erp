@@ -19,6 +19,8 @@ import { defaultTimeFilter } from '../utils/voucherTimeFilter';
 import type { VoucherTimeFilterState } from '../utils/voucherTimeFilter';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
+import { useOperatorDisplayLookup } from '../hooks/useOperatorDisplayLookup';
+import { resolveOperatorDisplayName } from '../utils/operatorDisplayName';
 import { isCarryForwardVoucher } from '../utils/carryForwardVoucher';
 import { useAsyncLoading } from '../hooks/useAsyncLoading';
 import type { VoucherFilters } from '../types';
@@ -50,6 +52,7 @@ export default function VoucherList() {
   const { message, modal } = App.useApp();
   const { refreshKey, accounts, refresh } = useApp();
   const { can } = useAuth();
+  const operatorLookup = useOperatorDisplayLookup();
   const [vouchers, setVouchers] = useState([]);
   const [filters, setFilters] = useState<VoucherFilters>({
     ...EMPTY_VOUCHER_FILTERS,
@@ -142,6 +145,12 @@ export default function VoucherList() {
       return;
     }
 
+    const displayList = list.map((v) => ({
+      ...v,
+      preparedBy: resolveOperatorDisplayName(v.preparedBy, operatorLookup, v.createdByAccountId),
+      reviewedBy: resolveOperatorDisplayName(v.reviewedBy, operatorLookup)
+    }));
+
     const loadingKey = 'voucher-export';
     message.loading({
       content: withAttachments ? '正在打包表格与附件…' : '正在导出表格…',
@@ -149,7 +158,7 @@ export default function VoucherList() {
       duration: 0
     });
     try {
-      const result = await ExportUtil.exportVouchersPackage(list, {
+      const result = await ExportUtil.exportVouchersPackage(displayList, {
         withAttachments,
         onProgress: (done, total) => {
           if (!withAttachments || !total) return;

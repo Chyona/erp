@@ -1,8 +1,17 @@
 import { ErpApi } from './erpApi';
 import { apiRequest, apiUploadForm } from './apiClient';
 import { Accounts } from './accounts';
-import { getCurrentOperatorName, getCurrentOperatorNickname } from '../context/AuthContext';
+import {
+  getCurrentOperatorName,
+  getCurrentOperatorNickname,
+  getCurrentOperatorUsername
+} from '../context/AuthContext';
+import { normalizePreparedByForSave } from '../utils/operatorDisplayName';
 import { buildAttachmentDisplayName } from '../utils/attachmentName';
+import {
+  AttachmentDuplicateError,
+  findDuplicateAttachment
+} from '../utils/attachmentDuplicate';
 import {
   parseVoucherNum as parseVoucherNumber
 } from '../utils/voucherFilter';
@@ -249,6 +258,7 @@ async function save(voucherData: VoucherInput, approve = false): Promise<Voucher
   await assertVoucherDateMutable(normalized.date);
 
   const operatorName = getCurrentOperatorName();
+  const operatorUsername = getCurrentOperatorUsername();
   const reviewerName = getCurrentOperatorNickname();
   const isNew = !normalized.id;
   let existing: VoucherRecord | null = null;
@@ -289,14 +299,17 @@ async function save(voucherData: VoucherInput, approve = false): Promise<Voucher
   if (approve) normalized.approvedAt = new Date().toISOString();
   normalized.checksum = generateChecksum(normalized);
 
-  // 制单人：创建人；编辑时保留原制单人
+  // 制单人：昵称优先（无昵称用用户名）；编辑时保留原制单人
   if (isNew) {
-    normalized.preparedBy = (normalized.preparedBy || '').trim() || operatorName;
-  } else {
     normalized.preparedBy =
-      (existing?.preparedBy || '').trim() ||
-      (normalized.preparedBy || '').trim() ||
+      normalizePreparedByForSave(normalized.preparedBy, operatorName, operatorUsername) ||
       operatorName;
+  } else {
+    const existingPreparedBy = (existing?.preparedBy || '').trim();
+    normalized.preparedBy = existingPreparedBy
+      ? normalizePreparedByForSave(existingPreparedBy, operatorName, operatorUsername)
+      : normalizePreparedByForSave(normalized.preparedBy, operatorName, operatorUsername) ||
+        operatorName;
   }
 
   // 审核人：仅在审核时写入当前登录用户昵称；草稿不写审核人
@@ -810,6 +823,19 @@ async function getAttachment(id) {
   return ErpApi.get('attachments', id);
 }
 
+async function listAttachmentsByIds(ids: string[] = []) {
+  const attachments = [];
+  for (const attId of ids) {
+    try {
+      const att = await getAttachment(attId);
+      if (att) attachments.push(att);
+    } catch {
+      // 单条失败不阻断其余附件
+    }
+  }
+  return attachments;
+}
+
 async function tryRecognizeInvoiceNumbers(file: File): Promise<string[]> {
   if (!isInvoiceRecognizableFile(file)) return [];
   try {
@@ -828,6 +854,12 @@ async function addAttachmentToVoucher(voucherId, file) {
   await assertVoucherDateMutable(voucher.date);
   if (file.size > 5 * 1024 * 1024) {
     throw new Error(`${file.name} 超过 5MB 限制`);
+  }
+
+  const existingAttachments = await listAttachmentsByIds(voucher.attachmentIds || []);
+  const duplicate = await findDuplicateAttachment(file, existingAttachments);
+  if (duplicate) {
+    throw new AttachmentDuplicateError(file.name);
   }
 
   const totals = calcTotals(voucher.entries || []);

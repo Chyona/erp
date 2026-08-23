@@ -7,6 +7,8 @@ import { confirmWarning } from '../utils/confirmAction';
 import { confirmDeleteWithPassword } from '../utils/confirmDeleteWithPassword';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
+import { useOperatorDisplayLookup } from '../hooks/useOperatorDisplayLookup';
+import { resolveOperatorDisplayName } from '../utils/operatorDisplayName';
 import { isCarryForwardVoucher, CARRY_FORWARD_VOUCHER_READONLY_TIP } from '../utils/carryForwardVoucher';
 import { CarryForwardBadge } from './StatusBadge';
 import { enrichAttachmentDisplayNames, attachmentNameContextFromVoucher } from '../utils/attachmentName';
@@ -56,6 +58,7 @@ export default function VoucherDetailModal({
   const { message, modal } = App.useApp();
   const { refresh } = useApp();
   const { canMutateVoucher, canPrintVoucher, role } = useAuth();
+  const operatorLookup = useOperatorDisplayLookup();
   const [activeId, setActiveId] = useState<string | null>(voucherId);
   const [voucher, setVoucher] = useState(null);
   const [attachments, setAttachments] = useState([]);
@@ -148,7 +151,19 @@ export default function VoucherDetailModal({
       message.warning('无权打印该凭证');
       return;
     }
-    const html = ExportUtil.renderPrintVoucher(voucher, company, attachments);
+    const html = ExportUtil.renderPrintVoucher(
+      {
+        ...voucher,
+        preparedBy: resolveOperatorDisplayName(
+          voucher.preparedBy,
+          operatorLookup,
+          voucher.createdByAccountId
+        ),
+        reviewedBy: resolveOperatorDisplayName(voucher.reviewedBy, operatorLookup)
+      },
+      company,
+      attachments
+    );
     ExportUtil.printVoucher(html);
   };
 

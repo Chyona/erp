@@ -96,11 +96,6 @@ export function getStoredToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
 }
 
-/** 当前登录操作人展示名（昵称优先，否则用户名） */
-export function getCurrentOperatorName(): string {
-  return getCurrentOperatorNickname();
-}
-
 /** 当前登录用户昵称（无昵称时回退用户名），用于审核人等字段 */
 export function getCurrentOperatorNickname(): string {
   try {
@@ -109,6 +104,23 @@ export function getCurrentOperatorNickname(): string {
     const parsed = JSON.parse(raw) as { nickname?: string; username?: string };
     const nickname = String(parsed.nickname || '').trim();
     if (nickname) return nickname;
+    return String(parsed.username || '').trim();
+  } catch {
+    return '';
+  }
+}
+
+/** 当前登录操作人展示名（昵称优先，否则用户名） */
+export function getCurrentOperatorName(): string {
+  return getCurrentOperatorNickname();
+}
+
+/** 当前登录用户名 */
+export function getCurrentOperatorUsername(): string {
+  try {
+    const raw = localStorage.getItem(USER_KEY);
+    if (!raw) return '';
+    const parsed = JSON.parse(raw) as { username?: string };
     return String(parsed.username || '').trim();
   } catch {
     return '';
