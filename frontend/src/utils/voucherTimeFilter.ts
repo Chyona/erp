@@ -30,6 +30,82 @@ export const EMPTY_TIME_FILTER: VoucherTimeFilterState = {
   endPeriod: null
 };
 
+const TIME_FILTER_STORAGE_KEY = 'erp_voucher_time_filter';
+
+function isValidPeriod(value: unknown): value is VoucherPeriod {
+  if (!value || typeof value !== 'object') return false;
+  const period = value as VoucherPeriod;
+  return (
+    Number.isFinite(period.year) &&
+    Number.isFinite(period.month) &&
+    period.month >= 1 &&
+    period.month <= 12
+  );
+}
+
+function normalizeStoredTimeFilter(raw: Partial<VoucherTimeFilterState>): VoucherTimeFilterState | null {
+  if (raw.mode !== 'date' && raw.mode !== 'period') return null;
+
+  const startDate = typeof raw.startDate === 'string' ? raw.startDate : '';
+  const endDate = typeof raw.endDate === 'string' ? raw.endDate : '';
+  const startPeriod = isValidPeriod(raw.startPeriod) ? raw.startPeriod : null;
+  const endPeriod = isValidPeriod(raw.endPeriod) ? raw.endPeriod : null;
+
+  if (raw.mode === 'period') {
+    if (startPeriod && endPeriod) {
+      const range = periodsToDateRange(startPeriod, endPeriod);
+      return {
+        mode: 'period',
+        startDate: range.startDate,
+        endDate: range.endDate,
+        startPeriod: range.startPeriod,
+        endPeriod: range.endPeriod
+      };
+    }
+    if (startDate && endDate) {
+      const periods = datesToPeriods(startDate, endDate);
+      return {
+        mode: 'period',
+        startDate,
+        endDate,
+        startPeriod: periods.startPeriod,
+        endPeriod: periods.endPeriod
+      };
+    }
+    return null;
+  }
+
+  if (!startDate || !endDate) return null;
+  const periods = datesToPeriods(startDate, endDate);
+  return {
+    mode: 'date',
+    startDate,
+    endDate,
+    startPeriod: periods.startPeriod,
+    endPeriod: periods.endPeriod
+  };
+}
+
+/** 从 localStorage 读取上次凭证管理的时间筛选；无效时回退默认（当前月）。 */
+export function loadStoredTimeFilter(): VoucherTimeFilterState {
+  try {
+    const raw = localStorage.getItem(TIME_FILTER_STORAGE_KEY);
+    if (!raw) return defaultTimeFilter();
+    const parsed = JSON.parse(raw) as Partial<VoucherTimeFilterState>;
+    return normalizeStoredTimeFilter(parsed) ?? defaultTimeFilter();
+  } catch {
+    return defaultTimeFilter();
+  }
+}
+
+export function saveStoredTimeFilter(state: VoucherTimeFilterState): void {
+  try {
+    localStorage.setItem(TIME_FILTER_STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // 存储失败时不影响查询
+  }
+}
+
 /** 默认按期间筛选，且选中最近一期（当前月） */
 export function defaultTimeFilter(): VoucherTimeFilterState {
   const period = currentPeriod();

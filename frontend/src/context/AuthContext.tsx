@@ -19,6 +19,7 @@ type AuthContextValue = {
   isAuthenticated: boolean;
   mustChangePassword: boolean;
   login: (token: string, user: AuthUser) => void;
+  patchUser: (patch: Partial<Pick<AuthUser, 'nickname' | 'username'>>) => void;
   logout: () => void;
   can: (permission: Permission) => boolean;
   canMutateVoucher: (voucher: { createdByAccountId?: number; status?: string } | null | undefined) => boolean;
@@ -66,6 +67,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   }, []);
 
+  const patchUser = useCallback((patch: Partial<Pick<AuthUser, 'nickname' | 'username'>>) => {
+    setUser((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, ...patch };
+      localStorage.setItem(USER_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       token,
@@ -74,13 +84,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: Boolean(token),
       mustChangePassword: Boolean(user?.mustChangePassword),
       login,
+      patchUser,
       logout,
       can: (permission) => can(user?.role, permission),
       canMutateVoucher: (voucher) => canMutateVoucher(user?.role, user?.accountId, voucher),
       canPrintVoucher: (voucher) => canPrintVoucher(user?.role, user?.accountId, voucher),
       canAccessOwnVoucher: (voucher) => canAccessOwnVoucher(user?.role, user?.accountId, voucher)
     }),
-    [token, user, login, logout]
+    [token, user, login, patchUser, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -3,7 +3,6 @@ import { apiRequest, apiUploadForm } from './apiClient';
 import { Accounts } from './accounts';
 import {
   getCurrentOperatorName,
-  getCurrentOperatorNickname,
   getCurrentOperatorUsername
 } from '../context/AuthContext';
 import { normalizePreparedByForSave } from '../utils/operatorDisplayName';
@@ -259,7 +258,6 @@ async function save(voucherData: VoucherInput, approve = false): Promise<Voucher
 
   const operatorName = getCurrentOperatorName();
   const operatorUsername = getCurrentOperatorUsername();
-  const reviewerName = getCurrentOperatorNickname();
   const isNew = !normalized.id;
   let existing: VoucherRecord | null = null;
   if (isNew) {
@@ -312,9 +310,9 @@ async function save(voucherData: VoucherInput, approve = false): Promise<Voucher
         operatorName;
   }
 
-  // 审核人：仅在审核时写入当前登录用户昵称；草稿不写审核人
+  // 审核人：仅在审核时写入当前登录用户昵称（无昵称用用户名）；草稿不写审核人
   if (approve) {
-    normalized.reviewedBy = reviewerName;
+    normalized.reviewedBy = operatorName;
   } else {
     normalized.reviewedBy = '';
   }

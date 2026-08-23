@@ -103,16 +103,6 @@ export default function Settings() {
           </Form.Item>
         </Card>
 
-        <Card title="默认签章" style={{ marginBottom: 16 }}>
-          <Form.Item
-            name="defaultSignatory"
-            label="默认经办人"
-            extra="新建凭证时自动填入，兼任制单、审核、记账、出纳"
-          >
-            <Input placeholder="请输入姓名" style={{ maxWidth: 320 }} />
-          </Form.Item>
-        </Card>
-
         <Button type="primary" htmlType="submit">
           保存设置
         </Button>

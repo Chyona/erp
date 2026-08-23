@@ -12,7 +12,7 @@ function lookupFromAuthUser(user: {
   nickname?: string;
 } | null): OperatorDisplayLookup {
   if (!user) {
-    return { byId: new Map(), byUsername: new Map() };
+    return { byId: new Map(), byUsername: new Map(), byLabel: new Map() };
   }
   return buildOperatorDisplayLookup([
     {

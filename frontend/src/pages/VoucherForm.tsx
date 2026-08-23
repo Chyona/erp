@@ -142,6 +142,7 @@ export default function VoucherForm() {
   const [voucherNumber, setVoucherNumber] = useState('');
   const [voucherStatus, setVoucherStatus] = useState<VoucherStatus>(Voucher.STATUS.DRAFT);
   const [reviewedBy, setReviewedBy] = useState('');
+  const [ownerAccountId, setOwnerAccountId] = useState<number | undefined>(user?.accountId);
   const [isRedLetter, setIsRedLetter] = useState(false);
   const [loading, setLoading] = useState(Boolean(routeId));
   const [adjacent, setAdjacent] = useState<{
@@ -169,6 +170,28 @@ export default function VoucherForm() {
   const signatory = Form.useWatch('signatory', form);
 
   const totals = useMemo(() => Voucher.calcTotals(entries), [entries]);
+  const operatorAccountId = ownerAccountId ?? user?.accountId;
+  const displaySignatory = useMemo(
+    () => resolveOperatorDisplayName(signatory, operatorLookup, operatorAccountId),
+    [signatory, operatorLookup, operatorAccountId]
+  );
+  const displayReviewedBy = useMemo(
+    () => resolveOperatorDisplayName(reviewedBy, operatorLookup),
+    [reviewedBy, operatorLookup]
+  );
+
+  useEffect(() => {
+    const rawSignatory = String(form.getFieldValue('signatory') || '').trim();
+    if (!rawSignatory || operatorLookup.byLabel.size === 0) return;
+    const resolved = resolveOperatorDisplayName(
+      rawSignatory,
+      operatorLookup,
+      operatorAccountId
+    );
+    if (resolved && resolved !== rawSignatory) {
+      form.setFieldValue('signatory', resolved);
+    }
+  }, [operatorLookup, operatorAccountId, form]);
 
   const buildFormSnapshot = useCallback(() => {
     const values = form.getFieldsValue();
@@ -215,7 +238,11 @@ export default function VoucherForm() {
     setAdjacent(next);
   }, []);
 
-  const loadDefaultSignatory = async () => getCurrentOperatorName();
+  const loadDefaultSignatory = useCallback(() => {
+    const fromUser = String(user?.nickname || '').trim() || String(user?.username || '').trim();
+    if (fromUser) return fromUser;
+    return getCurrentOperatorName();
+  }, [user?.nickname, user?.username]);
 
   const applyVoucherToForm = useCallback(
     async (v: NonNullable<Awaited<ReturnType<typeof Voucher.getById>>>) => {
@@ -257,14 +284,10 @@ export default function VoucherForm() {
         taxAmount: v.taxAmount || undefined,
         invoiceNumbers: v.invoiceNumbers || '',
         remark: v.remark || '',
-        signatory:
-          resolveOperatorDisplayName(v.preparedBy, operatorLookup, v.createdByAccountId) ||
-          resolveOperatorDisplayName(v.reviewedBy, operatorLookup) ||
-          v.postedBy ||
-          v.cashierBy ||
-          ''
+        signatory: v.preparedBy || v.reviewedBy || v.postedBy || v.cashierBy || ''
       });
       setEditingId(v.id);
+      setOwnerAccountId(v.createdByAccountId);
       setVoucherNumber(v.voucherNumber);
       setVoucherStatus(v.status || Voucher.STATUS.DRAFT);
       setCarryForwardPeriodLabel(
@@ -314,7 +337,7 @@ export default function VoucherForm() {
 
   const applyNewVoucherForm = useCallback(
     async (options: { presetDate?: string; keepDate?: ReturnType<typeof dayjs> } = {}) => {
-      const signatory = await loadDefaultSignatory();
+      const signatory = loadDefaultSignatory();
       const presetDate =
         options.presetDate && !isInsert ? dayjs(options.presetDate) : null;
       const nextDate =
@@ -334,6 +357,7 @@ export default function VoucherForm() {
         signatory
       });
       setEditingId(null);
+      setOwnerAccountId(user?.accountId);
       setEntries([emptyEntry(), emptyEntry()]);
       setAttachments([]);
       attachmentsRef.current = [];
@@ -350,7 +374,7 @@ export default function VoucherForm() {
       await refreshFormAdjacent(null);
       bumpSnapshotBaseline();
     },
-    [bumpSnapshotBaseline, form, insertDate, isInsert, refreshFormAdjacent]
+    [bumpSnapshotBaseline, form, insertDate, isInsert, loadDefaultSignatory, refreshFormAdjacent, user?.accountId]
   );
 
   useEffect(() => {
@@ -621,7 +645,7 @@ export default function VoucherForm() {
     });
   };
 
-  const loadDefaultSignatoryForClear = async () => getCurrentOperatorName();
+  const loadDefaultSignatoryForClear = () => loadDefaultSignatory();
 
   const clearForm = async () => {
     const values = form.getFieldsValue();
@@ -653,7 +677,7 @@ export default function VoucherForm() {
       );
     }
 
-    const signatory = await loadDefaultSignatoryForClear();
+    const signatory = loadDefaultSignatoryForClear();
     form.setFieldsValue({
       businessType: '日常费用',
       invoiceType: INVOICE_TYPE.NONE,
@@ -910,7 +934,7 @@ export default function VoucherForm() {
 
   const resetForNewVoucher = async (keepDate = form.getFieldValue('voucherDate') || dayjs()) => {
     const signatoryValue =
-      form.getFieldValue('signatory')?.trim() || (await loadDefaultSignatory());
+      form.getFieldValue('signatory')?.trim() || loadDefaultSignatory();
     const currentDate = keepDate || dayjs();
 
     form.setFieldsValue({
@@ -1024,18 +1048,21 @@ export default function VoucherForm() {
         preparedBy: (() => {
           const operatorName = getCurrentOperatorName();
           const operatorUsername = getCurrentOperatorUsername();
+          const accountId = isEdit ? ownerAccountId ?? user?.accountId : user?.accountId;
           if (existingPreparedBy.trim()) {
             return normalizePreparedByForSave(
-              existingPreparedBy,
+              resolveOperatorDisplayName(existingPreparedBy, operatorLookup, accountId),
               operatorName,
-              operatorUsername
+              operatorUsername,
+              operatorLookup
             );
           }
           return (
             normalizePreparedByForSave(
-              values.signatory,
+              resolveOperatorDisplayName(values.signatory, operatorLookup, accountId),
               operatorName,
-              operatorUsername
+              operatorUsername,
+              operatorLookup
             ) || operatorName
           );
         })()
@@ -1232,7 +1259,7 @@ export default function VoucherForm() {
               totals={totals}
               attachments={displayAttachments}
               attachmentsCount={attachments.length}
-              signatory={signatory || ''}
+              signatory={displaySignatory}
               onUpdateEntry={updateEntry}
               onInsertEntryAfter={insertEntryAfter}
               onCopyEntry={copyRowAt}
@@ -1245,7 +1272,7 @@ export default function VoucherForm() {
               canModifyAttachments={Voucher.canModifyAttachments(voucherStatus)}
               readOnly={readOnly}
               redLetter={isRedLetter}
-              reviewedBy={reviewedBy}
+              reviewedBy={displayReviewedBy}
               attachmentPanelOpen={attachmentPanelOpen}
               onAttachmentPanelClose={() => setAttachmentPanelOpen(false)}
               onAttachmentPanelToggle={toggleAttachmentPanel}

@@ -294,7 +294,7 @@ async function importVouchers(vouchers, { skipDuplicates = false, approve = fals
         invoiceNumbers: '',
         remark: raw.remark || '',
         preparedBy: String(raw.preparedBy || '').trim() || importerName,
-        reviewedBy: String(raw.reviewedBy || '').trim() || importerName,
+        reviewedBy: String(raw.reviewedBy || '').trim(),
         postedBy: '',
         cashierBy: '',
         totalDebit: totals.debit,

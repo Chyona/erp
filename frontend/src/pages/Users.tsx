@@ -53,7 +53,7 @@ function isBuiltinAdminAccount(record: SystemAccount): boolean {
 
 export default function Users() {
   const { message, modal } = App.useApp();
-  const { can, user } = useAuth();
+  const { can, user, patchUser } = useAuth();
   const [rows, setRows] = useState<SystemAccount[]>([]);
   const [loading, setLoading] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -122,6 +122,9 @@ export default function Users() {
         phone: (values.phone || '').trim(),
         remark: (values.remark || '').trim()
       });
+      if (editTarget.id === user?.accountId) {
+        patchUser({ nickname: (values.nickname || '').trim() });
+      }
       message.success('资料已更新');
       setEditTarget(null);
       editForm.resetFields();

@@ -90,12 +90,31 @@ type SettingKV struct {
 }
 
 type erpService struct {
-	repo  repository.ErpRepository
-	store *storage.Client
+	repo        repository.ErpRepository
+	accountRepo repository.AccountRepository
+	store       *storage.Client
 }
 
-func NewErpService(repo repository.ErpRepository, store *storage.Client) ErpService {
-	return &erpService{repo: repo, store: store}
+func NewErpService(repo repository.ErpRepository, accountRepo repository.AccountRepository, store *storage.Client) ErpService {
+	return &erpService{repo: repo, accountRepo: accountRepo, store: store}
+}
+
+// actorDisplayName 当前操作人展示名：优先读库内昵称，否则 JWT 内昵称/用户名。
+func (s *erpService) actorDisplayName(ctx context.Context) string {
+	actor := rbac.ActorFrom(ctx)
+	if actor == nil {
+		return ""
+	}
+	if s.accountRepo != nil && actor.AccountID > 0 {
+		acc, err := s.accountRepo.GetByID(ctx, actor.AccountID)
+		if err == nil && acc != nil {
+			if name := strings.TrimSpace(acc.Nickname); name != "" {
+				return name
+			}
+			return strings.TrimSpace(acc.Username)
+		}
+	}
+	return actor.DisplayName()
 }
 
 // generateID 生成业务主键（UUID v4）。
@@ -252,10 +271,10 @@ func (s *erpService) applyVoucherWritePolicy(ctx context.Context, voucher *model
 		}
 		voucher.CreatedByAccountID = actor.AccountID
 		if strings.TrimSpace(voucher.PreparedBy) == "" {
-			voucher.PreparedBy = actor.DisplayName()
+			voucher.PreparedBy = s.actorDisplayName(ctx)
 		}
 		if voucher.Status == "approved" {
-			voucher.ReviewedBy = actor.DisplayName()
+			voucher.ReviewedBy = s.actorDisplayName(ctx)
 		}
 		return nil
 	}
@@ -273,11 +292,11 @@ func (s *erpService) applyVoucherWritePolicy(ctx context.Context, voucher *model
 	if strings.TrimSpace(existing.PreparedBy) != "" {
 		voucher.PreparedBy = existing.PreparedBy
 	} else if strings.TrimSpace(voucher.PreparedBy) == "" {
-		voucher.PreparedBy = actor.DisplayName()
+		voucher.PreparedBy = s.actorDisplayName(ctx)
 	}
 	// 审核人：草稿→已审核时写入当前操作人昵称；反审核时清空
 	if voucher.Status == "approved" && existing.Status != "approved" {
-		voucher.ReviewedBy = actor.DisplayName()
+		voucher.ReviewedBy = s.actorDisplayName(ctx)
 	} else if voucher.Status == "draft" && existing.Status == "approved" {
 		voucher.ReviewedBy = ""
 	}
@@ -330,10 +349,7 @@ func (s *erpService) ApproveVouchersBatch(ctx context.Context, ids []string) (*V
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
-	reviewer := ""
-	if actor := rbac.ActorFrom(ctx); actor != nil {
-		reviewer = actor.DisplayName()
-	}
+	reviewer := s.actorDisplayName(ctx)
 	toSave := make([]model.Voucher, 0, len(ids))
 	for _, id := range ids {
 		item, ok := byID[id]
@@ -348,9 +364,7 @@ func (s *erpService) ApproveVouchersBatch(ctx context.Context, ids []string) (*V
 		item.Status = "approved"
 		item.ApprovedAt = now
 		item.UpdatedAt = now
-		if reviewer != "" {
-			item.ReviewedBy = reviewer
-		}
+		item.ReviewedBy = reviewer
 		toSave = append(toSave, item)
 	}
 	if len(toSave) > 0 {

@@ -15,7 +15,7 @@ import VoucherDetailModal from '../components/VoucherDetailModal';
 import VoucherImportModal from '../components/VoucherImportModal';
 import VoucherFilterPanel, { EMPTY_VOUCHER_FILTERS } from '../components/VoucherFilterPanel';
 import VoucherTimeFilter from '../components/VoucherTimeFilter';
-import { defaultTimeFilter } from '../utils/voucherTimeFilter';
+import { loadStoredTimeFilter, saveStoredTimeFilter } from '../utils/voucherTimeFilter';
 import type { VoucherTimeFilterState } from '../utils/voucherTimeFilter';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -45,7 +45,14 @@ function countActiveFilters(filters: VoucherFilters) {
   }).length;
 }
 
-const INITIAL_TIME_FILTER = defaultTimeFilter();
+function createInitialFilters(): VoucherFilters {
+  const stored = loadStoredTimeFilter();
+  return {
+    ...EMPTY_VOUCHER_FILTERS,
+    startDate: stored.startDate,
+    endDate: stored.endDate
+  };
+}
 
 export default function VoucherList() {
   const navigate = useNavigate();
@@ -54,17 +61,9 @@ export default function VoucherList() {
   const { can } = useAuth();
   const operatorLookup = useOperatorDisplayLookup();
   const [vouchers, setVouchers] = useState([]);
-  const [filters, setFilters] = useState<VoucherFilters>({
-    ...EMPTY_VOUCHER_FILTERS,
-    startDate: INITIAL_TIME_FILTER.startDate,
-    endDate: INITIAL_TIME_FILTER.endDate
-  });
-  const [draftFilters, setDraftFilters] = useState<VoucherFilters>({
-    ...EMPTY_VOUCHER_FILTERS,
-    startDate: INITIAL_TIME_FILTER.startDate,
-    endDate: INITIAL_TIME_FILTER.endDate
-  });
-  const [timeFilter, setTimeFilter] = useState<VoucherTimeFilterState>(INITIAL_TIME_FILTER);
+  const [filters, setFilters] = useState<VoucherFilters>(() => createInitialFilters());
+  const [draftFilters, setDraftFilters] = useState<VoucherFilters>(() => createInitialFilters());
+  const [timeFilter, setTimeFilter] = useState<VoucherTimeFilterState>(() => loadStoredTimeFilter());
   const [viewId, setViewId] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [showSubtotal, setShowSubtotal] = useState(true);
@@ -110,6 +109,11 @@ export default function VoucherList() {
 
   const handleTimeQuery = (startDate: string, endDate: string) => {
     applyFilters({ startDate, endDate });
+  };
+
+  const handleTimeFilterChange = (next: VoucherTimeFilterState) => {
+    setTimeFilter(next);
+    saveStoredTimeFilter(next);
   };
 
   const handleFilterSearch = () => {
@@ -282,7 +286,7 @@ export default function VoucherList() {
         <div className="voucher-list-toolbar__main">
           <VoucherTimeFilter
             value={timeFilter}
-            onChange={setTimeFilter}
+            onChange={handleTimeFilterChange}
             onQuery={handleTimeQuery}
             filterOpen={filterOpen}
             onFilterOpenChange={(open) => {

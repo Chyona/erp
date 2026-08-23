@@ -69,7 +69,7 @@ func main() {
 		storeClient = sc
 		logger.Info("对象存储已启用", zap.String("provider", string(sc.ProviderType())), zap.String("basePath", sc.BasePath()))
 	}
-	erpService := service.NewErpService(erpRepo, storeClient)
+	erpService := service.NewErpService(erpRepo, accountRepo, storeClient)
 	erpHandler := v1handler.NewErpHandler(erpService, accountService)
 	appService := service.NewAppService(erpRepo)
 	appHandler := v1handler.NewAppHandler(appService)
