@@ -216,20 +216,36 @@ export default function VoucherTable({
   const [attachPanelItems, setAttachPanelItems] = useState<Attachment[]>([]);
   const [attachPanelLoading, setAttachPanelLoading] = useState(false);
   const listUploadTailRef = useRef(new Map<string, Promise<void>>());
-  const listUploadToastRef = useRef({ count: 0, timer: 0 as ReturnType<typeof setTimeout> | 0 });
+  const listUploadToastRef = useRef({
+    count: 0,
+    recognized: [] as string[],
+    timer: 0 as ReturnType<typeof setTimeout> | 0
+  });
 
-  const noteListUploadSuccess = (count = 1) => {
-    listUploadToastRef.current.count += count;
+  const noteListUploadSuccess = (recognized: string[] = []) => {
+    listUploadToastRef.current.count += 1;
+    if (recognized.length) {
+      listUploadToastRef.current.recognized.push(...recognized);
+    }
     if (listUploadToastRef.current.timer) {
       clearTimeout(listUploadToastRef.current.timer);
     }
     listUploadToastRef.current.timer = setTimeout(() => {
       const n = listUploadToastRef.current.count;
+      const nums = [...new Set(listUploadToastRef.current.recognized)];
       listUploadToastRef.current.count = 0;
+      listUploadToastRef.current.recognized = [];
       listUploadToastRef.current.timer = 0;
-      if (n > 0) {
-        message.success(n > 1 ? `已上传 ${n} 个附件` : '附件上传成功');
+      if (n <= 0) return;
+      if (nums.length > 0) {
+        message.success(
+          n > 1
+            ? `已上传 ${n} 个附件，已识别发票号 ${nums.join(', ')}`
+            : `附件上传成功，已识别发票号 ${nums.join(', ')}`
+        );
+        return;
       }
+      message.success(n > 1 ? `已上传 ${n} 个附件` : '附件上传成功');
     }, 280);
   };
 
@@ -388,9 +404,12 @@ export default function VoucherTable({
       .then(async () => {
         setUploadingId(voucher.id);
         try {
-          const updated = await Voucher.addAttachmentToVoucher(voucher.id, file);
+          const { voucher: updated, recognizedInvoiceNumbers } = await Voucher.addAttachmentToVoucher(
+            voucher.id,
+            file
+          );
           option.onSuccess?.({});
-          noteListUploadSuccess(1);
+          noteListUploadSuccess(recognizedInvoiceNumbers);
           if (attachPanelVoucherRef.current?.id === voucher.id) {
             await loadAttachPanel(updated);
           }
@@ -649,7 +668,7 @@ export default function VoucherTable({
           width: 40,
           align: 'center',
           fixed: 'left',
-          onCell: (record) => resolveCellProps(record, 'select'),
+          onCell: (record) => resolveCellProps(record, 'select', true),
           render: (_, record) => {
             if (isEmptyPlaceholderRow(record)) return null;
             const voucher = record.voucher;
@@ -671,7 +690,7 @@ export default function VoucherTable({
     {
       title: '凭证字号',
       key: 'voucherNo',
-      width: 90,
+      width: 80,
       fixed: 'left',
       onCell: (record) => resolveCellProps(record, 'voucherNo', true),
       render: (_, record) => {
@@ -686,7 +705,7 @@ export default function VoucherTable({
     {
       title: '日期',
       dataIndex: ['voucher', 'date'],
-      width: 110,
+      width: 100,
       fixed: 'left',
       onCell: (record) => resolveCellProps(record, 'date', true),
       render: (_, record) => (isEmptyPlaceholderRow(record) ? null : record.voucher.date)
@@ -694,7 +713,6 @@ export default function VoucherTable({
     {
       title: '摘要',
       key: 'summary',
-      width: 220,
       ellipsis: true,
       onCell: (record) => resolveCellProps(record, 'summary'),
       render: (_, record) => {
@@ -721,7 +739,7 @@ export default function VoucherTable({
     {
       title: '借方金额',
       key: 'debit',
-      width: 110,
+      width: 100,
       align: 'right',
       onCell: (record) => resolveCellProps(record, 'debit'),
       render: (_, record) => {
@@ -734,7 +752,7 @@ export default function VoucherTable({
     {
       title: '贷方金额',
       key: 'credit',
-      width: 110,
+      width: 100,
       align: 'right',
       onCell: (record) => resolveCellProps(record, 'credit'),
       render: (_, record) => {
@@ -747,22 +765,22 @@ export default function VoucherTable({
     {
       title: '备注',
       key: 'remark',
-      width: 270,
-      ellipsis: true,
+      className: 'voucher-grouped-table__remark-col',
       onCell: (record) => resolveCellProps(record, 'remark', true),
       render: (_, record) => {
         if (isEmptyPlaceholderRow(record)) return null;
+        const remark = record.voucher.remark || '';
         return (
-        <span className="voucher-grouped-table__multiline" title={record.voucher.remark || ''}>
-          {record.voucher.remark || ''}
-        </span>
+          <span className="voucher-grouped-table__remark" title={remark}>
+            {remark}
+          </span>
         );
       }
     },
     {
       title: '附件',
       key: 'attachments',
-      width: 120,
+      width: 100,
       align: 'center',
       className: 'voucher-grouped-table__attach-col',
       onCell: (record) => resolveCellProps(record, 'attachments', true),
@@ -771,7 +789,7 @@ export default function VoucherTable({
     {
       title: '发票号',
       key: 'invoiceNumbers',
-      width: 160,
+      width: 180,
       onCell: (record) => resolveCellProps(record, 'invoiceNumbers', true),
       render: (_, record) =>
         isEmptyPlaceholderRow(record) ? null : renderMultilineText(record.voucher.invoiceNumbers)

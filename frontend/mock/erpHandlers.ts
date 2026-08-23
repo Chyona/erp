@@ -954,7 +954,9 @@ export async function handleErpMockRequest(
           type: body.type ?? existing?.type ?? '',
           size: body.size ?? existing?.size ?? 0,
           url: body.url ?? existing?.url ?? '',
-          uploadedAt: body.uploadedAt ?? existing?.uploadedAt ?? new Date().toISOString()
+          uploadedAt: body.uploadedAt ?? existing?.uploadedAt ?? new Date().toISOString(),
+          recognizedInvoiceNumbers:
+            body.recognizedInvoiceNumbers ?? existing?.recognizedInvoiceNumbers
         };
         store.attachments.set(id, item);
         ok(res, item);

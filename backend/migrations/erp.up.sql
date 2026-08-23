@@ -87,12 +87,13 @@ CREATE INDEX IF NOT EXISTS idx_vouchers_created_by_account_id ON vouchers (creat
 
 -- 凭证附件（文件存 COS 等对象存储，库内仅保存未签名 URL；前端经 ErpApi 读写元数据）
 CREATE TABLE IF NOT EXISTS attachments (
-    id          VARCHAR(64)  PRIMARY KEY,
-    name        VARCHAR(256) NOT NULL,
-    type        VARCHAR(128),
-    size        BIGINT       NOT NULL DEFAULT 0,
-    url         VARCHAR(1024) NOT NULL DEFAULT '',
-    uploaded_at VARCHAR(32)
+    id                         VARCHAR(64)  PRIMARY KEY,
+    name                       VARCHAR(256) NOT NULL,
+    type                       VARCHAR(128),
+    size                       BIGINT       NOT NULL DEFAULT 0,
+    url                        VARCHAR(1024) NOT NULL DEFAULT '',
+    uploaded_at                VARCHAR(32),
+    recognized_invoice_numbers VARCHAR(512) NOT NULL DEFAULT ''
 );
 
 -- 审计日志（前端 auditLogs store）

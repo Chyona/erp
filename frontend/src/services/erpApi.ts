@@ -47,7 +47,8 @@ function sanitizeAttachment(item: Attachment): Attachment {
     type: raw.type,
     size: raw.size,
     url: raw.url || '',
-    uploadedAt: raw.uploadedAt
+    uploadedAt: raw.uploadedAt,
+    recognizedInvoiceNumbers: raw.recognizedInvoiceNumbers
   };
 }
 

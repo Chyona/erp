@@ -22,6 +22,7 @@ export type MockAttachment = {
   size: number;
   url: string;
   uploadedAt: string;
+  recognizedInvoiceNumbers?: string;
 };
 
 export type MockAuditLog = {

@@ -19,6 +19,13 @@ import {
 } from '../utils/reportPeriod';
 import { formatVoucherAuditDetail, formatVoucherBatchAuditDetail } from '../utils/auditDetail';
 import { syncSalesVoucherMeta } from '../utils/salesInvoiceTax';
+import {
+  isInvoiceRecognizableFile,
+  mergeInvoiceNumbers,
+  parseInvoiceNumbersList,
+  removeInvoiceNumbers
+} from '../utils/invoiceNumberExtract';
+import { recognizeInvoiceNumbersFromFile } from './invoiceNumberRecognition';
 import { applyVoucherFilters, compareVouchersDesc } from '../utils/voucherListFilter';
 import type {
   Attachment,
@@ -803,6 +810,15 @@ async function getAttachment(id) {
   return ErpApi.get('attachments', id);
 }
 
+async function tryRecognizeInvoiceNumbers(file: File): Promise<string[]> {
+  if (!isInvoiceRecognizableFile(file)) return [];
+  try {
+    return await recognizeInvoiceNumbersFromFile(file);
+  } catch {
+    return [];
+  }
+}
+
 async function addAttachmentToVoucher(voucherId, file) {
   const voucher = await ErpApi.get('vouchers', voucherId);
   if (!voucher) throw new Error('凭证不存在');
@@ -825,6 +841,13 @@ async function addAttachmentToVoucher(voucherId, file) {
   });
 
   const att = await saveAttachment(file, fileName, voucher.date);
+  const recognized = await tryRecognizeInvoiceNumbers(file);
+  if (recognized.length) {
+    att.recognizedInvoiceNumbers = mergeInvoiceNumbers('', recognized);
+    await updateAttachment(att);
+    voucher.invoiceNumbers = mergeInvoiceNumbers(voucher.invoiceNumbers || '', recognized);
+  }
+
   voucher.attachmentIds = [...(voucher.attachmentIds || []), att.id];
   voucher.attachmentCount = voucher.attachmentIds.length;
   voucher.updatedAt = new Date().toISOString();
@@ -832,9 +855,14 @@ async function addAttachmentToVoucher(voucherId, file) {
   await ErpApi.addAuditLog(
     '上传附件',
     '凭证',
-    formatVoucherAuditDetail(voucher, `附件「${fileName}」`)
+    formatVoucherAuditDetail(
+      voucher,
+      recognized.length
+        ? `附件「${fileName}」，识别发票号 ${recognized.join(', ')}`
+        : `附件「${fileName}」`
+    )
   );
-  return voucher;
+  return { voucher, recognizedInvoiceNumbers: recognized };
 }
 
 async function removeAttachmentFromVoucher(voucherId, attachmentId) {
@@ -856,6 +884,18 @@ async function removeAttachmentsFromVoucher(voucherId, attachmentIds: string[]) 
   }
   await assertVoucherDateMutable(voucher.date);
 
+  const numbersToRemove: string[] = [];
+  for (const id of ids) {
+    try {
+      const att = await getAttachment(id);
+      if (att?.recognizedInvoiceNumbers) {
+        numbersToRemove.push(...parseInvoiceNumbersList(att.recognizedInvoiceNumbers));
+      }
+    } catch {
+      // 单条失败不阻断删除
+    }
+  }
+
   // 先删附件（含 COS），再更新凭证引用
   await ErpApi.removeMany('attachments', ids);
 
@@ -863,6 +903,9 @@ async function removeAttachmentsFromVoucher(voucherId, attachmentIds: string[]) 
   const nextIds = (voucher.attachmentIds || []).filter((id) => !removeSet.has(id));
   voucher.attachmentIds = nextIds;
   voucher.attachmentCount = nextIds.length;
+  if (numbersToRemove.length) {
+    voucher.invoiceNumbers = removeInvoiceNumbers(voucher.invoiceNumbers || '', numbersToRemove);
+  }
   voucher.updatedAt = new Date().toISOString();
   await ErpApi.put('vouchers', voucher);
   await ErpApi.addAuditLog(
@@ -870,7 +913,13 @@ async function removeAttachmentsFromVoucher(voucherId, attachmentIds: string[]) 
     '凭证',
     formatVoucherAuditDetail(
       voucher,
-      ids.length > 1 ? `删除附件 ${ids.length} 个` : `删除附件 ${ids[0]}`
+      ids.length > 1
+        ? numbersToRemove.length
+          ? `删除附件 ${ids.length} 个，移除发票号 ${numbersToRemove.join(', ')}`
+          : `删除附件 ${ids.length} 个`
+        : numbersToRemove.length
+          ? `删除附件 ${ids[0]}，移除发票号 ${numbersToRemove.join(', ')}`
+          : `删除附件 ${ids[0]}`
     )
   );
   return voucher;

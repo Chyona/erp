@@ -1785,6 +1785,20 @@ body,
   line-height: inherit;
 }
 
+.voucher-grouped-table__remark {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.35;
+}
+
+.voucher-grouped-table .ant-table-tbody>tr>td[rowspan].voucher-grouped-table__remark-col {
+  vertical-align: middle;
+}
+
 .voucher-grouped-table__subtotal-label {
   font-weight: 600;
   color: var(--app-table-header-color);

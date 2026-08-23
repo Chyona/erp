@@ -111,6 +111,8 @@ export interface Attachment {
   /** 对象存储公开 URL（无签名） */
   url: string;
   uploadedAt: string;
+  /** 上传时从该附件识别出的发票号（逗号分隔），删除附件时同步从凭证移除 */
+  recognizedInvoiceNumbers?: string;
 }
 
 export interface AuditLog {

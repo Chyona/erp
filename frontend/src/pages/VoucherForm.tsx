@@ -32,7 +32,7 @@ import {
   buildAttachmentDisplayName,
   enrichAttachmentDisplayNames
 } from '../utils/attachmentName';
-import { isInvoiceRecognizableFile, mergeInvoiceNumbers } from '../utils/invoiceNumberExtract';
+import { isInvoiceRecognizableFile, mergeInvoiceNumbers, parseInvoiceNumbersList, removeInvoiceNumbers } from '../utils/invoiceNumberExtract';
 import { recognizeInvoiceNumbersFromFile } from '../services/invoiceNumberRecognition';
 import { syncSalesVoucherMeta } from '../utils/salesInvoiceTax';
 import { INVOICE_TYPE, INVOICE_TYPE_OPTIONS } from '../constants/invoice';
@@ -707,12 +707,20 @@ export default function VoucherForm() {
       message.warning(Voucher.ATTACHMENT_READONLY_TIP);
       return;
     }
+    const removed = attachments[index];
     setAttachments((prev) => {
       const next = prev.filter((_, idx) => idx !== index);
       if (next.length === 0) setAttachmentPanelOpen(false);
       form.setFieldValue('attachmentCount', next.length);
       return next;
     });
+    if (removed?.recognizedInvoiceNumbers) {
+      const current = String(form.getFieldValue('invoiceNumbers') || '');
+      form.setFieldValue(
+        'invoiceNumbers',
+        removeInvoiceNumbers(current, parseInvoiceNumbersList(removed.recognizedInvoiceNumbers))
+      );
+    }
   };
 
   const removeAttachmentsFromPanel = (indices: number[]) => {
@@ -721,12 +729,20 @@ export default function VoucherForm() {
       return;
     }
     const removeSet = new Set(indices || []);
+    const removed = attachments.filter((_, idx) => removeSet.has(idx));
     setAttachments((prev) => {
       const next = prev.filter((_, idx) => !removeSet.has(idx));
       if (next.length === 0) setAttachmentPanelOpen(false);
       form.setFieldValue('attachmentCount', next.length);
       return next;
     });
+    const numbersToRemove = removed.flatMap((att) =>
+      parseInvoiceNumbersList(att.recognizedInvoiceNumbers || '')
+    );
+    if (numbersToRemove.length) {
+      const current = String(form.getFieldValue('invoiceNumbers') || '');
+      form.setFieldValue('invoiceNumbers', removeInvoiceNumbers(current, numbersToRemove));
+    }
   };
 
   const toggleAttachmentPanel = () => {
@@ -841,11 +857,17 @@ export default function VoucherForm() {
             updateAttachmentUploadStatus('正在识别发票号…');
           }
           const { numbers: recognized, hint } = await tryAutoRecognizeInvoiceNumber(fileObj);
+          let savedAtt = att;
           if (recognized.length) {
+            savedAtt = {
+              ...att,
+              recognizedInvoiceNumbers: mergeInvoiceNumbers('', recognized)
+            };
+            await Voucher.updateAttachment(savedAtt);
             const current = String(form.getFieldValue('invoiceNumbers') || '');
             form.setFieldValue('invoiceNumbers', mergeInvoiceNumbers(current, recognized));
           }
-          const next = [...attachmentsRef.current, att];
+          const next = [...attachmentsRef.current, savedAtt];
           attachmentsRef.current = next;
           setAttachments(next);
           form.setFieldValue('attachmentCount', next.length);

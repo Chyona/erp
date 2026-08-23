@@ -93,10 +93,25 @@ export function dedupeInvoiceNumbers(numbers: string[]): string[] {
   return out;
 }
 
-export function mergeInvoiceNumbers(existing: string, found: string[]): string {
-  const parts = String(existing || '')
+export function parseInvoiceNumbersList(existing: string): string[] {
+  return String(existing || '')
     .split(/[,，、;\s]+/)
     .map((item) => digitsOnly(item))
     .filter(isValidInvoiceNumber);
-  return dedupeInvoiceNumbers([...parts, ...found]).join(',');
+}
+
+export function joinInvoiceNumbers(numbers: string[]): string {
+  return dedupeInvoiceNumbers(numbers).join(',');
+}
+
+export function mergeInvoiceNumbers(existing: string, found: string[]): string {
+  return joinInvoiceNumbers([...parseInvoiceNumbersList(existing), ...found]);
+}
+
+export function removeInvoiceNumbers(existing: string, toRemove: string[]): string {
+  const removeSet = new Set(
+    toRemove.map((item) => digitsOnly(item)).filter(isValidInvoiceNumber)
+  );
+  if (!removeSet.size) return String(existing || '').trim();
+  return joinInvoiceNumbers(parseInvoiceNumbersList(existing).filter((num) => !removeSet.has(num)));
 }

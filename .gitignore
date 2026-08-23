@@ -16,3 +16,4 @@ backend/*/.env
 /backend/internal/config/config.yaml
 backend/.DS_Store
 backend/webserver.exe
+backend/logs/*
