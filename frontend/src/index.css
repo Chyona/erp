@@ -3723,7 +3723,7 @@ body,
   min-width: 0;
   --voucher-head-row1: 28px;
   --voucher-head-row2: 24px;
-  --voucher-row-height: calc(var(--voucher-head-row1) + var(--voucher-head-row2));
+  --voucher-row-height: 60px;
 }
 
 .voucher-sheet__table-layout .voucher-sheet__table-wrap {
@@ -3753,7 +3753,7 @@ body,
 
 .voucher-sheet__attach-col-header {
   flex-shrink: 0;
-  min-height: var(--voucher-row-height, 52px);
+  min-height: var(--voucher-row-height, 60px);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -3934,13 +3934,16 @@ body,
 
 .voucher-sheet__table {
   width: 100%;
-  min-width: 960px;
+  min-width: 900px;
   border-collapse: collapse;
   table-layout: fixed;
   font-size: 13px;
   --voucher-head-row1: 28px;
   --voucher-head-row2: 24px;
-  --voucher-row-height: calc(var(--voucher-head-row1) + var(--voucher-head-row2));
+  --voucher-row-height: 60px;
+  /* 借/贷方金额列宽：每格 22px，每组 242px */
+  --voucher-amount-digit-width: 22px;
+  --voucher-amount-group-width: calc(var(--voucher-amount-digit-width) * 11);
 }
 
 .voucher-sheet__table th,
@@ -3994,12 +3997,36 @@ body,
   width: 72px;
 }
 
+.voucher-sheet__col-index {
+  width: 72px;
+}
+
 .voucher-sheet__th-summary {
-  width: 18%;
+  width: auto;
+}
+
+.voucher-sheet__col-summary {
+  width: auto;
 }
 
 .voucher-sheet__th-account {
-  width: 22%;
+  width: auto;
+}
+
+.voucher-sheet__col-account {
+  width: auto;
+}
+
+.voucher-sheet__col-amount-digit {
+  width: var(--voucher-amount-digit-width);
+}
+
+.voucher-sheet__th-amount-group,
+.voucher-sheet__th-units,
+.voucher-sheet__td-amount {
+  width: var(--voucher-amount-group-width);
+  min-width: var(--voucher-amount-group-width);
+  max-width: var(--voucher-amount-group-width);
 }
 
 .voucher-sheet__table tbody td {
@@ -4191,7 +4218,7 @@ body,
 }
 
 .voucher-sheet__total-row td {
-  background: var(--app-table-row-total);
+  /* background: var(--app-table-row-total); */
   height: var(--voucher-row-height);
 }
 
@@ -4223,7 +4250,7 @@ body,
   display: grid;
   grid-template-columns: repeat(11, minmax(0, 1fr));
   width: 100%;
-  height: var(--voucher-row-height, 52px);
+  height: var(--voucher-row-height, 60px);
   position: relative;
   background: #fff;
 }
@@ -4336,6 +4363,12 @@ body,
   font-size: 11px;
   color: #64748b;
   font-weight: 500;
+}
+
+.amount-grid__cell--label.amount-grid__cell--highlight {
+  background: #3b82f6;
+  color: #fff;
+  font-weight: 600;
 }
 
 

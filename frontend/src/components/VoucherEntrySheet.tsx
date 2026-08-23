@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { DatePicker, Input, Select, Space, Tooltip } from 'antd';
 import { clampDayjsToToday, disableFutureDate } from '../utils/dateConstraints';
 import {
@@ -47,7 +48,12 @@ function VoucherEntrySheet({
 }) {
   const rowCount = Math.max(entries.length, MIN_ROWS);
   const period = accountingPeriodLabel || formatAccountingPeriod(voucherDate);
-  const totalAmount = Math.max(totals.debit, totals.credit);
+  const [debitHighlight, setDebitHighlight] = useState<number[]>([]);
+  const [creditHighlight, setCreditHighlight] = useState<number[]>([]);
+  const showTotalCn = totals.balanced;
+  const totalAmount = showTotalCn ? Math.max(totals.debit, totals.credit) : 0;
+  const totalDebitDisplay = totals.debit > 0 ? totals.debit : '';
+  const totalCreditDisplay = totals.credit > 0 ? totals.credit : '';
 
   return (
     <div className={`voucher-sheet${readOnly ? ' voucher-sheet--readonly' : ''}${redLetter ? ' voucher-sheet--red-letter' : ''}`}>
@@ -104,6 +110,13 @@ function VoucherEntrySheet({
         <div className="voucher-sheet__table-layout">
           <div className="voucher-sheet__table-wrap">
             <table className="voucher-sheet__table">
+              <colgroup>
+                <col className="voucher-sheet__col-index" />
+                <col className="voucher-sheet__col-summary" />
+                <col className="voucher-sheet__col-account" />
+                <col span={11} className="voucher-sheet__col-amount-digit" />
+                <col span={11} className="voucher-sheet__col-amount-digit" />
+              </colgroup>
               <thead>
                 <tr>
                   <th rowSpan={2} className="voucher-sheet__th-index">
@@ -124,10 +137,10 @@ function VoucherEntrySheet({
                 </tr>
                 <tr>
                   <th colSpan={11} className="voucher-sheet__th-units">
-                    <AmountGridHeader />
+                    <AmountGridHeader highlightIndices={debitHighlight} />
                   </th>
                   <th colSpan={11} className="voucher-sheet__th-units">
-                    <AmountGridHeader />
+                    <AmountGridHeader highlightIndices={creditHighlight} />
                   </th>
                 </tr>
               </thead>
@@ -139,7 +152,9 @@ function VoucherEntrySheet({
                   const amountValue = (side: 'debit' | 'credit') => {
                     if (!entry) return '';
                     const raw = entry[side];
-                    return raw === '' || raw === undefined || raw === null ? '' : raw;
+                    if (raw === '' || raw === undefined || raw === null) return '';
+                    const n = parseFloat(String(raw));
+                    return Number.isFinite(n) && n > 0 ? raw : '';
                   };
                   const accountPreview =
                     entry && [entry.accountCode, entry.accountName].filter(Boolean).join(' ');
@@ -261,6 +276,7 @@ function VoucherEntrySheet({
                             }
                             readOnly={readOnly || !showAmount}
                             redLetter={redLetter}
+                            onHighlightChange={setDebitHighlight}
                           />
                         </div>
                       </td>
@@ -287,6 +303,7 @@ function VoucherEntrySheet({
                             }
                             readOnly={readOnly || !showAmount}
                             redLetter={redLetter}
+                            onHighlightChange={setCreditHighlight}
                           />
                         </div>
                       </td>
@@ -297,18 +314,18 @@ function VoucherEntrySheet({
               <tfoot>
                 <tr className="voucher-sheet__total-row">
                   <td colSpan={3} className="voucher-sheet__total-label">
-                    <span className="voucher-sheet__total-text">合计</span>
+                    <span className="voucher-sheet__total-text">合计：</span>
                     <span
                       className={`voucher-sheet__total-cn${redLetter ? ' voucher-sheet__total-cn--red' : ''}`}
                     >
-                      {amountToChineseUppercase(totalAmount, redLetter)}
+                      {totalAmount > 0 ? amountToChineseUppercase(totalAmount, redLetter) : ''}
                     </span>
                   </td>
                   <td colSpan={11} className="voucher-sheet__td-amount">
-                    <AmountGrid value={totals.debit} readOnly redLetter={redLetter} />
+                    <AmountGrid value={totalDebitDisplay} readOnly redLetter={redLetter} />
                   </td>
                   <td colSpan={11} className="voucher-sheet__td-amount">
-                    <AmountGrid value={totals.credit} readOnly redLetter={redLetter} />
+                    <AmountGrid value={totalCreditDisplay} readOnly redLetter={redLetter} />
                   </td>
                 </tr>
               </tfoot>

@@ -319,14 +319,24 @@ export default function VoucherForm() {
       }
       return next.map((e, i) => {
         if (i !== index) return e;
-        const updated = { ...e, [field]: value };
+        let fieldValue = value;
+        if (field === 'debit' || field === 'credit') {
+          const n = parseFloat(String(value));
+          fieldValue =
+            value === '' || value === undefined || value === null
+              ? ''
+              : Number.isFinite(n) && n > 0
+                ? Math.round(n * 100) / 100
+                : '';
+        }
+        const updated = { ...e, [field]: fieldValue };
         if (field === 'accountId') {
           const acc = accounts.find((a) => a.id === value);
           updated.accountCode = acc?.code || '';
           updated.accountName = acc?.name || '';
         }
-        if (field === 'debit' && value) updated.credit = '';
-        if (field === 'credit' && value) updated.debit = '';
+        if (field === 'debit' && fieldValue) updated.credit = '';
+        if (field === 'credit' && fieldValue) updated.debit = '';
         return updated;
       });
     });
@@ -985,15 +995,6 @@ export default function VoucherForm() {
                 </Space>
               }
             />
-
-            {!readOnly && !totals.balanced && (totals.debit > 0 || totals.credit > 0) && (
-              <Alert
-                type="error"
-                showIcon
-                style={{ margin: '12px 0' }}
-                message={`借贷不平衡，差额：${Math.abs(totals.debit - totals.credit).toFixed(2)}`}
-              />
-            )}
 
             <div className="voucher-form__extra">
               {businessType === '销售收入' && (

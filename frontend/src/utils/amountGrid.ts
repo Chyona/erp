@@ -5,7 +5,7 @@ export function amountToDigits(amount) {
   const raw = String(amount ?? '').trim();
   if (!raw) return new Array(11).fill('');
   const n = Math.abs(parseFloat(raw));
-  if (!Number.isFinite(n)) return new Array(11).fill('');
+  if (!Number.isFinite(n) || n === 0) return new Array(11).fill('');
   const fixed = n.toFixed(2);
   const combined = fixed.replace('.', '');
   const digits = new Array(11).fill('');
@@ -13,6 +13,17 @@ export function amountToDigits(amount) {
     digits[11 - 1 - i] = combined[combined.length - 1 - i];
   }
   return digits;
+}
+
+/** 输入过程中需高亮的金额格列索引（最高有效位） */
+export function amountInputHighlightIndices(raw) {
+  const text = String(raw ?? '').trim();
+  if (!text || text === '.') return [];
+  const digits = amountToDigits(text);
+  for (let i = 0; i < digits.length; i++) {
+    if (digits[i]) return [i];
+  }
+  return [];
 }
 
 export function amountToChineseUppercase(money, negative = false) {
