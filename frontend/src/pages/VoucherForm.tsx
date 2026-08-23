@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Button,
   Card,
@@ -14,9 +14,10 @@ import {
 } from 'antd';
 import { useAsyncLoading } from '../hooks/useAsyncLoading';
 import { disableFutureDate } from '../utils/dateConstraints';
-import { useNavigate, useParams, useSearchParams, Navigate } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams, useLocation, Navigate } from 'react-router-dom';
 import dayjs from '../utils/dayjsSetup';
-import { Voucher } from '../services/voucher';
+import { Voucher, isNewVoucherNav } from '../services/voucher';
+import type { VoucherFormNavTarget } from '../services/voucher';
 import type { Attachment, VoucherStatus } from '../types';
 import { ErpApi } from '../services/erpApi';
 import { useApp } from '../context/AppContext';
@@ -49,6 +50,13 @@ const VOUCHER_TYPE = '记';
 const EYE_CARE_KEY = 'voucherEyeCare';
 const FULLSCREEN_KEY = 'voucherFullscreen';
 const SAVE_MSG_KEY = 'voucher-save';
+
+type VoucherNavState = {
+  skipInit?: boolean;
+  voucher?: Awaited<ReturnType<typeof Voucher.getById>>;
+  mode?: 'new';
+  presetDate?: string;
+};
 
 const BUSINESS_TYPES = [
   '日常费用',
@@ -86,24 +94,32 @@ const emptyEntry = (): FormEntry => ({
 });
 
 export default function VoucherForm() {
-  const { id } = useParams();
+  const { id: routeId } = useParams();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const insertDate = searchParams.get('date');
   const insertNumber = searchParams.get('number');
-  const isInsert = Boolean(!id && insertNumber);
-  const isEdit = Boolean(id);
+  const isInsert = Boolean(!routeId && insertNumber);
   const urlPresetDate = searchParams.get('date');
-  const initKey = isEdit
-    ? `edit:${id}`
+  const initKey = routeId
+    ? `edit:${routeId}`
     : isInsert
       ? `insert:${insertDate ?? ''}:${insertNumber ?? ''}`
       : `new:${urlPresetDate ?? ''}`;
   const initializedKeyRef = useRef<string | null>(null);
+  const skipPageInitRef = useRef(false);
+  const savedSnapshotRef = useRef<string | null>(null);
+  const [snapshotVersion, setSnapshotVersion] = useState(0);
+  const bumpSnapshotBaseline = useCallback(() => {
+    setSnapshotVersion((v) => v + 1);
+  }, []);
   const navigate = useNavigate();
   const { message, modal } = App.useApp();
   const { accounts, refresh } = useApp();
   const { user, canAccessOwnVoucher, canMutateVoucher } = useAuth();
   const [form] = Form.useForm();
+  const [editingId, setEditingId] = useState<string | null>(routeId ?? null);
+  const isEdit = editingId !== null;
   const [entries, setEntries] = useState<FormEntry[]>([emptyEntry(), emptyEntry()]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [attachmentPanelOpen, setAttachmentPanelOpen] = useState(false);
@@ -117,8 +133,11 @@ export default function VoucherForm() {
   const [voucherStatus, setVoucherStatus] = useState<VoucherStatus>(Voucher.STATUS.DRAFT);
   const [reviewedBy, setReviewedBy] = useState('');
   const [isRedLetter, setIsRedLetter] = useState(false);
-  const [loading, setLoading] = useState(isEdit);
-  const [adjacent, setAdjacent] = useState({ older: null, newer: null });
+  const [loading, setLoading] = useState(Boolean(routeId));
+  const [adjacent, setAdjacent] = useState<{
+    older: Awaited<ReturnType<typeof Voucher.getById>> | null;
+    newer: VoucherFormNavTarget | null;
+  }>({ older: null, newer: null });
   const [eyeCare, setEyeCare] = useState(() => localStorage.getItem(EYE_CARE_KEY) === '1');
   const [fullscreen, setFullscreen] = useState(() => localStorage.getItem(FULLSCREEN_KEY) === '1');
   const [carryForwardPeriodLabel, setCarryForwardPeriodLabel] = useState('');
@@ -141,6 +160,183 @@ export default function VoucherForm() {
 
   const totals = useMemo(() => Voucher.calcTotals(entries), [entries]);
 
+  const buildFormSnapshot = useCallback(() => {
+    const values = form.getFieldsValue();
+    const normAmount = (v: unknown) => {
+      const n = parseFloat(String(v));
+      return Number.isFinite(n) && n > 0 ? String(Math.round(n * 100) / 100) : '';
+    };
+    return JSON.stringify({
+      voucherDate: values.voucherDate?.format?.('YYYY-MM-DD') ?? '',
+      businessType: values.businessType ?? '',
+      invoiceType: values.invoiceType ?? '',
+      taxAmount: normAmount(values.taxAmount),
+      invoiceNumbers: String(values.invoiceNumbers ?? '').trim(),
+      remark: String(values.remark ?? '').trim(),
+      signatory: String(values.signatory ?? '').trim(),
+      voucherNumber,
+      entries: entries.map((e) => ({
+        summary: e.summary || '',
+        accountId: e.accountId || '',
+        debit: normAmount(e.debit),
+        credit: normAmount(e.credit)
+      })),
+      attachmentIds: attachments.map((a) => a.id).sort()
+    });
+  }, [form, voucherNumber, entries, attachments]);
+
+  const hasUnsavedChanges = useCallback(() => {
+    if (savedSnapshotRef.current === null) return false;
+    return buildFormSnapshot() !== savedSnapshotRef.current;
+  }, [buildFormSnapshot]);
+
+  const markFormSaved = useCallback(() => {
+    savedSnapshotRef.current = buildFormSnapshot();
+  }, [buildFormSnapshot]);
+
+  useEffect(() => {
+    markFormSaved();
+    // 仅在翻页/加载后 bumpSnapshotBaseline 时重设基线，避免编辑过程中误重置
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snapshotVersion]);
+
+  const refreshFormAdjacent = useCallback(async (currentId: string | null) => {
+    const next = await Voucher.getFormAdjacent(currentId);
+    setAdjacent(next);
+  }, []);
+
+  const loadDefaultSignatory = async () => getCurrentOperatorName();
+
+  const applyVoucherToForm = useCallback(
+    async (v: NonNullable<Awaited<ReturnType<typeof Voucher.getById>>>) => {
+      if (!v || v.status === 'locked') {
+        message.error('该凭证不可编辑');
+        return false;
+      }
+      if (!canAccessOwnVoucher(v)) {
+        message.error('无权查看该凭证');
+        return false;
+      }
+      if (!canMutateVoucher(v) && v.status === Voucher.STATUS.DRAFT) {
+        message.error(
+          v.createdByAccountId
+            ? '无权修改他人的凭证'
+            : '该凭证为历史数据、无归属人，仅管理员可修改'
+        );
+        return false;
+      }
+
+      setCarryForwardReadOnly(false);
+      setCarryForwardPeriodLabel('');
+      if (isCarryForwardVoucher(v)) {
+        setCarryForwardReadOnly(true);
+        message.warning(CARRY_FORWARD_VOUCHER_READONLY_TIP);
+      }
+
+      form.setFieldsValue({
+        voucherDate: dayjs(
+          v.isTaxExemptionCarryForward
+            ? expectedCarryForwardDate(v) || v.date
+            : v.isProfitLossClosing
+              ? expectedProfitLossClosingDate(v) || v.date
+              : v.date
+        ),
+        attachmentCount: v.attachmentCount || 0,
+        businessType: v.businessType || '其他',
+        invoiceType: v.invoiceType || INVOICE_TYPE.NONE,
+        taxAmount: v.taxAmount || undefined,
+        invoiceNumbers: v.invoiceNumbers || '',
+        remark: v.remark || '',
+        signatory: v.preparedBy || v.reviewedBy || v.postedBy || v.cashierBy || ''
+      });
+      setEditingId(v.id);
+      setVoucherNumber(v.voucherNumber);
+      setVoucherStatus(v.status || Voucher.STATUS.DRAFT);
+      setCarryForwardPeriodLabel(
+        v.isTaxExemptionCarryForward
+          ? formatStoredTaxExemptionPeriod(v)
+          : v.isProfitLossClosing
+            ? formatStoredProfitLossClosingPeriod(v)
+            : ''
+      );
+      setReviewedBy(v.reviewedBy || v.postedBy || '');
+      setIsRedLetter(Voucher.isRedLetterVoucher(v));
+      setEntries(
+        v.entries.map((e) => ({
+          key: Date.now() + Math.random(),
+          summary: e.summary || '',
+          accountId: e.accountId || '',
+          accountCode: e.accountCode || '',
+          accountName: e.accountName || '',
+          debit: e.debit || '',
+          credit: e.credit || ''
+        }))
+      );
+      const atts: Attachment[] = [];
+      if (v.attachmentIds) {
+        for (const attId of v.attachmentIds) {
+          const att = await Voucher.getAttachment(attId);
+          if (att) atts.push(att);
+        }
+      }
+      setAttachments(atts);
+      attachmentsRef.current = atts;
+      setAttachmentPanelOpen(false);
+      await refreshFormAdjacent(v.id);
+      bumpSnapshotBaseline();
+      return true;
+    },
+    [
+      bumpSnapshotBaseline,
+      canAccessOwnVoucher,
+      canMutateVoucher,
+      form,
+      message,
+      refreshFormAdjacent
+    ]
+  );
+
+  const applyNewVoucherForm = useCallback(
+    async (options: { presetDate?: string; keepDate?: ReturnType<typeof dayjs> } = {}) => {
+      const signatory = await loadDefaultSignatory();
+      const presetDate =
+        options.presetDate && !isInsert ? dayjs(options.presetDate) : null;
+      const nextDate =
+        options.keepDate ||
+        (isInsert && insertDate ? dayjs(insertDate) : null) ||
+        presetDate ||
+        dayjs();
+
+      form.setFieldsValue({
+        voucherDate: nextDate,
+        attachmentCount: 0,
+        businessType: '日常费用',
+        invoiceType: INVOICE_TYPE.NONE,
+        taxAmount: undefined,
+        invoiceNumbers: '',
+        remark: '',
+        signatory
+      });
+      setEditingId(null);
+      setEntries([emptyEntry(), emptyEntry()]);
+      setAttachments([]);
+      attachmentsRef.current = [];
+      setAttachmentPanelOpen(false);
+      setVoucherStatus(Voucher.STATUS.DRAFT);
+      setReviewedBy('');
+      setIsRedLetter(false);
+      setCarryForwardPeriodLabel('');
+      setCarryForwardReadOnly(false);
+      if (!isInsert) {
+        const dateStr = nextDate.format('YYYY-MM-DD');
+        setVoucherNumber(await Voucher.getNextNumber(VOUCHER_TYPE, dateStr));
+      }
+      await refreshFormAdjacent(null);
+      bumpSnapshotBaseline();
+    },
+    [bumpSnapshotBaseline, form, insertDate, isInsert, refreshFormAdjacent]
+  );
+
   useEffect(() => {
     if (!voucherDate || isEdit || isInsert) return;
     const dateStr = voucherDate.format('YYYY-MM-DD');
@@ -153,40 +349,37 @@ export default function VoucherForm() {
   }, [isInsert, insertNumber]);
 
   useEffect(() => {
+    const navState = location.state as VoucherNavState | null;
+    if (navState?.skipInit) {
+      skipPageInitRef.current = true;
+      initializedKeyRef.current = initKey;
+      (async () => {
+        try {
+          if (navState.mode === 'new') {
+            await applyNewVoucherForm({ presetDate: navState.presetDate });
+          } else if (navState.voucher) {
+            await applyVoucherToForm(navState.voucher);
+          }
+        } finally {
+          navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
+          skipPageInitRef.current = false;
+        }
+      })();
+      return;
+    }
+
+    if (skipPageInitRef.current) {
+      initializedKeyRef.current = initKey;
+      return;
+    }
     if (initializedKeyRef.current === initKey) return;
     initializedKeyRef.current = initKey;
     setLoading(true);
 
-    if (!isEdit) {
+    if (!routeId) {
       (async () => {
         try {
-          const signatory = await loadDefaultSignatory();
-          const presetDate = urlPresetDate && !isInsert ? dayjs(urlPresetDate) : null;
-          const nextDate = isInsert && insertDate ? dayjs(insertDate) : presetDate || dayjs();
-          form.setFieldsValue({
-            voucherDate: nextDate,
-            attachmentCount: 0,
-            businessType: '日常费用',
-            invoiceType: INVOICE_TYPE.NONE,
-            taxAmount: undefined,
-            invoiceNumbers: '',
-            remark: '',
-            signatory
-          });
-          setEntries([emptyEntry(), emptyEntry()]);
-          setAttachments([]);
-          attachmentsRef.current = [];
-          setAttachmentPanelOpen(false);
-          setVoucherStatus(Voucher.STATUS.DRAFT);
-          setReviewedBy('');
-          setIsRedLetter(false);
-          setCarryForwardPeriodLabel('');
-          setCarryForwardReadOnly(false);
-          setAdjacent({ older: null, newer: null });
-          if (!isInsert) {
-            const dateStr = nextDate.format('YYYY-MM-DD');
-            setVoucherNumber(await Voucher.getNextNumber(VOUCHER_TYPE, dateStr));
-          }
+          await applyNewVoucherForm({ presetDate: urlPresetDate || undefined });
         } finally {
           setLoading(false);
         }
@@ -196,95 +389,21 @@ export default function VoucherForm() {
 
     (async () => {
       try {
-        const v = await Voucher.getById(id);
-        if (!v || v.status === 'locked') {
-          message.error('该凭证不可编辑');
+        const v = await Voucher.getById(routeId);
+        if (!v) {
+          message.error('凭证不存在');
           navigate('/vouchers');
           return;
         }
-        if (!canAccessOwnVoucher(v)) {
-          message.error('无权查看该凭证');
+        const ok = await applyVoucherToForm(v);
+        if (!ok) {
           navigate('/vouchers');
-          return;
         }
-        if (!canMutateVoucher(v) && v.status === Voucher.STATUS.DRAFT) {
-          message.error(
-            v.createdByAccountId
-              ? '无权修改他人的凭证'
-              : '该凭证为历史数据、无归属人，仅管理员可修改'
-          );
-          navigate('/vouchers');
-          return;
-        }
-        if (isCarryForwardVoucher(v)) {
-          setCarryForwardReadOnly(true);
-          message.warning(CARRY_FORWARD_VOUCHER_READONLY_TIP);
-        }
-        form.setFieldsValue({
-          voucherDate: dayjs(
-            v.isTaxExemptionCarryForward
-              ? expectedCarryForwardDate(v) || v.date
-              : v.isProfitLossClosing
-                ? expectedProfitLossClosingDate(v) || v.date
-                : v.date
-          ),
-          attachmentCount: v.attachmentCount || 0,
-          businessType: v.businessType || '其他',
-          invoiceType: v.invoiceType || INVOICE_TYPE.NONE,
-          taxAmount: v.taxAmount || undefined,
-          invoiceNumbers: v.invoiceNumbers || '',
-          remark: v.remark || '',
-          signatory: v.preparedBy || v.reviewedBy || v.postedBy || v.cashierBy || ''
-        });
-        setVoucherNumber(v.voucherNumber);
-        setVoucherStatus(v.status || Voucher.STATUS.DRAFT);
-        setCarryForwardPeriodLabel(
-          v.isTaxExemptionCarryForward
-            ? formatStoredTaxExemptionPeriod(v)
-            : v.isProfitLossClosing
-              ? formatStoredProfitLossClosingPeriod(v)
-              : ''
-        );
-        setReviewedBy(v.reviewedBy || v.postedBy || '');
-        setIsRedLetter(Voucher.isRedLetterVoucher(v));
-        setEntries(
-          v.entries.map((e) => ({
-            key: Date.now() + Math.random(),
-            summary: e.summary || '',
-            accountId: e.accountId || '',
-            accountCode: e.accountCode || '',
-            accountName: e.accountName || '',
-            debit: e.debit || '',
-            credit: e.credit || ''
-          }))
-        );
-        const atts = [];
-        if (v.attachmentIds) {
-          for (const attId of v.attachmentIds) {
-            const att = await Voucher.getAttachment(attId);
-            if (att) atts.push(att);
-          }
-        }
-        setAttachments(atts);
       } finally {
         setLoading(false);
       }
     })();
   }, [initKey]);
-
-  useEffect(() => {
-    if (!isEdit || !id) {
-      setAdjacent({ older: null, newer: null });
-      return;
-    }
-    (async () => {
-      const [older, newer] = await Promise.all([
-        Voucher.getAdjacentVoucher(id, 'older'),
-        Voucher.getAdjacentVoucher(id, 'newer')
-      ]);
-      setAdjacent({ older, newer });
-    })();
-  }, [id, isEdit]);
 
   const toggleEyeCare = () => {
     setEyeCare((prev) => {
@@ -302,14 +421,101 @@ export default function VoucherForm() {
     });
   };
 
-  const openVoucher = (voucher) => {
-    if (!voucher) return;
-    if (voucher.status === Voucher.STATUS.LOCKED) {
-      message.info('已结项凭证请在凭证列表中查看');
-      return;
-    }
-    navigate(`/vouchers/${voucher.id}/edit`);
-  };
+  const confirmDiscardIfDirty = useCallback(async () => {
+    if (!hasUnsavedChanges()) return true;
+    return confirmWarning(modal, {
+      title: '系统提示',
+      content: '您有未保存的凭证修改，离开后内容将丢失。确认要离开吗？',
+      okText: '确认离开'
+    });
+  }, [hasUnsavedChanges, modal]);
+
+  const openNewVoucher = useCallback(
+    async (presetDate?: string) => {
+      if (!(await confirmDiscardIfDirty())) return;
+      skipPageInitRef.current = true;
+      const path = presetDate ? `/vouchers/new?date=${presetDate}` : '/vouchers/new';
+      const willRemount = Boolean(routeId);
+      navigate(path, {
+        replace: true,
+        state: willRemount ? { skipInit: true, mode: 'new', presetDate } : null
+      });
+      if (!willRemount) {
+        await applyNewVoucherForm({ presetDate });
+        initializedKeyRef.current = presetDate ? `new:${presetDate}` : 'new:';
+      }
+      skipPageInitRef.current = false;
+    },
+    [applyNewVoucherForm, confirmDiscardIfDirty, navigate, routeId]
+  );
+
+  const openVoucher = useCallback(
+    async (target: VoucherFormNavTarget | null) => {
+      if (!target) return;
+      if (isNewVoucherNav(target)) {
+        await openNewVoucher();
+        return;
+      }
+      if (target.status === Voucher.STATUS.LOCKED) {
+        message.info('已结项凭证请在凭证列表中查看');
+        return;
+      }
+      if (!(await confirmDiscardIfDirty())) return;
+
+      skipPageInitRef.current = true;
+      if (target.id !== editingId) {
+        const willRemount = !routeId;
+        navigate(`/vouchers/${target.id}/edit`, {
+          replace: true,
+          state: willRemount ? { skipInit: true, voucher: target } : null
+        });
+        if (willRemount) {
+          skipPageInitRef.current = false;
+          return;
+        }
+      }
+      const ok = await applyVoucherToForm(target);
+      if (!ok) {
+        skipPageInitRef.current = false;
+        return;
+      }
+      initializedKeyRef.current = `edit:${target.id}`;
+      skipPageInitRef.current = false;
+    },
+    [
+      applyVoucherToForm,
+      confirmDiscardIfDirty,
+      editingId,
+      message,
+      navigate,
+      openNewVoucher,
+      routeId
+    ]
+  );
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (loading || saving) return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      if (e.key === 'ArrowLeft' && adjacent.older) {
+        e.preventDefault();
+        openVoucher(adjacent.older);
+      } else if (e.key === 'ArrowRight' && adjacent.newer) {
+        e.preventDefault();
+        openVoucher(adjacent.newer);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [adjacent, loading, openVoucher, saving]);
 
   const updateEntry = (index, field, value) => {
     setEntries((prev) => {
@@ -399,7 +605,7 @@ export default function VoucherForm() {
     });
   };
 
-  const loadDefaultSignatory = async () => getCurrentOperatorName();
+  const loadDefaultSignatoryForClear = async () => getCurrentOperatorName();
 
   const clearForm = async () => {
     const values = form.getFieldsValue();
@@ -431,7 +637,7 @@ export default function VoucherForm() {
       );
     }
 
-    const signatory = await loadDefaultSignatory();
+    const signatory = await loadDefaultSignatoryForClear();
     form.setFieldsValue({
       businessType: '日常费用',
       invoiceType: INVOICE_TYPE.NONE,
@@ -444,6 +650,7 @@ export default function VoucherForm() {
     setEntries([emptyEntry(), emptyEntry()]);
     setAttachments([]);
     setAttachmentPanelOpen(false);
+    markFormSaved();
     message.success('已清除全部内容');
   };
 
@@ -671,6 +878,7 @@ export default function VoucherForm() {
       attachmentCount: 0,
       signatory: signatoryValue
     });
+    setEditingId(null);
     setEntries([emptyEntry(), emptyEntry()]);
     setAttachments([]);
     attachmentsRef.current = [];
@@ -680,11 +888,11 @@ export default function VoucherForm() {
     setIsRedLetter(false);
     setCarryForwardPeriodLabel('');
     setCarryForwardReadOnly(false);
-    setLoading(false);
-    setAdjacent({ older: null, newer: null });
 
     const dateStr = currentDate.format('YYYY-MM-DD');
     setVoucherNumber(await Voucher.getNextNumber(VOUCHER_TYPE, dateStr));
+    markFormSaved();
+    await refreshFormAdjacent(null);
   };
 
   const save = async ({ continueNew = false } = {}) => {
@@ -704,7 +912,7 @@ export default function VoucherForm() {
       let existingPreparedBy = '';
 
       if (isEdit) {
-        const existing = await Voucher.getById(id);
+        const existing = await Voucher.getById(editingId);
         taxExemptionDone = existing?.taxExemptionDone || false;
         taxExemptionVoucherId = existing?.taxExemptionVoucherId || '';
         isTaxExemptionCarryForward = existing?.isTaxExemptionCarryForward || false;
@@ -737,7 +945,7 @@ export default function VoucherForm() {
           : 0;
 
       const voucherData = {
-        id: isEdit ? id : null,
+        id: isEdit ? editingId : null,
         voucherType: VOUCHER_TYPE,
         voucherNumber: isEdit ? voucherNumber : voucherNumber,
         date:
@@ -781,7 +989,11 @@ export default function VoucherForm() {
         const keepDate = values.voucherDate;
         if (isEdit) {
           initializedKeyRef.current = null;
-          navigate(`/vouchers/new?date=${keepDate.format('YYYY-MM-DD')}`, { replace: true });
+          skipPageInitRef.current = true;
+          navigate(`/vouchers/new?date=${keepDate.format('YYYY-MM-DD')}`, {
+            replace: true,
+            state: { skipInit: true, mode: 'new', presetDate: keepDate.format('YYYY-MM-DD') }
+          });
         }
         await resetForNewVoucher(keepDate);
         refresh();
@@ -843,7 +1055,7 @@ export default function VoucherForm() {
   };
 
   const handleUnapprove = async () => {
-    if (!isEdit || voucherStatus !== Voucher.STATUS.APPROVED) return;
+    if (!isEdit || !editingId || voucherStatus !== Voucher.STATUS.APPROVED) return;
     const ok = await confirmWarning(modal, {
       title: '反审核',
       content: `确定将凭证 ${VOUCHER_TYPE}-${voucherNumber} 改回草稿？反审核后可继续编辑。`,
@@ -852,7 +1064,7 @@ export default function VoucherForm() {
     if (!ok) return;
     await runUnapprove(async () => {
       try {
-        const updated = await Voucher.unapprove(id);
+        const updated = await Voucher.unapprove(editingId);
         setVoucherStatus(updated.status);
         setReviewedBy('');
         message.success('已反审核，凭证已改回草稿');
@@ -1024,20 +1236,20 @@ export default function VoucherForm() {
                     </Form.Item>
                     {(invoiceType === INVOICE_TYPE.ORDINARY ||
                       invoiceType === INVOICE_TYPE.SPECIAL) && (
-                      <Form.Item
-                        name="taxAmount"
-                        label="增值税额"
-                        rules={[{ required: true, message: '请填写增值税额' }]}
-                      >
-                        <InputNumber
-                          min={0}
-                          precision={2}
-                          style={{ width: '100%' }}
-                          placeholder="0.00"
-                          disabled={readOnly}
-                        />
-                      </Form.Item>
-                    )}
+                        <Form.Item
+                          name="taxAmount"
+                          label="增值税额"
+                          rules={[{ required: true, message: '请填写增值税额' }]}
+                        >
+                          <InputNumber
+                            min={0}
+                            precision={2}
+                            style={{ width: '100%' }}
+                            placeholder="0.00"
+                            disabled={readOnly}
+                          />
+                        </Form.Item>
+                      )}
                   </>
                 )}
               </div>

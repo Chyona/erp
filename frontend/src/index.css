@@ -3532,9 +3532,9 @@ body,
 
 .voucher-sheet__stamp {
   position: absolute;
-  top: 8px;
+  top: 30px;
   right: 168px;
-  z-index: 3;
+  z-index: 10;
   padding: 6px 20px;
   border: 3px solid rgba(207, 19, 34, 0.7);
   border-radius: 6px;
@@ -3562,10 +3562,6 @@ body,
 .voucher-sheet__footer-value {
   min-width: 72px;
   color: rgba(0, 0, 0, 0.88);
-}
-
-.voucher-form-card--readonly {
-  background: #fafafa;
 }
 
 .voucher-form__toolbar {

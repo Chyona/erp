@@ -1070,6 +1070,33 @@ function formatMoney(n) {
   );
 }
 
+/** 翻页到「新建凭证」占位（比最新已存凭证更新） */
+export const NEW_VOUCHER_NAV = { __isNewVoucher: true as const };
+
+export type VoucherFormNavTarget = VoucherRecord | typeof NEW_VOUCHER_NAV;
+
+export function isNewVoucherNav(target: unknown): target is typeof NEW_VOUCHER_NAV {
+  return Boolean(target && typeof target === 'object' && '__isNewVoucher' in target);
+}
+
+/** 录凭证页翻页：日期新→旧；新建凭证视为最新一页 */
+async function getFormAdjacent(currentId: string | null): Promise<{
+  older: VoucherRecord | null;
+  newer: VoucherFormNavTarget | null;
+}> {
+  const vouchers = [...(await ErpApi.getAll('vouchers'))].sort(compareVouchersDesc);
+  if (!currentId) {
+    return { older: vouchers[0] ?? null, newer: null };
+  }
+  const index = vouchers.findIndex((v) => v.id === currentId);
+  if (index < 0) {
+    return { older: vouchers[0] ?? null, newer: null };
+  }
+  const older = index < vouchers.length - 1 ? vouchers[index + 1] : null;
+  const newer = index === 0 ? NEW_VOUCHER_NAV : index > 0 ? vouchers[index - 1] : null;
+  return { older, newer };
+}
+
 export const Voucher = {
   STATUS,
   STATUS_LABEL,
@@ -1093,6 +1120,7 @@ export const Voucher = {
   getAll,
   getById,
   getAdjacentVoucher,
+  getFormAdjacent,
   findByVoucherNo,
   saveAttachment,
   addAttachmentToVoucher,
