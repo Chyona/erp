@@ -202,6 +202,22 @@ function calcTotals(entries: VoucherEntry[]): TotalsResult {
   };
 }
 
+/** 分录四要素均为空时视为占位行，保存时自动忽略 */
+function isBlankVoucherEntry(e: VoucherEntry): boolean {
+  const debit = parseFloat(String(e.debit)) || 0;
+  const credit = parseFloat(String(e.credit)) || 0;
+  return (
+    !e.accountId &&
+    !String(e.summary || '').trim() &&
+    debit <= 0 &&
+    credit <= 0
+  );
+}
+
+function withoutBlankEntries(entries: VoucherEntry[]): VoucherEntry[] {
+  return entries.filter((e) => !isBlankVoucherEntry(e));
+}
+
 function generateChecksum(voucher: VoucherInput | VoucherRecord) {
   const str = JSON.stringify({
     id: voucher.id,
@@ -220,6 +236,7 @@ function generateChecksum(voucher: VoucherInput | VoucherRecord) {
 
 async function save(voucherData: VoucherInput, approve = false): Promise<VoucherRecord> {
   const normalized = normalizeVoucherFinanceInterestEntries(voucherData);
+  normalized.entries = withoutBlankEntries(normalized.entries);
   const totals = calcTotals(normalized.entries);
   if (!totals.balanced) {
     throw new Error(

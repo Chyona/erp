@@ -352,14 +352,36 @@ export async function handleErpMockRequest(
       }
       if (method === 'PUT') {
         const body =
-          (await parseJSON<{ nickname?: string; role?: MockRole; status?: number }>(req)) || {};
+          (await parseJSON<{
+            nickname?: string;
+            email?: string;
+            phone?: string;
+            remark?: string;
+            role?: MockRole;
+            status?: number;
+          }>(req)) || {};
         const target = mockUsers[idx];
-        if (target.username === 'admin') {
-          fail(res, 400, '内置管理员账号不可修改');
+        const isBuiltinAdmin = target.username === 'admin';
+        if (isBuiltinAdmin && (body.role !== undefined || body.status !== undefined)) {
+          fail(res, 400, '内置管理员账号不可修改角色或状态');
           return true;
         }
-        if (body.nickname) target.nickname = body.nickname;
-        if (body.role === 'admin' || body.role === 'user' || body.role === 'readonly') {
+        if (body.nickname !== undefined) target.nickname = (body.nickname || '').trim();
+        if (body.email !== undefined) {
+          const email = (body.email || '').trim();
+          if (!email) {
+            fail(res, 400, '请填写邮箱');
+            return true;
+          }
+          if (mockUsers.some((u) => u.email === email && u.id !== id)) {
+            fail(res, 400, '该邮箱已被使用，请换一个邮箱');
+            return true;
+          }
+          target.email = email;
+        }
+        if (body.phone !== undefined) target.phone = (body.phone || '').trim();
+        if (body.remark !== undefined) target.remark = (body.remark || '').trim();
+        if (!isBuiltinAdmin && (body.role === 'admin' || body.role === 'user' || body.role === 'readonly')) {
           if (target.role === 'admin' && body.role !== 'admin') {
             if (mockUsers.filter((u) => u.role === 'admin').length <= 1) {
               fail(res, 400, '至少保留一个管理员账号');
@@ -368,7 +390,7 @@ export async function handleErpMockRequest(
           }
           target.role = body.role;
         }
-        if (typeof body.status === 'number') {
+        if (!isBuiltinAdmin && typeof body.status === 'number') {
           if (body.status !== 1 && mockUsers.filter((u) => u.role === 'admin' && u.status === 1).length <= 1 && target.role === 'admin') {
             fail(res, 400, '不能禁用最后一个管理员');
             return true;

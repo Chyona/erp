@@ -43,8 +43,10 @@ export default function Users() {
   const [rows, setRows] = useState<SystemAccount[]>([]);
   const [loading, setLoading] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<SystemAccount | null>(null);
   const [resetTarget, setResetTarget] = useState<SystemAccount | null>(null);
   const [form] = Form.useForm();
+  const [editForm] = Form.useForm();
   const [resetForm] = Form.useForm();
   const allowed = can('users');
 
@@ -93,6 +95,35 @@ export default function Users() {
     }
   };
 
+  const handleEditProfile = async () => {
+    if (!editTarget) return;
+    const values = await editForm.validateFields();
+    try {
+      await updateSystemAccount(editTarget.id, {
+        nickname: (values.nickname || '').trim(),
+        email: values.email.trim(),
+        phone: (values.phone || '').trim(),
+        remark: (values.remark || '').trim()
+      });
+      message.success('资料已更新');
+      setEditTarget(null);
+      editForm.resetFields();
+      await load();
+    } catch (err) {
+      message.error(toUserMessage(err, '更新失败'));
+    }
+  };
+
+  const openEditProfile = (record: SystemAccount) => {
+    editForm.setFieldsValue({
+      nickname: record.nickname || '',
+      email: record.email || '',
+      phone: record.phone || '',
+      remark: record.remark || ''
+    });
+    setEditTarget(record);
+  };
+
   const handleResetPassword = async () => {
     if (!resetTarget) return;
     const values = await resetForm.validateFields();
@@ -122,8 +153,8 @@ export default function Users() {
       </div>
 
       <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
-        新建账号时填写初始密码；用户首次登录后需自行设置密码。之后可在右上角「修改密码」，或由管理员「重置密码」。内置
-        admin 仅可改密码，不可删除或降权。
+        新建账号时填写初始密码；用户首次登录后需自行设置密码。之后可在右上角「修改密码」，或由管理员「重置密码」。管理员可编辑各账号的昵称、邮箱等资料；内置
+        admin 仅可改资料与密码，不可删除或降权。
       </Typography.Paragraph>
 
       <Table
@@ -135,6 +166,11 @@ export default function Users() {
           { title: '用户名', dataIndex: 'username' },
           { title: '昵称', dataIndex: 'nickname' },
           { title: '邮箱', dataIndex: 'email' },
+          {
+            title: '手机',
+            dataIndex: 'phone',
+            render: (phone: string) => phone || '—'
+          },
           {
             title: '角色',
             dataIndex: 'role',
@@ -155,19 +191,27 @@ export default function Users() {
             render: (_, record) => {
               if (isBuiltinAdminAccount(record)) {
                 return (
-                  <Button
-                    size="small"
-                    onClick={() => {
-                      resetForm.resetFields();
-                      setResetTarget(record);
-                    }}
-                  >
-                    修改密码
-                  </Button>
+                  <Space wrap>
+                    <Button size="small" onClick={() => openEditProfile(record)}>
+                      编辑资料
+                    </Button>
+                    <Button
+                      size="small"
+                      onClick={() => {
+                        resetForm.resetFields();
+                        setResetTarget(record);
+                      }}
+                    >
+                      修改密码
+                    </Button>
+                  </Space>
                 );
               }
               return (
                 <Space wrap>
+                  <Button size="small" onClick={() => openEditProfile(record)}>
+                    编辑资料
+                  </Button>
                   <Select
                     size="small"
                     style={{ width: 120 }}
@@ -263,6 +307,33 @@ export default function Users() {
           </Form.Item>
           <Form.Item name="role" label="角色" rules={[{ required: true }]}>
             <Select options={ROLE_OPTIONS} />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={editTarget ? `编辑资料：${editTarget.username}` : '编辑资料'}
+        open={Boolean(editTarget)}
+        onCancel={() => setEditTarget(null)}
+        onOk={handleEditProfile}
+        destroyOnHidden
+      >
+        <Form form={editForm} layout="vertical">
+          <Form.Item name="nickname" label="昵称">
+            <Input placeholder="显示名称" />
+          </Form.Item>
+          <Form.Item
+            name="email"
+            label="邮箱"
+            rules={[{ required: true, type: 'email', message: '请填写有效邮箱' }]}
+          >
+            <Input />
+          </Form.Item>
+          <Form.Item name="phone" label="手机">
+            <Input placeholder="选填" />
+          </Form.Item>
+          <Form.Item name="remark" label="备注">
+            <Input.TextArea rows={2} placeholder="选填" />
           </Form.Item>
         </Form>
       </Modal>

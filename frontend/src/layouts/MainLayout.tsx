@@ -10,7 +10,11 @@ import {
   SettingOutlined,
   LogoutOutlined,
   TeamOutlined,
-  LockOutlined
+  LockOutlined,
+  SunOutlined,
+  MoonOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useMemo, useState } from 'react';
@@ -25,6 +29,9 @@ import { ROLE_LABEL } from '../utils/permissions';
 import { toUserMessage } from '../utils/userMessage';
 
 const { Sider, Header, Content } = Layout;
+const SIDER_COLLAPSED_KEY = 'erp_sider_collapsed';
+const SIDER_THEME_KEY = 'erp_sider_theme';
+type SiderTheme = 'dark' | 'light';
 
 export default function MainLayout() {
   const navigate = useNavigate();
@@ -35,6 +42,26 @@ export default function MainLayout() {
   const [pwdOpen, setPwdOpen] = useState(false);
   const [pwdForm] = Form.useForm();
   const [pwdSaving, setPwdSaving] = useState(false);
+  const [collapsed, setCollapsed] = useState(
+    () => localStorage.getItem(SIDER_COLLAPSED_KEY) === '1'
+  );
+  const [siderTheme, setSiderTheme] = useState<SiderTheme>(() => {
+    const stored = localStorage.getItem(SIDER_THEME_KEY);
+    return stored === 'light' ? 'light' : 'dark';
+  });
+
+  const handleSiderCollapse = (value: boolean) => {
+    setCollapsed(value);
+    localStorage.setItem(SIDER_COLLAPSED_KEY, value ? '1' : '0');
+  };
+
+  const toggleSiderTheme = () => {
+    setSiderTheme((prev) => {
+      const next: SiderTheme = prev === 'dark' ? 'light' : 'dark';
+      localStorage.setItem(SIDER_THEME_KEY, next);
+      return next;
+    });
+  };
 
   const navItems = useMemo(() => {
     const items = [
@@ -131,23 +158,48 @@ export default function MainLayout() {
 
   return (
     <Layout className="app-layout">
-      <Sider width={220} theme="dark" className="app-sider">
+      <Sider
+        width={160}
+        collapsedWidth={64}
+        collapsible
+        collapsed={collapsed}
+        onCollapse={handleSiderCollapse}
+        trigger={null}
+        theme={siderTheme}
+        className={`app-sider app-sider--${siderTheme}`}
+      >
         <div className="sidebar-logo">
           <span className="logo-icon">📒</span>
-          <Typography.Title level={5} style={{ color: '#fff', margin: 0 }} title={APP_CONFIG.name}>
+          <span className="sidebar-logo__title" title={APP_CONFIG.name}>
             {APP_CONFIG.shortName}
-          </Typography.Title>
+          </span>
         </div>
         <Menu
-          theme="dark"
+          theme={siderTheme}
           mode="inline"
           selectedKeys={[menuKey]}
           items={navItems}
           onClick={({ key }) => navigate(key)}
           className="sidebar-menu"
         />
-        <div className="sidebar-footer">
-          <small>{APP_CONFIG.footer}</small>
+        <div className="sidebar-toolbar">
+          <button
+            type="button"
+            className="sidebar-toolbar__btn"
+            aria-label={siderTheme === 'dark' ? '切换为浅色导航' : '切换为深色导航'}
+            onClick={toggleSiderTheme}
+          >
+            {siderTheme === 'dark' ? <SunOutlined /> : <MoonOutlined />}
+          </button>
+          <span className="sidebar-toolbar__divider" aria-hidden="true" />
+          <button
+            type="button"
+            className="sidebar-toolbar__btn"
+            aria-label={collapsed ? '展开导航' : '折叠导航'}
+            onClick={() => handleSiderCollapse(!collapsed)}
+          >
+            {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+          </button>
         </div>
       </Sider>
       <Layout className="app-main">

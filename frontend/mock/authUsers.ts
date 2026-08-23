@@ -11,6 +11,8 @@ export type MockAuthUser = {
   password: string;
   email: string;
   nickname: string;
+  phone?: string;
+  remark?: string;
   role: MockRole;
   status: number;
   mustChangePassword: boolean;
@@ -56,6 +58,8 @@ export function publicAccount(u: MockAuthUser) {
     username: u.username,
     email: u.email,
     nickname: u.nickname,
+    phone: u.phone || '',
+    remark: u.remark || '',
     role: u.role,
     status: u.status,
     must_change_password: u.mustChangePassword

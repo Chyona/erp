@@ -13,6 +13,8 @@ export type SystemAccount = {
   username: string;
   email: string;
   nickname: string;
+  phone?: string;
+  remark?: string;
   role: Role | string;
   status: number;
   must_change_password?: boolean;
@@ -73,7 +75,14 @@ export async function createSystemAccount(input: {
 
 export async function updateSystemAccount(
   id: number,
-  input: { nickname?: string; role?: Role; status?: number }
+  input: {
+    nickname?: string;
+    email?: string;
+    phone?: string;
+    remark?: string;
+    role?: Role;
+    status?: number;
+  }
 ) {
   return request<SystemAccount>('PUT', `/accounts/${id}`, input);
 }

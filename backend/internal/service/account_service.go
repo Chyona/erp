@@ -13,12 +13,22 @@ import (
 	"gorm.io/gorm"
 )
 
+// UpdateAccountPatch 管理员可更新的账号字段（用户名不可改）。
+type UpdateAccountPatch struct {
+	Nickname *string
+	Email    *string
+	Phone    *string
+	Remark   *string
+	Role     *string
+	Status   *int8
+}
+
 // AccountService 账号业务接口。
 type AccountService interface {
 	CreateAccount(ctx context.Context, username, email, password, nickname, role string) (*model.Account, error)
 	GetAccount(ctx context.Context, id uint) (*model.Account, error)
 	ListAccounts(ctx context.Context, page, pageSize int) ([]model.Account, int64, error)
-	UpdateAccount(ctx context.Context, id uint, nickname string, role *string, status *int8) (*model.Account, error)
+	UpdateAccount(ctx context.Context, id uint, patch UpdateAccountPatch) (*model.Account, error)
 	ResetPassword(ctx context.Context, id uint, newPassword string, requireReSetup bool) (*model.Account, error)
 	SetupPassword(ctx context.Context, accountID uint, newPassword string) (*model.Account, error)
 	SkipPasswordSetup(ctx context.Context, accountID uint) (*model.Account, error)
@@ -113,7 +123,7 @@ func (s *accountService) ListAccounts(ctx context.Context, page, pageSize int) (
 	return accounts, total, nil
 }
 
-func (s *accountService) UpdateAccount(ctx context.Context, id uint, nickname string, role *string, status *int8) (*model.Account, error) {
+func (s *accountService) UpdateAccount(ctx context.Context, id uint, patch UpdateAccountPatch) (*model.Account, error) {
 	account, err := s.accountRepo.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -123,20 +133,43 @@ func (s *accountService) UpdateAccount(ctx context.Context, id uint, nickname st
 	}
 	builtin := rbac.IsBuiltinAdminUsername(account.Username)
 	oldRole := resolveAccountRole(account)
-	if nickname != "" {
-		if builtin {
-			return nil, errors.New("内置管理员账号不可修改")
-		}
-		account.Nickname = nickname
-	}
-	if role != nil {
-		if builtin {
+
+	if builtin {
+		if patch.Role != nil {
 			return nil, errors.New("内置管理员账号不可修改角色")
 		}
-		if !rbac.IsValidRole(*role) {
+		if patch.Status != nil && *patch.Status != 1 {
+			return nil, errors.New("内置管理员账号不可禁用")
+		}
+	}
+
+	if patch.Nickname != nil {
+		account.Nickname = strings.TrimSpace(*patch.Nickname)
+	}
+	if patch.Email != nil {
+		email := strings.TrimSpace(*patch.Email)
+		if email == "" {
+			return nil, errors.New("请填写邮箱")
+		}
+		existing, err := s.accountRepo.GetByEmail(ctx, email)
+		if err == nil && existing.ID != id {
+			return nil, errors.New("该邮箱已被使用，请换一个邮箱")
+		} else if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+		account.Email = email
+	}
+	if patch.Phone != nil {
+		account.Phone = strings.TrimSpace(*patch.Phone)
+	}
+	if patch.Remark != nil {
+		account.Remark = strings.TrimSpace(*patch.Remark)
+	}
+	if patch.Role != nil {
+		if !rbac.IsValidRole(*patch.Role) {
 			return nil, errors.New("请选择有效的角色")
 		}
-		newRole := rbac.NormalizeRole(*role)
+		newRole := rbac.NormalizeRole(*patch.Role)
 		if oldRole == rbac.RoleAdmin && newRole != rbac.RoleAdmin {
 			n, err := s.accountRepo.CountByRole(ctx, rbac.RoleAdmin)
 			if err != nil {
@@ -148,11 +181,8 @@ func (s *accountService) UpdateAccount(ctx context.Context, id uint, nickname st
 		}
 		account.Role = newRole
 	}
-	if status != nil {
-		if builtin && *status != 1 {
-			return nil, errors.New("内置管理员账号不可禁用")
-		}
-		if oldRole == rbac.RoleAdmin && *status != 1 {
+	if patch.Status != nil {
+		if oldRole == rbac.RoleAdmin && *patch.Status != 1 {
 			n, err := s.accountRepo.CountByRole(ctx, rbac.RoleAdmin)
 			if err != nil {
 				return nil, err
@@ -161,7 +191,7 @@ func (s *accountService) UpdateAccount(ctx context.Context, id uint, nickname st
 				return nil, errors.New("不能禁用最后一个管理员")
 			}
 		}
-		account.Status = *status
+		account.Status = *patch.Status
 	}
 	if err := s.accountRepo.Update(ctx, account); err != nil {
 		return nil, err

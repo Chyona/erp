@@ -32,7 +32,10 @@ type CreateAccountRequest struct {
 
 // UpdateAccountRequest 更新账号请求体。
 type UpdateAccountRequest struct {
-	Nickname string  `json:"nickname"`
+	Nickname *string `json:"nickname"`
+	Email    *string `json:"email" binding:"omitempty,email"`
+	Phone    *string `json:"phone"`
+	Remark   *string `json:"remark"`
 	Role     *string `json:"role"`
 	Status   *int8   `json:"status"`
 }
@@ -122,7 +125,7 @@ func (h *AccountHandler) ListAccounts(c *gin.Context) {
 
 // UpdateAccount 更新账号
 // @Summary      更新账号
-// @Description  更新账号昵称或状态
+// @Description  更新账号昵称、邮箱、手机、备注或角色状态
 // @Tags         账号
 // @Accept       json
 // @Produce      json
@@ -143,7 +146,14 @@ func (h *AccountHandler) UpdateAccount(c *gin.Context) {
 		return
 	}
 
-	account, err := h.accountService.UpdateAccount(c.Request.Context(), id, req.Nickname, req.Role, req.Status)
+	account, err := h.accountService.UpdateAccount(c.Request.Context(), id, service.UpdateAccountPatch{
+		Nickname: req.Nickname,
+		Email:    req.Email,
+		Phone:    req.Phone,
+		Remark:   req.Remark,
+		Role:     req.Role,
+		Status:   req.Status,
+	})
 	if err != nil {
 		response.BadRequest(c, err.Error())
 		return
