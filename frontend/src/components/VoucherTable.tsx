@@ -567,6 +567,7 @@ export default function VoucherTable({
       title: '凭证字号',
       key: 'voucherNo',
       width: 90,
+      fixed: 'left',
       onCell: (record) => mergeCell(record.groupRowSpan),
       render: (_, record) =>
         canOpenVoucherLink(record.voucher) ? (
@@ -579,13 +580,16 @@ export default function VoucherTable({
       title: '日期',
       dataIndex: ['voucher', 'date'],
       width: 110,
+      fixed: 'left',
       onCell: (record) => mergeCell(record.groupRowSpan),
       render: (_, record) => record.voucher.date
     },
     {
       title: '摘要',
       key: 'summary',
+      width: 160,
       ellipsis: true,
+      fixed: 'left',
       render: (_, record) =>
         record.rowType === 'subtotal' ? (
           <span className="voucher-grouped-table__subtotal-label">金额小计</span>
@@ -678,6 +682,7 @@ export default function VoucherTable({
       key: 'actions',
       width: 60,
       align: 'center',
+      fixed: 'right',
       onCell: (record) => mergeCell(record.groupRowSpan),
       render: (_, record) => renderActions(record.voucher)
     }

@@ -1624,6 +1624,11 @@ body,
   background: var(--app-table-row-hover) !important;
 }
 
+.voucher-grouped-table .ant-table-tbody>tr:not(.voucher-grouped-table__row--subtotal):hover>td.ant-table-cell-fix-left,
+.voucher-grouped-table .ant-table-tbody>tr:not(.voucher-grouped-table__row--subtotal):hover>td.ant-table-cell-fix-right {
+  background: var(--app-table-row-hover) !important;
+}
+
 .voucher-grouped-table .ant-table-cell {
   vertical-align: middle;
   font-size: var(--app-table-font-size);
@@ -1651,6 +1656,11 @@ body,
   font-variant-numeric: tabular-nums;
 }
 
+.voucher-grouped-table__row--subtotal>td.ant-table-cell-fix-left,
+.voucher-grouped-table__row--subtotal>td.ant-table-cell-fix-right {
+  background: var(--app-table-row-subtotal) !important;
+}
+
 .voucher-grouped-table__row--total>td,
 .voucher-grouped-table .ant-table-summary tr.voucher-grouped-table__row--total>.ant-table-cell {
   background: var(--app-table-row-total) !important;
@@ -1660,6 +1670,21 @@ body,
 
 .voucher-grouped-table .ant-table-summary table {
   min-width: 1200px;
+}
+
+.voucher-grouped-table .ant-table-cell-fix-left-last::after,
+.voucher-grouped-table .ant-table-cell-fix-right-first::after {
+  box-shadow: none;
+}
+
+.voucher-grouped-table .ant-table-thead>tr>th.ant-table-cell-fix-left-last,
+.voucher-grouped-table .ant-table-tbody>tr>td.ant-table-cell-fix-left-last {
+  box-shadow: 4px 0 6px -2px rgba(15, 23, 42, 0.08);
+}
+
+.voucher-grouped-table .ant-table-thead>tr>th.ant-table-cell-fix-right-first,
+.voucher-grouped-table .ant-table-tbody>tr>td.ant-table-cell-fix-right-first {
+  box-shadow: -4px 0 6px -2px rgba(15, 23, 42, 0.08);
 }
 
 .voucher-grouped-table__attach {

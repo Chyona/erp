@@ -133,11 +133,11 @@ export default function VoucherMoreActions({ voucher }) {
       label: '冲销',
       disabled: locked
     },
-    {
-      key: 'reorder',
-      label: '调整顺序',
-      disabled: locked
-    },
+    // {
+    //   key: 'reorder',
+    //   label: '调整顺序',
+    //   disabled: locked
+    // },
     {
       key: 'insert',
       disabled: locked,
