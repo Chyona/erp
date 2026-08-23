@@ -15,4 +15,5 @@ dayjs.extend(weekOfYear);
 dayjs.extend(weekYear);
 dayjs.locale('zh-cn');
 
+export type { Dayjs } from 'dayjs';
 export default dayjs;
