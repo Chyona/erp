@@ -1,4 +1,4 @@
-import { Button, Space, Tooltip } from 'antd';
+import { Button, Tooltip } from 'antd';
 import {
   EyeOutlined,
   FullscreenExitOutlined,
@@ -27,7 +27,7 @@ export default function VoucherSheetTools({
   hasNext?: boolean;
 }) {
   return (
-    <Space size={4} className="voucher-sheet__tools">
+    <div className="voucher-sheet__tools">
       <Tooltip title={eyeCare ? '关闭护眼' : '护眼'}>
         <Button
           type="text"
@@ -39,7 +39,19 @@ export default function VoucherSheetTools({
           护眼
         </Button>
       </Tooltip>
-      <Space size={2} className="voucher-sheet__nav">
+      <Tooltip title={fullscreen ? '退出全屏' : '全屏'}>
+        <Button
+          type="text"
+          size="small"
+          className={`voucher-sheet__tool-btn${fullscreen ? ' voucher-sheet__tool-btn--active' : ''}`}
+          icon={fullscreen ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
+          onClick={onFullscreenToggle}
+        >
+          全屏
+        </Button>
+      </Tooltip>
+      <span className="voucher-form__toolbar-divider" aria-hidden="true" />
+      <div className="voucher-sheet__nav">
         <Tooltip title="上一张（更早）">
           <Button
             type="text"
@@ -60,18 +72,7 @@ export default function VoucherSheetTools({
             onClick={onNext}
           />
         </Tooltip>
-      </Space>
-      <Tooltip title={fullscreen ? '退出全屏' : '全屏'}>
-        <Button
-          type="text"
-          size="small"
-          className={`voucher-sheet__tool-btn${fullscreen ? ' voucher-sheet__tool-btn--active' : ''}`}
-          icon={fullscreen ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
-          onClick={onFullscreenToggle}
-        >
-          全屏
-        </Button>
-      </Tooltip>
-    </Space>
+      </div>
+    </div>
   );
 }

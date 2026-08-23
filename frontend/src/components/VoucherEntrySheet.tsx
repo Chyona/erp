@@ -88,6 +88,7 @@ function VoucherEntrySheet({
           </div>
           <div className="voucher-sheet__meta-right voucher-sheet__meta-right--compact">
             {businessTypeField}
+            <span className="voucher-form__toolbar-divider" aria-hidden="true" />
             <VoucherAttachmentControls
               attachmentsCount={attachmentsCount}
               onToggle={onAttachmentPanelToggle}

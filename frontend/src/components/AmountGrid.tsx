@@ -4,14 +4,6 @@ import { CalculatorOutlined } from '@ant-design/icons';
 import { AMOUNT_UNITS, amountToDigits } from '../utils/amountGrid';
 import AmountCalculatorPanel from './AmountCalculatorPanel';
 
-function cellBorderClass(index: number) {
-  if (index === 10) return 'amount-grid__cell--fen';
-  if (index === 8) return 'amount-grid__cell--yuan';
-  if (index === 4) return 'amount-grid__cell--wan';
-  if (index === 0) return 'amount-grid__cell--yi';
-  return '';
-}
-
 export default function AmountGrid({
   value,
   onChange,
@@ -98,7 +90,7 @@ export default function AmountGrid({
         {AMOUNT_UNITS.map((unit, i) => (
           <div
             key={unit + i}
-            className={`amount-grid__cell ${cellBorderClass(i)}`}
+            className={`amount-grid__cell`}
             title={unit}
           >
             <span className="amount-grid__digit">{digits[i]}</span>
@@ -120,7 +112,7 @@ export default function AmountGrid({
       {AMOUNT_UNITS.map((unit, i) => (
         <div
           key={unit + i}
-          className={`amount-grid__cell ${cellBorderClass(i)}`}
+          className={`amount-grid__cell`}
           title={unit}
         >
           <span className="amount-grid__digit">{digits[i]}</span>
@@ -191,7 +183,7 @@ export function AmountGridHeader() {
       {AMOUNT_UNITS.map((unit, i) => (
         <div
           key={unit + i}
-          className={`amount-grid__cell amount-grid__cell--label ${cellBorderClass(i)}`}
+          className={`amount-grid__cell amount-grid__cell--label`}
         >
           {unit}
         </div>

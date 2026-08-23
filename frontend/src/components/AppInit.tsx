@@ -19,7 +19,7 @@ function formatInitError(err: unknown): { summary: string; tips: string[] } {
     return {
       summary: '连不上服务器，暂时无法打开系统。',
       tips: [
-        '请确认电脑上的「后端服务」已启动（一般在本机 30000 端口）。',
+        '请确认后端服务已启动。',
         '请确认数据库服务已启动。',
         '若是第一次使用，需先完成数据库初始化后再启动后端。',
         '都就绪后，刷新本页面再试。'

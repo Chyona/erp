@@ -1050,6 +1050,7 @@ body,
   border-color: #91caff !important;
   background: #e6f4ff !important;
   box-shadow: none;
+  margin-right: 8px;
 }
 
 .voucher-template-btn:hover,
@@ -3465,6 +3466,22 @@ body,
   margin-bottom: 24px;
 }
 
+.voucher-form__toolbar-left-side {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.voucher-form__toolbar-divider {
+  display: inline-block;
+  width: 1px;
+  height: 16px;
+  background: #d1d5db;
+  flex-shrink: 0;
+  align-self: center;
+}
+
 .voucher-sheet__main {
   min-width: 0;
 }
@@ -3530,6 +3547,9 @@ body,
 }
 
 .voucher-sheet__tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   flex-shrink: 0;
 }
 
@@ -3547,9 +3567,9 @@ body,
 }
 
 .voucher-sheet__nav {
-  margin-left: 4px;
-  padding-left: 8px;
-  border-left: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }
 
 .voucher-sheet__nav-btn {
@@ -4204,8 +4224,17 @@ body,
   box-shadow: inset -1px 0 0 #e2e8f0;
 }
 
+.amount-grid__cell:nth-of-type(3),
+.amount-grid__cell:nth-of-type(6) {
+  box-shadow: inset -1px 0 0 rgba(47, 149, 255, .3);
+}
+
+.amount-grid__cell:nth-of-type(9) {
+  box-shadow: inset -1px 0 0 rgba(255, 95, 31, .3);
+}
+
 .amount-grid__cell:last-child,
-.amount-grid__cell.amount-grid__cell--fen {
+.amount-grid__cell:nth-of-type(11) {
   box-shadow: none;
 }
 
@@ -4215,17 +4244,6 @@ body,
   font-weight: 500;
 }
 
-.amount-grid__cell--yuan {
-  box-shadow: inset -1px 0 0 #ef4444;
-}
-
-.amount-grid__cell--wan {
-  box-shadow: inset -1px 0 0 #3b82f6;
-}
-
-.amount-grid__cell--yi {
-  box-shadow: inset -1px 0 0 #3b82f6;
-}
 
 .amount-grid__digit {
   font-family: 'Courier New', Consolas, monospace;

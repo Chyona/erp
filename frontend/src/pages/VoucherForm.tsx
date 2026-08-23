@@ -9,7 +9,8 @@ import {
   Select,
   Space,
   Alert,
-  App
+  App,
+  Tooltip
 } from 'antd';
 import { useAsyncLoading } from '../hooks/useAsyncLoading';
 import { disableFutureDate } from '../utils/dateConstraints';
@@ -888,15 +889,20 @@ export default function VoucherForm() {
               {formActions}
             </div>
             <div className="voucher-form__toolbar-left-side">
-              {/* 模板属辅助填单，放右侧与护眼/翻页同组，不与保存主操作抢注意力 */}
               {!readOnly ? (
-                <VoucherExamples
-                  accounts={accounts}
-                  onApply={applyExample}
-                  getSnapshot={getTemplateSnapshot}
-                />
+                <>
+                  <Tooltip title="辅助填单">
+                    <VoucherExamples
+                      accounts={accounts}
+                      onApply={applyExample}
+                      getSnapshot={getTemplateSnapshot}
+                    />
+                  </Tooltip>
+                  <span className="voucher-form__toolbar-divider" aria-hidden="true" />
+                </>
               ) : null}
-              {sheetTools}</div>
+              {sheetTools}
+            </div>
           </div>
           <Form form={form} layout="vertical" className="voucher-form">
             <Form.Item name="voucherDate" hidden rules={[{ required: true, message: '请选择日期' }]}>
