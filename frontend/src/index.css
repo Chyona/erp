@@ -3730,7 +3730,6 @@ body,
   flex: 1;
   min-width: 0;
   width: 100%;
-  border: none;
   border-radius: 0;
   overflow: hidden;
 }
@@ -3929,7 +3928,7 @@ body,
 
 .voucher-sheet__table-wrap {
   overflow-x: auto;
-  border: 1px solid #cbd5e1;
+  border: 1px solid #022433;
   border-radius: 4px;
 }
 
@@ -3949,6 +3948,26 @@ body,
   border: 1px solid #cbd5e1;
   padding: 0;
   vertical-align: middle;
+  position: relative;
+}
+
+.voucher-sheet__table th:first-child,
+.voucher-sheet__table td:first-child {
+  border-left: none;
+}
+
+
+.voucher-sheet__table th:last-child,
+.voucher-sheet__table td:last-child {
+  border-right: none;
+}
+
+.voucher-sheet__table th {
+  border-top: none;
+}
+
+.voucher-sheet__table td {
+  border-bottom: none;
 }
 
 .voucher-sheet__table thead th {
@@ -4025,8 +4044,38 @@ body,
   background: #eff6ff;
 }
 
-.voucher-sheet__table tbody tr:hover .voucher-sheet__td-index {
-  background: #dbeafe;
+/* 行悬浮：所有列显示编辑控件；鼠标所在列白底蓝框 */
+.voucher-sheet__table tbody tr:hover td:hover,
+.voucher-sheet__table tbody tr:hover td:focus-within {
+  background: #fff !important;
+  z-index: 2;
+}
+
+.voucher-sheet__table tbody tr:hover td:hover::after,
+.voucher-sheet__table tbody tr:hover td:focus-within::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 1px solid #3b82f6;
+  pointer-events: none;
+  z-index: 10;
+  box-sizing: border-box;
+}
+
+.voucher-sheet__table tbody tr:hover .voucher-sheet__cell-preview {
+  display: none;
+}
+
+.voucher-sheet__table tbody tr:hover .voucher-sheet__cell-editor {
+  display: block;
+}
+
+.voucher-sheet__table tbody td:focus-within .voucher-sheet__cell-preview {
+  display: none;
+}
+
+.voucher-sheet__table tbody td:focus-within .voucher-sheet__cell-editor {
+  display: block;
 }
 
 .voucher-sheet__row-action {
@@ -4057,6 +4106,51 @@ body,
 .voucher-sheet__row-action:disabled {
   color: #cbd5e1;
   cursor: not-allowed;
+}
+
+.voucher-sheet__cell-preview {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 8px;
+  line-height: var(--voucher-row-height);
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.voucher-sheet__cell-editor {
+  display: none;
+  height: var(--voucher-row-height);
+}
+
+.voucher-sheet__amount-cell {
+  position: relative;
+  height: var(--voucher-row-height);
+}
+
+.voucher-sheet__table tbody tr:hover .amount-grid {
+  background: #eff6ff;
+}
+
+.voucher-sheet__table tbody tr:hover td.voucher-sheet__td-amount:hover .amount-grid,
+.voucher-sheet__table tbody tr:hover td.voucher-sheet__td-amount:focus-within .amount-grid {
+  background: #fff;
+}
+
+.voucher-sheet__amount-activator {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: text;
+}
+
+.voucher-sheet__table tbody tr.voucher-sheet__row--pad:hover .voucher-sheet__td-amount .voucher-sheet__amount-activator {
+  display: block;
 }
 
 .voucher-sheet__td-summary .ant-input,

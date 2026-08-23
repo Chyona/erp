@@ -312,8 +312,12 @@ export default function VoucherForm() {
   };
 
   const updateEntry = (index, field, value) => {
-    setEntries((prev) =>
-      prev.map((e, i) => {
+    setEntries((prev) => {
+      const next = [...prev];
+      while (next.length <= index) {
+        next.push(emptyEntry());
+      }
+      return next.map((e, i) => {
         if (i !== index) return e;
         const updated = { ...e, [field]: value };
         if (field === 'accountId') {
@@ -324,8 +328,8 @@ export default function VoucherForm() {
         if (field === 'debit' && value) updated.credit = '';
         if (field === 'credit' && value) updated.debit = '';
         return updated;
-      })
-    );
+      });
+    });
   };
 
   const addEntry = () => setEntries((prev) => [...prev, emptyEntry()]);
@@ -338,12 +342,46 @@ export default function VoucherForm() {
     });
   };
 
-  const copyEntry = (index) => {
+  const copyEntry = (index: number) => {
     const source = entries[index];
     if (!source) return;
     setEntries((prev) => {
       const next = [...prev];
       next.splice(index + 1, 0, {
+        ...source,
+        key: Date.now() + Math.random()
+      });
+      return next;
+    });
+  };
+
+  const ensureEntryAt = (index: number) => {
+    setEntries((prev) => {
+      if (prev[index]) return prev;
+      const next = [...prev];
+      while (next.length <= index) {
+        next.push(emptyEntry());
+      }
+      return next;
+    });
+  };
+
+  const copyRowAt = (index: number) => {
+    if (entries[index]) {
+      copyEntry(index);
+      return;
+    }
+    const source = index > 0 ? entries[index - 1] : null;
+    if (!source) {
+      ensureEntryAt(index);
+      return;
+    }
+    setEntries((prev) => {
+      const next = [...prev];
+      while (next.length < index) {
+        next.push(emptyEntry());
+      }
+      next.splice(index, 0, {
         ...source,
         key: Date.now() + Math.random()
       });
@@ -443,21 +481,7 @@ export default function VoucherForm() {
     message.success('已添加贷方分录，请核对摘要和科目');
   };
 
-  const removeEntry = async (index) => {
-    if (entries.length <= 1) {
-      message.error('至少保留一条分录');
-      return;
-    }
-    const entry = entries[index];
-    const hasData = entry.summary || entry.accountId || entry.debit || entry.credit;
-    if (hasData) {
-      const ok = await confirmDanger(modal, {
-        title: '确定删除该分录？',
-        content: '删除后该分录内容将无法恢复。',
-        okText: '确定删除'
-      });
-      if (!ok) return;
-    }
+  const removeEntry = (index: number) => {
     setEntries((prev) => prev.filter((_, i) => i !== index));
   };
 
@@ -930,7 +954,8 @@ export default function VoucherForm() {
               signatory={signatory || ''}
               onUpdateEntry={updateEntry}
               onInsertEntryAfter={insertEntryAfter}
-              onCopyEntry={copyEntry}
+              onCopyEntry={copyRowAt}
+              onEnsureEntry={ensureEntryAt}
               onRemoveEntry={removeEntry}
               onUpload={handleUpload}
               uploadStatus={attachmentUploadStatus}

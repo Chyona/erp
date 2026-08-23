@@ -27,6 +27,7 @@ function VoucherEntrySheet({
   onUpdateEntry,
   onInsertEntryAfter,
   onCopyEntry,
+  onEnsureEntry,
   onRemoveEntry,
   onUpload,
   uploadStatus = null,
@@ -138,7 +139,12 @@ function VoucherEntrySheet({
                   const amountValue = (side: 'debit' | 'credit') => {
                     if (!entry) return '';
                     const raw = entry[side];
-                    return raw === '' || raw === undefined || raw === null ? 0 : raw;
+                    return raw === '' || raw === undefined || raw === null ? '' : raw;
+                  };
+                  const accountPreview =
+                    entry && [entry.accountCode, entry.accountName].filter(Boolean).join(' ');
+                  const activateRow = () => {
+                    if (!readOnly && isPad) onEnsureEntry?.(index);
                   };
                   return (
                     <tr key={entry?.key || `pad-${index}`} className={isPad ? 'voucher-sheet__row--pad' : ''}>
@@ -155,90 +161,134 @@ function VoucherEntrySheet({
                                 <PlusCircleOutlined />
                               </button>
                             </Tooltip>
-                            {!isPad && (
-                              <>
-                                <Tooltip title="复制">
-                                  <button
-                                    type="button"
-                                    className="voucher-sheet__row-action"
-                                    onClick={() => onCopyEntry?.(index)}
-                                  >
-                                    <CopyOutlined />
-                                  </button>
-                                </Tooltip>
-                                <Tooltip title="删除">
-                                  <button
-                                    type="button"
-                                    className="voucher-sheet__row-action voucher-sheet__row-action--danger"
-                                    onClick={() => onRemoveEntry?.(index)}
-                                    disabled={entries.length <= 1}
-                                  >
-                                    <MinusCircleOutlined />
-                                  </button>
-                                </Tooltip>
-                              </>
-                            )}
+                            <Tooltip title="复制">
+                              <button
+                                type="button"
+                                className="voucher-sheet__row-action"
+                                onClick={() => onCopyEntry?.(index)}
+                              >
+                                <CopyOutlined />
+                              </button>
+                            </Tooltip>
+                            <Tooltip title="删除">
+                              <button
+                                type="button"
+                                className="voucher-sheet__row-action voucher-sheet__row-action--danger"
+                                onClick={() => onRemoveEntry?.(index)}
+                                disabled={!entry}
+                              >
+                                <MinusCircleOutlined />
+                              </button>
+                            </Tooltip>
                           </div>
                         )}
                       </td>
                       <td className="voucher-sheet__td-summary">
-                        {!isPad &&
-                          (readOnly ? (
-                            <span className="voucher-sheet__readonly-text">{entry.summary || ''}</span>
-                          ) : (
-                            <Input
-                              variant="borderless"
-                              value={entry.summary}
-                              placeholder="摘要"
-                              onChange={(e) => onUpdateEntry(index, 'summary', e.target.value)}
-                            />
-                          ))}
+                        {readOnly ? (
+                          <span className="voucher-sheet__readonly-text">{entry?.summary || ''}</span>
+                        ) : (
+                          <>
+                            <span className="voucher-sheet__cell-preview" title={entry?.summary || ''}>
+                              {entry?.summary || ''}
+                            </span>
+                            <div className="voucher-sheet__cell-editor">
+                              <Input
+                                variant="borderless"
+                                value={entry?.summary ?? ''}
+                                placeholder="摘要"
+                                onFocus={activateRow}
+                                onChange={(e) => {
+                                  activateRow();
+                                  onUpdateEntry(index, 'summary', e.target.value);
+                                }}
+                              />
+                            </div>
+                          </>
+                        )}
                       </td>
                       <td className="voucher-sheet__td-account">
-                        {!isPad &&
-                          (readOnly ? (
-                            <span className="voucher-sheet__readonly-text">
-                              {[entry.accountCode, entry.accountName].filter(Boolean).join(' ') || ''}
+                        {readOnly ? (
+                          <span className="voucher-sheet__readonly-text">{accountPreview || ''}</span>
+                        ) : (
+                          <>
+                            <span className="voucher-sheet__cell-preview" title={accountPreview || ''}>
+                              {accountPreview || ''}
                             </span>
-                          ) : (
-                            <Select
-                              variant="borderless"
-                              showSearch
-                              placeholder="选择科目"
-                              style={{ width: '100%' }}
-                              value={entry.accountId || undefined}
-                              optionFilterProp="label"
-                              onChange={(v) => onUpdateEntry(index, 'accountId', v)}
-                              options={accounts.map((a) => ({
-                                value: a.id,
-                                label: Accounts.formatAccountOption(a)
-                              }))}
+                            <div className="voucher-sheet__cell-editor">
+                              <Select
+                                variant="borderless"
+                                showSearch
+                                placeholder="选择科目"
+                                style={{ width: '100%' }}
+                                value={entry?.accountId || undefined}
+                                optionFilterProp="label"
+                                onOpenChange={(open) => {
+                                  if (open) activateRow();
+                                }}
+                                onChange={(v) => {
+                                  activateRow();
+                                  onUpdateEntry(index, 'accountId', v);
+                                }}
+                                options={accounts.map((a) => ({
+                                  value: a.id,
+                                  label: Accounts.formatAccountOption(a)
+                                }))}
+                              />
+                            </div>
+                          </>
+                        )}
+                      </td>
+                      <td colSpan={11} className="voucher-sheet__td-amount">
+                        <div className="voucher-sheet__amount-cell">
+                          {isPad && !readOnly ? (
+                            <button
+                              type="button"
+                              className="voucher-sheet__amount-activator"
+                              tabIndex={-1}
+                              aria-label="录入金额"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                activateRow();
+                              }}
                             />
-                          ))}
+                          ) : null}
+                          <AmountGrid
+                            value={showAmount ? amountValue('debit') : ''}
+                            onChange={
+                              showAmount && !readOnly
+                                ? (v) => onUpdateEntry(index, 'debit', v)
+                                : undefined
+                            }
+                            readOnly={readOnly || !showAmount}
+                            redLetter={redLetter}
+                          />
+                        </div>
                       </td>
                       <td colSpan={11} className="voucher-sheet__td-amount">
-                        <AmountGrid
-                          value={showAmount ? amountValue('debit') : ''}
-                          onChange={
-                            showAmount && !readOnly
-                              ? (v) => onUpdateEntry(index, 'debit', v)
-                              : undefined
-                          }
-                          readOnly={readOnly || !showAmount}
-                          redLetter={redLetter}
-                        />
-                      </td>
-                      <td colSpan={11} className="voucher-sheet__td-amount">
-                        <AmountGrid
-                          value={showAmount ? amountValue('credit') : ''}
-                          onChange={
-                            showAmount && !readOnly
-                              ? (v) => onUpdateEntry(index, 'credit', v)
-                              : undefined
-                          }
-                          readOnly={readOnly || !showAmount}
-                          redLetter={redLetter}
-                        />
+                        <div className="voucher-sheet__amount-cell">
+                          {isPad && !readOnly ? (
+                            <button
+                              type="button"
+                              className="voucher-sheet__amount-activator"
+                              tabIndex={-1}
+                              aria-label="录入金额"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                activateRow();
+                              }}
+                            />
+                          ) : null}
+                          <AmountGrid
+                            value={showAmount ? amountValue('credit') : ''}
+                            onChange={
+                              showAmount && !readOnly
+                                ? (v) => onUpdateEntry(index, 'credit', v)
+                                : undefined
+                            }
+                            readOnly={readOnly || !showAmount}
+                            redLetter={redLetter}
+                          />
+                        </div>
                       </td>
                     </tr>
                   );
