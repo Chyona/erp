@@ -14,6 +14,18 @@ import { Accounts } from '../services/accounts';
 
 const MIN_ROWS = 4;
 
+function VoucherTableColgroup() {
+  return (
+    <colgroup>
+      <col className="voucher-sheet__col-index" />
+      <col className="voucher-sheet__col-summary" />
+      <col className="voucher-sheet__col-account" />
+      <col span={11} className="voucher-sheet__col-amount-digit" />
+      <col span={11} className="voucher-sheet__col-amount-digit" />
+    </colgroup>
+  );
+}
+
 function VoucherEntrySheet({
   voucherType,
   voucherNumber,
@@ -109,227 +121,223 @@ function VoucherEntrySheet({
 
         <div className="voucher-sheet__table-layout">
           <div className="voucher-sheet__table-wrap">
-            <table className="voucher-sheet__table">
-              <colgroup>
-                <col className="voucher-sheet__col-index" />
-                <col className="voucher-sheet__col-summary" />
-                <col className="voucher-sheet__col-account" />
-                <col span={11} className="voucher-sheet__col-amount-digit" />
-                <col span={11} className="voucher-sheet__col-amount-digit" />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th rowSpan={2} className="voucher-sheet__th-index">
-                    #
-                  </th>
-                  <th rowSpan={2} className="voucher-sheet__th-summary">
-                    摘要
-                  </th>
-                  <th rowSpan={2} className="voucher-sheet__th-account">
-                    科目
-                  </th>
-                  <th colSpan={11} className="voucher-sheet__th-amount-group">
-                    借方金额
-                  </th>
-                  <th colSpan={11} className="voucher-sheet__th-amount-group">
-                    贷方金额
-                  </th>
-                </tr>
-                <tr>
-                  <th colSpan={11} className="voucher-sheet__th-units">
-                    <AmountGridHeader highlightIndices={debitHighlight} />
-                  </th>
-                  <th colSpan={11} className="voucher-sheet__th-units">
-                    <AmountGridHeader highlightIndices={creditHighlight} />
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {Array.from({ length: rowCount }, (_, index) => {
-                  const entry = entries[index];
-                  const isPad = !entry;
-                  const showAmount = Boolean(entry);
-                  const amountValue = (side: 'debit' | 'credit') => {
-                    if (!entry) return '';
-                    const raw = entry[side];
-                    if (raw === '' || raw === undefined || raw === null) return '';
-                    const n = parseFloat(String(raw));
-                    return Number.isFinite(n) && n > 0 ? raw : '';
-                  };
-                  const accountPreview =
-                    entry && [entry.accountCode, entry.accountName].filter(Boolean).join(' ');
-                  const activateRow = () => {
-                    if (!readOnly && isPad) onEnsureEntry?.(index);
-                  };
-                  return (
-                    <tr key={entry?.key || `pad-${index}`} className={isPad ? 'voucher-sheet__row--pad' : ''}>
-                      <td className="voucher-sheet__td-index">
-                        <span className="voucher-sheet__row-no">{index + 1}</span>
-                        {!readOnly && (
-                          <div className="voucher-sheet__row-actions">
-                            <Tooltip title="增行">
+            <div className="voucher-sheet__table-scroll">
+              <table className="voucher-sheet__table">
+                <VoucherTableColgroup />
+                <thead>
+                  <tr>
+                    <th rowSpan={2} className="voucher-sheet__th-index">
+                      #
+                    </th>
+                    <th rowSpan={2} className="voucher-sheet__th-summary">
+                      摘要
+                    </th>
+                    <th rowSpan={2} className="voucher-sheet__th-account">
+                      科目
+                    </th>
+                    <th colSpan={11} className="voucher-sheet__th-amount-group">
+                      借方金额
+                    </th>
+                    <th colSpan={11} className="voucher-sheet__th-amount-group">
+                      贷方金额
+                    </th>
+                  </tr>
+                  <tr>
+                    <th colSpan={11} className="voucher-sheet__th-units">
+                      <AmountGridHeader highlightIndices={debitHighlight} />
+                    </th>
+                    <th colSpan={11} className="voucher-sheet__th-units">
+                      <AmountGridHeader highlightIndices={creditHighlight} />
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Array.from({ length: rowCount }, (_, index) => {
+                    const entry = entries[index];
+                    const isPad = !entry;
+                    const showAmount = Boolean(entry);
+                    const amountValue = (side: 'debit' | 'credit') => {
+                      if (!entry) return '';
+                      const raw = entry[side];
+                      if (raw === '' || raw === undefined || raw === null) return '';
+                      const n = parseFloat(String(raw));
+                      return Number.isFinite(n) && n > 0 ? raw : '';
+                    };
+                    const accountPreview =
+                      entry && [entry.accountCode, entry.accountName].filter(Boolean).join(' ');
+                    const activateRow = () => {
+                      if (!readOnly && isPad) onEnsureEntry?.(index);
+                    };
+                    return (
+                      <tr key={entry?.key || `pad-${index}`} className={isPad ? 'voucher-sheet__row--pad' : ''}>
+                        <td className="voucher-sheet__td-index">
+                          <span className="voucher-sheet__row-no">{index + 1}</span>
+                          {!readOnly && (
+                            <div className="voucher-sheet__row-actions">
+                              <Tooltip title="增行">
+                                <button
+                                  type="button"
+                                  className="voucher-sheet__row-action"
+                                  onClick={() => onInsertEntryAfter?.(index)}
+                                >
+                                  <PlusCircleOutlined />
+                                </button>
+                              </Tooltip>
+                              <Tooltip title="复制">
+                                <button
+                                  type="button"
+                                  className="voucher-sheet__row-action"
+                                  onClick={() => onCopyEntry?.(index)}
+                                >
+                                  <CopyOutlined />
+                                </button>
+                              </Tooltip>
+                              <Tooltip title="删除">
+                                <button
+                                  type="button"
+                                  className="voucher-sheet__row-action voucher-sheet__row-action--danger"
+                                  onClick={() => onRemoveEntry?.(index)}
+                                  disabled={!entry}
+                                >
+                                  <MinusCircleOutlined />
+                                </button>
+                              </Tooltip>
+                            </div>
+                          )}
+                        </td>
+                        <td className="voucher-sheet__td-summary">
+                          {readOnly ? (
+                            <span className="voucher-sheet__readonly-text">{entry?.summary || ''}</span>
+                          ) : (
+                            <>
+                              <span className="voucher-sheet__cell-preview" title={entry?.summary || ''}>
+                                {entry?.summary || ''}
+                              </span>
+                              <div className="voucher-sheet__cell-editor">
+                                <Input
+                                  variant="borderless"
+                                  value={entry?.summary ?? ''}
+                                  placeholder="摘要"
+                                  onFocus={activateRow}
+                                  onChange={(e) => {
+                                    activateRow();
+                                    onUpdateEntry(index, 'summary', e.target.value);
+                                  }}
+                                />
+                              </div>
+                            </>
+                          )}
+                        </td>
+                        <td className="voucher-sheet__td-account">
+                          {readOnly ? (
+                            <span className="voucher-sheet__readonly-text">{accountPreview || ''}</span>
+                          ) : (
+                            <>
+                              <span className="voucher-sheet__cell-preview" title={accountPreview || ''}>
+                                {accountPreview || ''}
+                              </span>
+                              <div className="voucher-sheet__cell-editor">
+                                <Select
+                                  variant="borderless"
+                                  showSearch
+                                  placeholder="选择科目"
+                                  style={{ width: '100%' }}
+                                  value={entry?.accountId || undefined}
+                                  optionFilterProp="label"
+                                  onOpenChange={(open) => {
+                                    if (open) activateRow();
+                                  }}
+                                  onChange={(v) => {
+                                    activateRow();
+                                    onUpdateEntry(index, 'accountId', v);
+                                  }}
+                                  options={accounts.map((a) => ({
+                                    value: a.id,
+                                    label: Accounts.formatAccountOption(a)
+                                  }))}
+                                />
+                              </div>
+                            </>
+                          )}
+                        </td>
+                        <td colSpan={11} className="voucher-sheet__td-amount">
+                          <div className="voucher-sheet__amount-cell">
+                            {isPad && !readOnly ? (
                               <button
                                 type="button"
-                                className="voucher-sheet__row-action"
-                                onClick={() => onInsertEntryAfter?.(index)}
-                              >
-                                <PlusCircleOutlined />
-                              </button>
-                            </Tooltip>
-                            <Tooltip title="复制">
-                              <button
-                                type="button"
-                                className="voucher-sheet__row-action"
-                                onClick={() => onCopyEntry?.(index)}
-                              >
-                                <CopyOutlined />
-                              </button>
-                            </Tooltip>
-                            <Tooltip title="删除">
-                              <button
-                                type="button"
-                                className="voucher-sheet__row-action voucher-sheet__row-action--danger"
-                                onClick={() => onRemoveEntry?.(index)}
-                                disabled={!entry}
-                              >
-                                <MinusCircleOutlined />
-                              </button>
-                            </Tooltip>
+                                className="voucher-sheet__amount-activator"
+                                tabIndex={-1}
+                                aria-label="录入金额"
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  activateRow();
+                                }}
+                              />
+                            ) : null}
+                            <AmountGrid
+                              value={showAmount ? amountValue('debit') : ''}
+                              onChange={
+                                showAmount && !readOnly
+                                  ? (v) => onUpdateEntry(index, 'debit', v)
+                                  : undefined
+                              }
+                              readOnly={readOnly || !showAmount}
+                              redLetter={redLetter}
+                              onHighlightChange={setDebitHighlight}
+                            />
                           </div>
-                        )}
-                      </td>
-                      <td className="voucher-sheet__td-summary">
-                        {readOnly ? (
-                          <span className="voucher-sheet__readonly-text">{entry?.summary || ''}</span>
-                        ) : (
-                          <>
-                            <span className="voucher-sheet__cell-preview" title={entry?.summary || ''}>
-                              {entry?.summary || ''}
-                            </span>
-                            <div className="voucher-sheet__cell-editor">
-                              <Input
-                                variant="borderless"
-                                value={entry?.summary ?? ''}
-                                placeholder="摘要"
-                                onFocus={activateRow}
-                                onChange={(e) => {
+                        </td>
+                        <td colSpan={11} className="voucher-sheet__td-amount">
+                          <div className="voucher-sheet__amount-cell">
+                            {isPad && !readOnly ? (
+                              <button
+                                type="button"
+                                className="voucher-sheet__amount-activator"
+                                tabIndex={-1}
+                                aria-label="录入金额"
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
                                   activateRow();
-                                  onUpdateEntry(index, 'summary', e.target.value);
                                 }}
                               />
-                            </div>
-                          </>
-                        )}
-                      </td>
-                      <td className="voucher-sheet__td-account">
-                        {readOnly ? (
-                          <span className="voucher-sheet__readonly-text">{accountPreview || ''}</span>
-                        ) : (
-                          <>
-                            <span className="voucher-sheet__cell-preview" title={accountPreview || ''}>
-                              {accountPreview || ''}
-                            </span>
-                            <div className="voucher-sheet__cell-editor">
-                              <Select
-                                variant="borderless"
-                                showSearch
-                                placeholder="选择科目"
-                                style={{ width: '100%' }}
-                                value={entry?.accountId || undefined}
-                                optionFilterProp="label"
-                                onOpenChange={(open) => {
-                                  if (open) activateRow();
-                                }}
-                                onChange={(v) => {
-                                  activateRow();
-                                  onUpdateEntry(index, 'accountId', v);
-                                }}
-                                options={accounts.map((a) => ({
-                                  value: a.id,
-                                  label: Accounts.formatAccountOption(a)
-                                }))}
-                              />
-                            </div>
-                          </>
-                        )}
-                      </td>
-                      <td colSpan={11} className="voucher-sheet__td-amount">
-                        <div className="voucher-sheet__amount-cell">
-                          {isPad && !readOnly ? (
-                            <button
-                              type="button"
-                              className="voucher-sheet__amount-activator"
-                              tabIndex={-1}
-                              aria-label="录入金额"
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                activateRow();
-                              }}
+                            ) : null}
+                            <AmountGrid
+                              value={showAmount ? amountValue('credit') : ''}
+                              onChange={
+                                showAmount && !readOnly
+                                  ? (v) => onUpdateEntry(index, 'credit', v)
+                                  : undefined
+                              }
+                              readOnly={readOnly || !showAmount}
+                              redLetter={redLetter}
+                              onHighlightChange={setCreditHighlight}
                             />
-                          ) : null}
-                          <AmountGrid
-                            value={showAmount ? amountValue('debit') : ''}
-                            onChange={
-                              showAmount && !readOnly
-                                ? (v) => onUpdateEntry(index, 'debit', v)
-                                : undefined
-                            }
-                            readOnly={readOnly || !showAmount}
-                            redLetter={redLetter}
-                            onHighlightChange={setDebitHighlight}
-                          />
-                        </div>
-                      </td>
-                      <td colSpan={11} className="voucher-sheet__td-amount">
-                        <div className="voucher-sheet__amount-cell">
-                          {isPad && !readOnly ? (
-                            <button
-                              type="button"
-                              className="voucher-sheet__amount-activator"
-                              tabIndex={-1}
-                              aria-label="录入金额"
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                activateRow();
-                              }}
-                            />
-                          ) : null}
-                          <AmountGrid
-                            value={showAmount ? amountValue('credit') : ''}
-                            onChange={
-                              showAmount && !readOnly
-                                ? (v) => onUpdateEntry(index, 'credit', v)
-                                : undefined
-                            }
-                            readOnly={readOnly || !showAmount}
-                            redLetter={redLetter}
-                            onHighlightChange={setCreditHighlight}
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-              <tfoot>
-                <tr className="voucher-sheet__total-row">
-                  <td colSpan={3} className="voucher-sheet__total-label">
-                    <span className="voucher-sheet__total-text">合计：</span>
-                    <span
-                      className={`voucher-sheet__total-cn${redLetter ? ' voucher-sheet__total-cn--red' : ''}`}
-                    >
-                      {totalAmount > 0 ? amountToChineseUppercase(totalAmount, redLetter) : ''}
-                    </span>
-                  </td>
-                  <td colSpan={11} className="voucher-sheet__td-amount">
-                    <AmountGrid value={totalDebitDisplay} readOnly redLetter={redLetter} />
-                  </td>
-                  <td colSpan={11} className="voucher-sheet__td-amount">
-                    <AmountGrid value={totalCreditDisplay} readOnly redLetter={redLetter} />
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="voucher-sheet__total-row">
+                    <td colSpan={3} className="voucher-sheet__total-label">
+                      <span className="voucher-sheet__total-text">合计：</span>
+                      <span
+                        className={`voucher-sheet__total-cn${redLetter ? ' voucher-sheet__total-cn--red' : ''}`}
+                      >
+                        {totalAmount > 0 ? amountToChineseUppercase(totalAmount, redLetter) : ''}
+                      </span>
+                    </td>
+                    <td colSpan={11} className="voucher-sheet__td-amount">
+                      <AmountGrid value={totalDebitDisplay} readOnly redLetter={redLetter} />
+                    </td>
+                    <td colSpan={11} className="voucher-sheet__td-amount">
+                      <AmountGrid value={totalCreditDisplay} readOnly redLetter={redLetter} />
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
           </div>
           <VoucherAttachmentColumn
             attachments={attachments}

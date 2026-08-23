@@ -997,17 +997,33 @@ export default function VoucherForm() {
             />
 
             <div className="voucher-form__extra">
-              {businessType === '销售收入' && (
-                <>
-                  <Form.Item
-                    name="invoiceType"
-                    label="开票类型"
-                    initialValue={INVOICE_TYPE.NONE}
-                  >
-                    <Select options={INVOICE_TYPE_OPTIONS} disabled={readOnly} />
-                  </Form.Item>
-                  {(invoiceType === INVOICE_TYPE.ORDINARY ||
-                    invoiceType === INVOICE_TYPE.SPECIAL) && (
+              <div className="voucher-form__extra-col">
+                <Form.Item name="invoiceNumbers" label="发票号">
+                  <Input
+                    placeholder="上传发票附件后自动识别，多个号码用逗号分隔"
+                    readOnly={readOnly}
+                  />
+                </Form.Item>
+                <Form.Item name="remark" label="备注">
+                  <TextArea
+                    rows={3}
+                    placeholder="补充说明业务背景，便于税务核查"
+                    readOnly={readOnly}
+                  />
+                </Form.Item>
+              </div>
+              <div className="voucher-form__extra-col">
+                {businessType === '销售收入' && (
+                  <>
+                    <Form.Item
+                      name="invoiceType"
+                      label="开票类型"
+                      initialValue={INVOICE_TYPE.NONE}
+                    >
+                      <Select options={INVOICE_TYPE_OPTIONS} disabled={readOnly} />
+                    </Form.Item>
+                    {(invoiceType === INVOICE_TYPE.ORDINARY ||
+                      invoiceType === INVOICE_TYPE.SPECIAL) && (
                       <Form.Item
                         name="taxAmount"
                         label="增值税额"
@@ -1022,21 +1038,9 @@ export default function VoucherForm() {
                         />
                       </Form.Item>
                     )}
-                </>
-              )}
-              <Form.Item name="invoiceNumbers" label="发票号">
-                <Input
-                  placeholder="上传发票附件后自动识别，多个号码用逗号分隔"
-                  readOnly={readOnly}
-                />
-              </Form.Item>
-              <Form.Item name="remark" label="备注">
-                <TextArea
-                  rows={3}
-                  placeholder="补充说明业务背景，便于税务核查"
-                  readOnly={readOnly}
-                />
-              </Form.Item>
+                  </>
+                )}
+              </div>
             </div>
           </Form>
         </Card>

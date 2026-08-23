@@ -26,7 +26,8 @@ body {
 }
 
 .login-page {
-  min-height: 100vh;
+  min-height: max(100vh, var(--app-min-height));
+  min-width: var(--app-min-width);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -72,10 +73,14 @@ body {
   --app-table-font-size: 13px;
   --app-table-cell-padding-y: 8px;
   --app-table-cell-padding-x: 12px;
-  --app-table-scrollbar-size: 8px;
-  --app-table-scrollbar-thumb: #cbd5e1;
-  --app-table-scrollbar-thumb-hover: #94a3b8;
-  --app-table-scrollbar-track: transparent;
+  --app-scrollbar-size: 8px;
+  --app-scrollbar-thumb: #c8d0da;
+  --app-scrollbar-thumb-hover: #94a3b8;
+  --app-scrollbar-track: transparent;
+  --app-table-scrollbar-size: var(--app-scrollbar-size);
+  --app-table-scrollbar-thumb: var(--app-scrollbar-thumb);
+  --app-table-scrollbar-thumb-hover: var(--app-scrollbar-thumb-hover);
+  --app-table-scrollbar-track: var(--app-scrollbar-track);
   --app-table-sticky-shadow: 0 1px 0 var(--app-table-border), 0 2px 6px rgba(15, 23, 42, 0.04);
   --app-tooltip-bg: #fff;
   --app-tooltip-color: rgba(0, 0, 0, 0.88);
@@ -84,12 +89,57 @@ body {
     0 6px 16px 0 rgba(0, 0, 0, 0.08),
     0 3px 6px -4px rgba(0, 0, 0, 0.12),
     0 9px 28px 8px rgba(0, 0, 0, 0.05);
+  --app-min-width: 1280px;
+  --app-min-height: 720px;
+}
+
+/* 全站统一滚动条（Firefox + Chromium / WebKit） */
+*,
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--app-scrollbar-thumb) var(--app-scrollbar-track);
+}
+
+*::-webkit-scrollbar {
+  width: var(--app-scrollbar-size);
+  height: var(--app-scrollbar-size);
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--app-scrollbar-track);
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--app-scrollbar-thumb);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--app-scrollbar-thumb-hover);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+html {
+  min-width: var(--app-min-width);
+  min-height: var(--app-min-height);
+  overflow: auto;
 }
 
 html,
 body,
 #root {
   height: 100%;
+}
+
+body,
+#root {
+  min-width: var(--app-min-width);
+  min-height: var(--app-min-height);
   overflow: hidden;
 }
 
@@ -110,7 +160,9 @@ body,
 }
 
 .app-layout {
-  height: 100vh;
+  min-width: var(--app-min-width);
+  min-height: var(--app-min-height);
+  height: max(100vh, var(--app-min-height));
   overflow: hidden;
 }
 
@@ -119,7 +171,7 @@ body,
   left: 0;
   top: 0;
   bottom: 0;
-  height: 100vh !important;
+  height: max(100vh, var(--app-min-height)) !important;
   overflow: hidden;
   z-index: 100;
 }
@@ -138,7 +190,9 @@ body,
 
 .app-main {
   margin-left: 220px;
-  height: 100vh;
+  min-width: calc(var(--app-min-width) - 220px);
+  min-height: var(--app-min-height);
+  height: max(100vh, var(--app-min-height));
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -546,44 +600,12 @@ body,
   padding-left: 0;
 }
 
-/* 统一表格滚动条 */
+/* 表格滚动容器触摸惯性 */
 .app-table-scroll,
 .page-table-body--scroll .ant-table-body,
 .voucher-import-modal__table .ant-table-body,
 .app-table .ant-table-body {
-  scrollbar-width: thin;
-  scrollbar-color: var(--app-table-scrollbar-thumb) var(--app-table-scrollbar-track);
   -webkit-overflow-scrolling: touch;
-}
-
-.app-table-scroll::-webkit-scrollbar,
-.page-table-body--scroll .ant-table-body::-webkit-scrollbar,
-.voucher-import-modal__table .ant-table-body::-webkit-scrollbar,
-.app-table .ant-table-body::-webkit-scrollbar {
-  width: var(--app-table-scrollbar-size);
-  height: var(--app-table-scrollbar-size);
-}
-
-.app-table-scroll::-webkit-scrollbar-thumb,
-.page-table-body--scroll .ant-table-body::-webkit-scrollbar-thumb,
-.voucher-import-modal__table .ant-table-body::-webkit-scrollbar-thumb,
-.app-table .ant-table-body::-webkit-scrollbar-thumb {
-  background: var(--app-table-scrollbar-thumb);
-  border-radius: 999px;
-}
-
-.app-table-scroll::-webkit-scrollbar-thumb:hover,
-.page-table-body--scroll .ant-table-body::-webkit-scrollbar-thumb:hover,
-.voucher-import-modal__table .ant-table-body::-webkit-scrollbar-thumb:hover,
-.app-table .ant-table-body::-webkit-scrollbar-thumb:hover {
-  background: var(--app-table-scrollbar-thumb-hover);
-}
-
-.app-table-scroll::-webkit-scrollbar-track,
-.page-table-body--scroll .ant-table-body::-webkit-scrollbar-track,
-.voucher-import-modal__table .ant-table-body::-webkit-scrollbar-track,
-.app-table .ant-table-body::-webkit-scrollbar-track {
-  background: var(--app-table-scrollbar-track);
 }
 
 .page-table-body {
@@ -2635,20 +2657,6 @@ body,
   min-height: 0;
   overflow: auto;
   -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
-  scrollbar-color: var(--app-table-scrollbar-thumb) var(--app-table-scrollbar-track);
-}
-
-.balance-sheet-view::-webkit-scrollbar,
-.income-statement-view::-webkit-scrollbar {
-  width: var(--app-table-scrollbar-size);
-  height: var(--app-table-scrollbar-size);
-}
-
-.balance-sheet-view::-webkit-scrollbar-thumb,
-.income-statement-view::-webkit-scrollbar-thumb {
-  background: var(--app-table-scrollbar-thumb);
-  border-radius: 999px;
 }
 
 .balance-sheet-report--loading,
@@ -3357,20 +3365,123 @@ body,
   border-color: #cfe3c4;
 }
 
-.voucher-form-page--fullscreen {
-  background: #f1f5f9;
-  padding: 16px;
-  overflow: auto;
-}
-
 .voucher-form-page--fullscreen .voucher-form-card {
   max-width: none;
   margin: 0;
+  flex: 0 1 auto;
+  max-height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .voucher-form-card {
   width: 100%;
   max-width: 1200px;
+}
+
+/* 凭证页：Card 按内容高度；内容过高时撑满并在分录行内滚动 */
+.voucher-form-page .page-form-body {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.voucher-form-page .page-form-body>.voucher-form-card {
+  flex: 0 1 auto;
+  max-height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.voucher-form-page .voucher-form-card>.ant-card-body {
+  flex: 0 1 auto;
+  max-height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.voucher-form-page .voucher-form-card>.ant-card-body>.ant-alert {
+  flex-shrink: 0;
+}
+
+.voucher-form-page .voucher-form {
+  flex: 0 1 auto;
+  max-height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.voucher-form-page .voucher-form__toolbar,
+.voucher-form-page .voucher-form__extra {
+  flex-shrink: 0;
+}
+
+.voucher-form-page .voucher-sheet {
+  flex: 0 1 auto;
+  max-height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.voucher-form-page .voucher-sheet__main {
+  flex: 0 1 auto;
+  max-height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.voucher-form-page .voucher-sheet__meta--above-table,
+.voucher-form-page .voucher-sheet__footer {
+  flex-shrink: 0;
+}
+
+.voucher-form-page .voucher-sheet__table-layout {
+  flex: 0 1 auto;
+  max-height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.voucher-form-page .voucher-sheet__table-layout .voucher-sheet__table-wrap {
+  flex: 0 1 auto;
+  max-height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.voucher-form-page .voucher-sheet__table-scroll {
+  flex: 0 1 auto;
+  width: 100%;
+  max-height: 100%;
+  min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.voucher-form-page .voucher-sheet__table-scroll .voucher-sheet__table {
+  width: 100%;
+  min-width: 900px;
+}
+
+.voucher-form-page--fullscreen {
+  background: #f1f5f9;
+  padding: 16px;
+  overflow: hidden;
 }
 
 .voucher-form__extra {
@@ -3379,8 +3490,15 @@ body,
   border-top: 1px dashed #e2e8f0;
   display: grid;
   grid-template-columns: 1fr;
-  gap: 12px 16px;
+  gap: 12px 20px;
   align-items: start;
+}
+
+.voucher-form__extra-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
 }
 
 /* 附加区：label 在上、控件在下 */
@@ -3400,13 +3518,6 @@ body,
 @media (min-width: 768px) {
   .voucher-form__extra {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (min-width: 992px) {
-  .voucher-form__extra {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px 20px;
   }
 }
 
@@ -3718,9 +3829,9 @@ body,
   position: relative;
   display: flex;
   align-items: flex-start;
-  border-radius: 4px;
   overflow: visible;
   min-width: 0;
+  border: 1px solid #022433;
   --voucher-head-row1: 28px;
   --voucher-head-row2: 24px;
   --voucher-row-height: 60px;
@@ -3730,8 +3841,12 @@ body,
   flex: 1;
   min-width: 0;
   width: 100%;
-  border-radius: 0;
   overflow: hidden;
+}
+
+.voucher-sheet__table-scroll {
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .voucher-sheet__attach-col {
@@ -3926,12 +4041,6 @@ body,
   white-space: nowrap;
 }
 
-.voucher-sheet__table-wrap {
-  overflow-x: auto;
-  border: 1px solid #022433;
-  border-radius: 4px;
-}
-
 .voucher-sheet__table {
   width: 100%;
   min-width: 900px;
@@ -3981,14 +4090,18 @@ body,
   padding: 0 4px;
   font-size: 12px;
   box-sizing: border-box;
+  position: sticky;
+  z-index: 3;
 }
 
 .voucher-sheet__table thead tr:first-child th {
+  top: 0;
   height: var(--voucher-head-row1);
   line-height: var(--voucher-head-row1);
 }
 
 .voucher-sheet__table thead tr:nth-child(2) th {
+  top: var(--voucher-head-row1);
   height: var(--voucher-head-row2);
   padding: 0;
 }
@@ -4218,8 +4331,11 @@ body,
 }
 
 .voucher-sheet__total-row td {
-  /* background: var(--app-table-row-total); */
   height: var(--voucher-row-height);
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  background: #fff;
 }
 
 .voucher-sheet__total-label {
