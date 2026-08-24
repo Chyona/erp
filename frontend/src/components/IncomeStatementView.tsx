@@ -1,21 +1,22 @@
 import { useRef } from 'react';
 import { useTableHeaderGutter } from '../hooks/useTableHeaderGutter';
-import { formatReportAmount } from '../utils/reportAmount';
-
-function labelClass(type, label) {
-  if (type === 'detail') {
-    return label.startsWith('其中：')
-      ? 'income-statement-view__label--detail'
-      : 'income-statement-view__label--detail-sub';
-  }
-  if (/^[一二三四]、/.test(label)) {
-    return 'income-statement-view__label--section';
-  }
-  return '';
-}
+import CopyableReportAmount from './CopyableReportAmount';
+import ReportLabelText from './ReportLabelText';
 
 function isTotalRow(type, label) {
   return type === 'calc' || /合计|总计/.test(label || '');
+}
+
+function IncomeStatementColGroup() {
+  return (
+    <colgroup>
+      <col className="income-statement-view__col income-statement-view__col--label" />
+      <col className="income-statement-view__col income-statement-view__col--index" />
+      <col className="income-statement-view__col income-statement-view__col--amount" />
+      <col className="income-statement-view__col income-statement-view__col--amount" />
+      <col className="income-statement-view__col income-statement-view__col--fill" />
+    </colgroup>
+  );
 }
 
 export default function IncomeStatementView({ rows = [] }) {
@@ -27,6 +28,7 @@ export default function IncomeStatementView({ rows = [] }) {
       <div className="income-statement-view__scroll">
         <div className="income-statement-view__head">
           <table className="income-statement-view__table">
+            <IncomeStatementColGroup />
             <thead>
               <tr>
                 <th className="income-statement-view__th income-statement-view__th--label">项目</th>
@@ -42,6 +44,7 @@ export default function IncomeStatementView({ rows = [] }) {
         </div>
         <div className="income-statement-view__body">
           <table className="income-statement-view__table">
+            <IncomeStatementColGroup />
             <tbody>
               {rows.map((row) => {
                 const totalRow = isTotalRow(row.type, row.label);
@@ -50,13 +53,18 @@ export default function IncomeStatementView({ rows = [] }) {
                     <td
                       className={[
                         'income-statement-view__label',
-                        labelClass(row.type, row.label),
                         totalRow ? 'income-statement-view__label--total' : ''
                       ]
                         .filter(Boolean)
                         .join(' ')}
                     >
-                      {row.label}
+                      <ReportLabelText
+                        type={row.type}
+                        label={row.label}
+                        total={totalRow}
+                        showSectionStyle
+                        variant="income-statement"
+                      />
                     </td>
                     <td
                       className={[
@@ -77,7 +85,7 @@ export default function IncomeStatementView({ rows = [] }) {
                         .filter(Boolean)
                         .join(' ')}
                     >
-                      {formatReportAmount(row.periodAmount)}
+                      <CopyableReportAmount value={row.periodAmount} />
                     </td>
                     <td
                       className={[
@@ -88,7 +96,7 @@ export default function IncomeStatementView({ rows = [] }) {
                         .filter(Boolean)
                         .join(' ')}
                     >
-                      {formatReportAmount(row.ytdAmount)}
+                      <CopyableReportAmount value={row.ytdAmount} />
                     </td>
                     <td className="income-statement-view__fill" />
                   </tr>

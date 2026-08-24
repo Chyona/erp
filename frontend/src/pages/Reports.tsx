@@ -18,6 +18,7 @@ import { Voucher } from '../services/voucher';
 import ScrollTable from '../components/ScrollTable';
 import BalanceSheetView from '../components/BalanceSheetView';
 import IncomeStatementView from '../components/IncomeStatementView';
+import CopyableReportAmount from '../components/CopyableReportAmount';
 import ReportPeriodFilter from '../components/ReportPeriodFilter';
 import {
   defaultReportsPeriod,
@@ -34,13 +35,17 @@ function isNegativeAmount(v: unknown) {
   return v != null && Number(v) < -0.005;
 }
 
-function trialBalanceAmountCell(v: unknown) {
+function formatTrialBalanceAmount(v: unknown) {
   if (v == null || Math.abs(Number(v)) < 0.005) return '';
   return Number(v).toFixed(2);
 }
 
+function trialBalanceAmountCell(v: unknown) {
+  return <CopyableReportAmount value={v} format="plain" />;
+}
+
 function amountCell(v: unknown) {
-  return trialBalanceAmountCell(v);
+  return formatTrialBalanceAmount(v);
 }
 
 function trialAmountColumn(
@@ -137,7 +142,7 @@ function trialSummaryCell(
 
   return (
     <Table.Summary.Cell index={index} align="right" className={classes || undefined}>
-      <strong>{trialBalanceAmountCell(value)}</strong>
+      <CopyableReportAmount value={value} format="plain" strong />
     </Table.Summary.Cell>
   );
 }
@@ -203,8 +208,8 @@ function TrialBalanceImbalanceTooltip({ data, period }) {
   if (!data.periodOccurrenceBalanced) {
     details.push(
       <li key="period">
-        本期发生额：借方 {trialBalanceAmountCell(data.totals.periodDebit) || '0.00'}，贷方{' '}
-        {trialBalanceAmountCell(data.totals.periodCredit) || '0.00'}，差额{' '}
+        本期发生额：借方 {formatTrialBalanceAmount(data.totals.periodDebit) || '0.00'}，贷方{' '}
+        {formatTrialBalanceAmount(data.totals.periodCredit) || '0.00'}，差额{' '}
         <strong>{Math.abs(data.periodOccurrenceDiff).toFixed(2)}</strong>
       </li>
     );
@@ -212,8 +217,8 @@ function TrialBalanceImbalanceTooltip({ data, period }) {
   if (!data.ytdOccurrenceBalanced) {
     details.push(
       <li key="ytd">
-        本年累计：借方 {trialBalanceAmountCell(data.totals.ytdDebit) || '0.00'}，贷方{' '}
-        {trialBalanceAmountCell(data.totals.ytdCredit) || '0.00'}，差额{' '}
+        本年累计：借方 {formatTrialBalanceAmount(data.totals.ytdDebit) || '0.00'}，贷方{' '}
+        {formatTrialBalanceAmount(data.totals.ytdCredit) || '0.00'}，差额{' '}
         <strong>{Math.abs(data.ytdOccurrenceDiff).toFixed(2)}</strong>
       </li>
     );

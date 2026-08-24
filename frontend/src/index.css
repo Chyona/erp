@@ -3688,6 +3688,18 @@ body,
   width: 100%;
 }
 
+.income-statement-view__col--label {
+  width: 38%;
+}
+
+.income-statement-view__col--index {
+  width: 56px;
+}
+
+.income-statement-view__col--amount {
+  width: 148px;
+}
+
 .balance-sheet-view__table,
 .income-statement-view__table {
   width: 100%;
@@ -3769,10 +3781,6 @@ body,
   font-weight: 600;
 }
 
-.balance-sheet-view__label--detail {
-  padding-left: 2em;
-}
-
 .balance-sheet-view__label--total,
 .balance-sheet-view__index--total,
 .balance-sheet-view__amount--total {
@@ -3815,9 +3823,30 @@ body,
 
 .income-statement-view__label {
   text-align: left;
+}
+
+.report-label-text {
+  display: block;
+  max-width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.report-label-text--indent-1 {
+  padding-inline-start: 2em;
+}
+
+.report-label-text--indent-2 {
+  padding-inline-start: 4em;
+}
+
+.report-label-text--indent-3 {
+  padding-inline-start: 6em;
+}
+
+.report-label-text--section {
+  font-weight: 600;
 }
 
 .income-statement-view__label--section {
@@ -3825,17 +3854,8 @@ body,
 }
 
 .income-statement-view__label--total,
-.income-statement-view__index--total,
-.income-statement-view__amount--total {
+.income-statement-view__index--total {
   font-weight: 600;
-}
-
-.income-statement-view__label--detail {
-  padding-left: 2em;
-}
-
-.income-statement-view__label--detail-sub {
-  padding-left: 4em;
 }
 
 .income-statement-view__index {
@@ -3848,6 +3868,65 @@ body,
   color: var(--app-table-amount);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.income-statement-view__amount--total {
+  color: var(--app-table-text);
+}
+
+.copyable-report-amount {
+  display: inline;
+  cursor: default;
+  white-space: nowrap;
+}
+
+.income-statement-view__amount .ant-tooltip-open,
+.balance-sheet-view__amount .ant-tooltip-open,
+.trial-balance-report .ant-table-cell .ant-tooltip-open {
+  display: inline !important;
+  max-width: none;
+  vertical-align: baseline;
+}
+
+.copyable-report-amount__text {
+  transition: color 0.15s;
+  white-space: nowrap;
+}
+
+.copyable-report-amount:hover .copyable-report-amount__text {
+  color: #6366f1;
+}
+
+.report-page__draft-amount .copyable-report-amount:hover .copyable-report-amount__text {
+  color: #dc2626;
+}
+
+.copyable-report-amount-tooltip .ant-tooltip-inner {
+  min-height: auto;
+  padding: 4px 10px;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+}
+
+.copyable-report-amount-tooltip .ant-tooltip-arrow::before {
+  background: #fff;
+}
+
+.copyable-report-amount-tooltip__action {
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #2563eb;
+  font-size: var(--app-font-size-sm);
+  line-height: 1.4;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.copyable-report-amount-tooltip__action:hover {
+  color: #1d4ed8;
 }
 
 .income-statement-view__fill {

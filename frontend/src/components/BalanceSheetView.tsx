@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { useTableHeaderGutter } from '../hooks/useTableHeaderGutter';
-import { formatReportAmount } from '../utils/reportAmount';
+import CopyableReportAmount from './CopyableReportAmount';
+import ReportLabelText from './ReportLabelText';
 
 function BalanceSheetColGroup() {
   return (
@@ -56,7 +57,7 @@ function SideCells({ side, record }) {
           className={`balance-sheet-view__label balance-sheet-view__label--section ${labelSplitClass}`
             .trim()}
         >
-          {label}
+          <ReportLabelText type="section" label={label} />
         </td>
         <td className="balance-sheet-view__index" />
         <td className="balance-sheet-view__amount" />
@@ -70,7 +71,6 @@ function SideCells({ side, record }) {
   const labelClass = [
     'balance-sheet-view__label',
     labelSplitClass,
-    type === 'detail' ? 'balance-sheet-view__label--detail' : '',
     isTotalRow ? 'balance-sheet-view__label--total' : ''
   ]
     .filter(Boolean)
@@ -95,13 +95,15 @@ function SideCells({ side, record }) {
 
   return (
     <>
-      <td className={labelClass}>{label}</td>
+      <td className={labelClass}>
+        <ReportLabelText type={type} label={label} total={isTotalRow} variant="balance-sheet" />
+      </td>
       <td className={indexClass}>{row ?? ''}</td>
       <td className={amountClass('', record[`${side}EndingDraft`])}>
-        {formatReportAmount(ending)}
+        <CopyableReportAmount value={ending} />
       </td>
       <td className={amountClass('balance-sheet-view__amount--year', record[`${side}OpeningDraft`])}>
-        {formatReportAmount(opening)}
+        <CopyableReportAmount value={opening} />
       </td>
     </>
   );
