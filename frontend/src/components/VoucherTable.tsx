@@ -797,16 +797,12 @@ export default function VoucherTable({
     {
       title: '备注',
       key: 'remark',
+      ellipsis: true,
       className: 'voucher-grouped-table__remark-col',
       onCell: (record) => resolveCellProps(record, 'remark', true),
       render: (_, record) => {
         if (isEmptyPlaceholderRow(record)) return null;
-        const remark = record.voucher.remark || '';
-        return (
-          <EllipsisText className="voucher-grouped-table__remark" tooltip={remark}>
-            {remark}
-          </EllipsisText>
-        );
+        return record.voucher.remark || '';
       }
     },
     {

@@ -83,7 +83,7 @@ export default function AccountsPage() {
 
   const columns = [
     { title: '编码', dataIndex: 'code', width: 100 },
-    { title: '名称', dataIndex: 'name', width: 160 },
+    { title: '名称', dataIndex: 'name', width: 160, ellipsis: true },
     { title: '类别', dataIndex: 'category', width: 160 },
     {
       title: '余额方向',

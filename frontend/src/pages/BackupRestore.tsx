@@ -5,6 +5,7 @@ import { ExclamationCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { Backup, formatBackupSize, formatBackupSource } from '../services/backup';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { useTabDataRefresh } from '../context/PageTabsContext';
 import { useAsyncLoading } from '../hooks/useAsyncLoading';
 import ScrollTable from '../components/ScrollTable';

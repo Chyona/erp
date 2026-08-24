@@ -1,3 +1,5 @@
+import EllipsisText from './EllipsisText';
+
 type ReportLabelTextProps = {
   type?: string;
   label?: string;
@@ -46,7 +48,7 @@ export default function ReportLabelText({
       : '';
 
   return (
-    <span
+    <EllipsisText
       className={[
         'report-label-text',
         reportLabelIndentClass(type, label, variant),
@@ -54,8 +56,9 @@ export default function ReportLabelText({
       ]
         .filter(Boolean)
         .join(' ')}
+      tooltip={label}
     >
       {label}
-    </span>
+    </EllipsisText>
   );
 }

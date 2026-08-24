@@ -22,6 +22,7 @@ import {
   type NavMenuGroup
 } from '../constants/navMenu';
 import { useAuth } from '../context/AuthContext';
+import EllipsisText from './EllipsisText';
 
 type NavIconSet = {
   outline: React.ReactNode;
@@ -155,7 +156,11 @@ export default function AppSidebar({ collapsed, theme }: AppSidebarProps) {
         }}
       >
         <NavIcon icons={icons} active={isHighlighted} />
-        {!collapsed ? <span className="sidebar-nav__label">{entry.label}</span> : null}
+        {!collapsed ? (
+          <EllipsisText className="sidebar-nav__label" tooltip={entry.label}>
+            {entry.label}
+          </EllipsisText>
+        ) : null}
       </button>
     );
   };

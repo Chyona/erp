@@ -1,4 +1,5 @@
 import type React from 'react';
+import type { TableProps } from 'antd';
 
 export const TABLE_ROW_GROUP_BASE = 'app-table-group--base';
 export const TABLE_ROW_GROUP_ALT = 'app-table-group--alt';
@@ -41,10 +42,8 @@ export function setTableGroupHover(tbody: HTMLElement | null, groupIndex: number
   });
 }
 
-type TableRowProps = Record<string, unknown> & {
-  onMouseEnter?: (event: React.MouseEvent<HTMLTableRowElement>) => void;
-  onMouseLeave?: (event: React.MouseEvent<HTMLTableRowElement>) => void;
-};
+type TableOnRow<T extends object> = NonNullable<TableProps<T>['onRow']>;
+type TableRowProps<T extends object> = ReturnType<TableOnRow<T>>;
 
 export function reportViewRowProps(index: number, record?: unknown, className = 'report-view__row') {
   const groupIndex = resolveTableRowGroupIndex(record, index);
@@ -63,8 +62,8 @@ export function reportViewRowProps(index: number, record?: unknown, className = 
 export function mergeTableOnRow<T extends object>(
   record: T,
   index: number | undefined,
-  userOnRow?: (record: T, index?: number) => TableRowProps
-) {
+  userOnRow?: TableProps<T>['onRow']
+): TableRowProps<T> {
   const user = userOnRow?.(record, index) ?? {};
   if (shouldExcludeTableStripe(record, String(user.className ?? ''))) {
     return user;
@@ -81,5 +80,5 @@ export function mergeTableOnRow<T extends object>(
       user.onMouseLeave?.(event);
       setTableGroupHover(event.currentTarget.closest('tbody'), groupIndex, false);
     }
-  };
+  } as TableRowProps<T>;
 }

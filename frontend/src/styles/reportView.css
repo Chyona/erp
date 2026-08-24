@@ -186,10 +186,8 @@
   border-inline-start: 2px solid var(--app-table-border-strong) !important;
 }
 
-.balance-sheet-view__label {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.report-label-text.ellipsis-text {
+  width: 100%;
 }
 
 /* --- 列宽：利润表 --- */
@@ -243,9 +241,6 @@
 .report-label-text {
   display: block;
   max-width: 100%;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .report-label-text--indent-1 {
