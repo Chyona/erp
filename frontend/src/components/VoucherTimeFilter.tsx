@@ -52,6 +52,7 @@ type VoucherTimeFilterProps = {
   onFilterOpenChange?: (open: boolean) => void;
   filterContent?: ReactNode;
   activeFilterCount?: number;
+  showFilter?: boolean;
 };
 
 function PeriodPanel({
@@ -114,7 +115,8 @@ export default function VoucherTimeFilter({
   filterOpen = false,
   onFilterOpenChange,
   filterContent,
-  activeFilterCount = 0
+  activeFilterCount = 0,
+  showFilter = true
 }: VoucherTimeFilterProps) {
   const [timeOpen, setTimeOpen] = useState(false);
   const [draftMode, setDraftMode] = useState<VoucherTimeMode>(value.mode);
@@ -390,23 +392,27 @@ export default function VoucherTimeFilter({
           {displayText}
         </button>
       </Popover>
-      <span className="voucher-time-filter-group__divider" aria-hidden />
-      <Popover
-        trigger="click"
-        placement="bottomLeft"
-        open={filterOpen}
-        onOpenChange={onFilterOpenChange}
-        classNames={{ root: 'voucher-filter-popover' }}
-        content={filterContent}
-      >
-        <button
-          type="button"
-          className={`voucher-time-filter-group__trigger${activeFilterCount ? ' voucher-time-filter-group__trigger--active' : ''}`}
-        >
-          <FilterOutlined className="voucher-time-filter-group__trigger-icon" />
-          过滤{activeFilterCount ? ` (${activeFilterCount})` : ''}
-        </button>
-      </Popover>
+      {showFilter ? (
+        <>
+          <span className="voucher-time-filter-group__divider" aria-hidden />
+          <Popover
+            trigger="click"
+            placement="bottomLeft"
+            open={filterOpen}
+            onOpenChange={onFilterOpenChange}
+            classNames={{ root: 'voucher-filter-popover' }}
+            content={filterContent}
+          >
+            <button
+              type="button"
+              className={`voucher-time-filter-group__trigger${activeFilterCount ? ' voucher-time-filter-group__trigger--active' : ''}`}
+            >
+              <FilterOutlined className="voucher-time-filter-group__trigger-icon" />
+              过滤{activeFilterCount ? ` (${activeFilterCount})` : ''}
+            </button>
+          </Popover>
+        </>
+      ) : null}
     </div>
   );
 }

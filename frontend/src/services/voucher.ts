@@ -1125,34 +1125,77 @@ async function getStats() {
 }
 
 async function getLedger(accountId, startDate, endDate) {
-  const vouchers = await getAll({ startDate, endDate, status: '' });
-  const approved = vouchers.filter((v) => v.status !== STATUS.DRAFT);
-  const rows = [];
-  let balance = 0;
+  const vouchers = await getAll({ status: '' });
   const account = await Accounts.getById(accountId);
   const isDebit = account ? account.direction === 'debit' : true;
   const accountCode = account?.code || '';
 
-  for (const v of approved.sort((a, b) => a.date.localeCompare(b.date))) {
-    for (const e of v.entries) {
+  const sorted = [...vouchers].sort(
+    (a, b) => a.date.localeCompare(b.date) || String(a.voucherNo).localeCompare(String(b.voucherNo))
+  );
+
+  const accumulateEntry = (balance, entry) => {
+    const sameAccount =
+      entry.accountId === accountId ||
+      (accountCode && entry.accountCode === accountCode);
+    if (!sameAccount) return balance;
+    const debit = parseFloat(String(entry.debit)) || 0;
+    const credit = parseFloat(String(entry.credit)) || 0;
+    return balance + (isDebit ? debit - credit : credit - debit);
+  };
+
+  let openingBalance = 0;
+  for (const voucher of sorted) {
+    if (startDate && voucher.date >= startDate) break;
+    if (voucher.status === STATUS.DRAFT) continue;
+    for (const entry of voucher.entries) {
+      openingBalance = accumulateEntry(openingBalance, entry);
+    }
+  }
+
+  const rows = [];
+  let approvedBalance = openingBalance;
+
+  if (startDate) {
+    rows.push({
+      date: startDate,
+      voucherNo: '',
+      summary: '期初余额',
+      debit: 0,
+      credit: 0,
+      balance: Math.round(openingBalance * 100) / 100,
+      isOpening: true
+    });
+  }
+
+  for (const voucher of sorted) {
+    if (startDate && voucher.date < startDate) continue;
+    if (endDate && voucher.date > endDate) continue;
+    const isDraft = voucher.status === STATUS.DRAFT;
+    for (const entry of voucher.entries) {
       const sameAccount =
-        e.accountId === accountId ||
-        (accountCode && e.accountCode === accountCode);
+        entry.accountId === accountId ||
+        (accountCode && entry.accountCode === accountCode);
       if (!sameAccount) continue;
-      const debit = parseFloat(String(e.debit)) || 0;
-      const credit = parseFloat(String(e.credit)) || 0;
-      balance += isDebit ? debit - credit : credit - debit;
+      const debit = parseFloat(String(entry.debit)) || 0;
+      const credit = parseFloat(String(entry.credit)) || 0;
+      if (!isDraft) {
+        approvedBalance = accumulateEntry(approvedBalance, entry);
+      }
       rows.push({
-        date: v.date,
-        voucherNo: v.voucherNo,
-        summary: e.summary,
+        date: voucher.date,
+        voucherNo: voucher.voucherNo,
+        voucherId: voucher.id,
+        summary: entry.summary,
         debit,
         credit,
-        balance: Math.round(balance * 100) / 100
+        balance: Math.round(approvedBalance * 100) / 100,
+        isDraft
       });
     }
   }
-  return { account, rows, endingBalance: balance };
+
+  return { account, rows, endingBalance: approvedBalance, openingBalance };
 }
 
 function formatMoney(n) {

@@ -37,9 +37,18 @@ function toDebitCreditColumns(balance, direction) {
   return { debit: null, credit: b };
 }
 
-async function getApprovedVouchersUpTo(endDate) {
-  const vouchers = await Voucher.getAll({ endDate, status: '' });
-  return vouchers.filter((v) => v.status !== Voucher.STATUS.DRAFT);
+async function getVouchersUpTo(endDate: string) {
+  return Voucher.getAll({ endDate, status: '' });
+}
+
+function isDraftVoucher(v: VoucherRecord) {
+  return v.status === Voucher.STATUS.DRAFT;
+}
+
+function moneyDiffers(a: number | null | undefined, b: number | null | undefined) {
+  const na = a == null ? 0 : roundMoney(a);
+  const nb = b == null ? 0 : roundMoney(b);
+  return Math.abs(na - nb) >= 0.005;
 }
 
 function buildAccountSums(
@@ -254,22 +263,33 @@ function resolvePreviousPeriodProfitLossClosed(
   return false;
 }
 
-/**
- * 报表统一账簿：凭证 → 科目汇总（科目余额表的数据源）
- * 利润表、资产负债表均从此结构取数，不再各自独立扫凭证。
- */
-async function buildReportLedger(startDate, endDate, reportPeriod = null) {
-  const accounts = await Accounts.getAll();
-  const vouchers = await getApprovedVouchersUpTo(endDate);
+type LedgerAccountRow = {
+  account: Account;
+  opening: { debit: number; credit: number };
+  period: { debit: number; credit: number };
+  periodBusiness: { debit: number; credit: number };
+  ytd: { debit: number; credit: number };
+  ytdBusiness: { debit: number; credit: number };
+  beforePeriod: { debit: number; credit: number };
+  beforePeriodBusiness: { debit: number; credit: number };
+  openingYear: { debit: number; credit: number };
+  ending: { debit: number; credit: number };
+  openingBalance: number;
+  openingYearBalance: number;
+  endingBalance: number;
+  periodNetAmount: number;
+  ytdNetAmount: number;
+};
+
+function buildLedgerAccountRows(
+  accounts: Account[],
+  vouchers: VoucherRecord[],
+  startDate: string,
+  endDate: string
+): LedgerAccountRow[] {
   const yearStart = `${endDate.slice(0, 4)}-01-01`;
   const beforePeriodEndDate = dayjs(startDate).subtract(1, 'day').format('YYYY-MM-DD');
   const hasBeforePeriodInYear = beforePeriodEndDate >= yearStart;
-  const periodProfitLossClosed =
-    reportPeriod != null && hasProfitLossClosing(vouchers, reportPeriod);
-  const previousPeriodProfitLossClosed = resolvePreviousPeriodProfitLossClosed(
-    vouchers,
-    reportPeriod
-  );
 
   const openingSums = buildAccountSums(vouchers, { beforeDate: startDate });
   const periodSums = buildAccountSums(vouchers, { fromDate: startDate, toDate: endDate });
@@ -297,7 +317,7 @@ async function buildReportLedger(startDate, endDate, reportPeriod = null) {
   const openingYearSums = buildAccountSums(vouchers, { beforeDate: yearStart });
   const endingSums = buildAccountSums(vouchers, { toDate: endDate });
 
-  const accountRows = accounts.map((account) => {
+  return accounts.map((account) => {
     const opening = sumSums(openingSums, account.code);
     const period = sumSums(periodSums, account.code);
     const periodBusiness = sumSums(periodBusinessSums, account.code);
@@ -326,7 +346,6 @@ async function buildReportLedger(startDate, endDate, reportPeriod = null) {
         account.direction
       ),
       endingBalance: accountBalance(ending.debit, ending.credit, account.direction),
-      /** 利润表取数：periodBusiness / ytdBusiness 经 profitStatementLineAmount 计算 */
       periodNetAmount: profitStatementLineAmount(
         periodBusiness.debit,
         periodBusiness.credit,
@@ -339,6 +358,34 @@ async function buildReportLedger(startDate, endDate, reportPeriod = null) {
       )
     };
   });
+}
+
+/**
+ * 报表统一账簿：凭证 → 科目汇总（科目余额表的数据源）
+ * 展示含未审核凭证；损益结转判断仍仅依据已审核凭证。
+ */
+async function buildReportLedger(startDate, endDate, reportPeriod = null) {
+  const accounts = await Accounts.getAll();
+  const allVouchers = await getVouchersUpTo(endDate);
+  const approvedVouchers = allVouchers.filter((v) => !isDraftVoucher(v));
+  const yearStart = `${endDate.slice(0, 4)}-01-01`;
+  const periodProfitLossClosed =
+    reportPeriod != null && hasProfitLossClosing(approvedVouchers, reportPeriod);
+  const previousPeriodProfitLossClosed = resolvePreviousPeriodProfitLossClosed(
+    approvedVouchers,
+    reportPeriod
+  );
+
+  const accountRows = buildLedgerAccountRows(accounts, allVouchers, startDate, endDate);
+  const approvedAccountRows = buildLedgerAccountRows(
+    accounts,
+    approvedVouchers,
+    startDate,
+    endDate
+  );
+  const hasDraftInPeriod = allVouchers.some(
+    (v) => isDraftVoucher(v) && v.date >= startDate && v.date <= endDate
+  );
 
   return {
     startDate,
@@ -346,9 +393,33 @@ async function buildReportLedger(startDate, endDate, reportPeriod = null) {
     yearStart,
     accounts,
     accountRows,
+    approvedAccountRows,
+    hasDraftInPeriod,
     periodProfitLossClosed,
     previousPeriodProfitLossClosed
   };
+}
+
+function compileTrialBalanceColumns(
+  account: Account,
+  row: LedgerAccountRow,
+  ledger: Awaited<ReturnType<typeof buildReportLedger>>
+) {
+  const openingCols = toDebitCreditColumns(row.openingBalance, account.direction);
+  const endingCols = toDebitCreditColumns(row.endingBalance, account.direction);
+  const periodCols = trialBalanceOccurrenceColumns(
+    account,
+    row.period,
+    row.periodBusiness,
+    ledger.periodProfitLossClosed
+  );
+  const ytdCols = trialBalanceYtdOccurrenceColumns(
+    account,
+    row,
+    ledger.periodProfitLossClosed,
+    ledger.previousPeriodProfitLossClosed
+  );
+  return { openingCols, endingCols, periodCols, ytdCols };
 }
 
 function compileTrialBalanceFromLedger(ledger: Awaited<ReturnType<typeof buildReportLedger>>) {
@@ -363,23 +434,27 @@ function compileTrialBalanceFromLedger(ledger: Awaited<ReturnType<typeof buildRe
     endingDebit: 0,
     endingCredit: 0
   };
+  const approvedTotals = {
+    openingDebit: 0,
+    openingCredit: 0,
+    periodDebit: 0,
+    periodCredit: 0,
+    ytdDebit: 0,
+    ytdCredit: 0,
+    endingDebit: 0,
+    endingCredit: 0
+  };
 
-  for (const row of ledger.accountRows) {
+  for (let i = 0; i < ledger.accountRows.length; i += 1) {
+    const row = ledger.accountRows[i];
+    const approvedRow = ledger.approvedAccountRows[i];
     const { account } = row;
-    const openingCols = toDebitCreditColumns(row.openingBalance, account.direction);
-    const endingCols = toDebitCreditColumns(row.endingBalance, account.direction);
-    const periodCols = trialBalanceOccurrenceColumns(
-      account,
-      row.period,
-      row.periodBusiness,
-      ledger.periodProfitLossClosed
-    );
-    const ytdCols = trialBalanceYtdOccurrenceColumns(
+    const { openingCols, endingCols, periodCols, ytdCols } = compileTrialBalanceColumns(
       account,
       row,
-      ledger.periodProfitLossClosed,
-      ledger.previousPeriodProfitLossClosed
+      ledger
     );
+    const approvedCompiled = compileTrialBalanceColumns(account, approvedRow, ledger);
 
     rows.push({
       key: account.id,
@@ -393,7 +468,17 @@ function compileTrialBalanceFromLedger(ledger: Awaited<ReturnType<typeof buildRe
       ytdDebit: ytdCols.debit,
       ytdCredit: ytdCols.credit,
       endingDebit: endingCols.debit,
-      endingCredit: endingCols.credit
+      endingCredit: endingCols.credit,
+      draftFlags: {
+        openingDebit: moneyDiffers(openingCols.debit, approvedCompiled.openingCols.debit),
+        openingCredit: moneyDiffers(openingCols.credit, approvedCompiled.openingCols.credit),
+        periodDebit: moneyDiffers(periodCols.debit, approvedCompiled.periodCols.debit),
+        periodCredit: moneyDiffers(periodCols.credit, approvedCompiled.periodCols.credit),
+        ytdDebit: moneyDiffers(ytdCols.debit, approvedCompiled.ytdCols.debit),
+        ytdCredit: moneyDiffers(ytdCols.credit, approvedCompiled.ytdCols.credit),
+        endingDebit: moneyDiffers(endingCols.debit, approvedCompiled.endingCols.debit),
+        endingCredit: moneyDiffers(endingCols.credit, approvedCompiled.endingCols.credit)
+      }
     });
 
     totals.openingDebit += openingCols.debit || 0;
@@ -404,17 +489,41 @@ function compileTrialBalanceFromLedger(ledger: Awaited<ReturnType<typeof buildRe
     totals.ytdCredit += ytdCols.credit || 0;
     totals.endingDebit += endingCols.debit || 0;
     totals.endingCredit += endingCols.credit || 0;
+
+    approvedTotals.openingDebit += approvedCompiled.openingCols.debit || 0;
+    approvedTotals.openingCredit += approvedCompiled.openingCols.credit || 0;
+    approvedTotals.periodDebit += approvedCompiled.periodCols.debit || 0;
+    approvedTotals.periodCredit += approvedCompiled.periodCols.credit || 0;
+    approvedTotals.ytdDebit += approvedCompiled.ytdCols.debit || 0;
+    approvedTotals.ytdCredit += approvedCompiled.ytdCols.credit || 0;
+    approvedTotals.endingDebit += approvedCompiled.endingCols.debit || 0;
+    approvedTotals.endingCredit += approvedCompiled.endingCols.credit || 0;
   }
+
+  const totalDraftFlags = {
+    openingDebit: moneyDiffers(totals.openingDebit, approvedTotals.openingDebit),
+    openingCredit: moneyDiffers(totals.openingCredit, approvedTotals.openingCredit),
+    periodDebit: moneyDiffers(totals.periodDebit, approvedTotals.periodDebit),
+    periodCredit: moneyDiffers(totals.periodCredit, approvedTotals.periodCredit),
+    ytdDebit: moneyDiffers(totals.ytdDebit, approvedTotals.ytdDebit),
+    ytdCredit: moneyDiffers(totals.ytdCredit, approvedTotals.ytdCredit),
+    endingDebit: moneyDiffers(totals.endingDebit, approvedTotals.endingDebit),
+    endingCredit: moneyDiffers(totals.endingCredit, approvedTotals.endingCredit)
+  };
 
   return {
     startDate: ledger.startDate,
     endDate: ledger.endDate,
     yearStart: ledger.yearStart,
+    hasDraftInPeriod: ledger.hasDraftInPeriod,
     rows,
-    periodOccurrenceBalanced: totalsBalanced(totals.periodDebit, totals.periodCredit),
-    ytdOccurrenceBalanced: totalsBalanced(totals.ytdDebit, totals.ytdCredit),
-    periodOccurrenceDiff: roundMoney(totals.periodDebit - totals.periodCredit),
-    ytdOccurrenceDiff: roundMoney(totals.ytdDebit - totals.ytdCredit),
+    periodOccurrenceBalanced: totalsBalanced(
+      approvedTotals.periodDebit,
+      approvedTotals.periodCredit
+    ),
+    ytdOccurrenceBalanced: totalsBalanced(approvedTotals.ytdDebit, approvedTotals.ytdCredit),
+    periodOccurrenceDiff: roundMoney(approvedTotals.periodDebit - approvedTotals.periodCredit),
+    ytdOccurrenceDiff: roundMoney(approvedTotals.ytdDebit - approvedTotals.ytdCredit),
     periodProfitLossClosed: ledger.periodProfitLossClosed,
     totals: {
       openingDebit: blankMoney(totals.openingDebit),
@@ -425,7 +534,8 @@ function compileTrialBalanceFromLedger(ledger: Awaited<ReturnType<typeof buildRe
       ytdCredit: blankMoney(totals.ytdCredit),
       endingDebit: blankMoney(totals.endingDebit),
       endingCredit: blankMoney(totals.endingCredit)
-    }
+    },
+    totalDraftFlags
   };
 }
 
@@ -434,13 +544,13 @@ async function getTrialBalance(startDate, endDate, reportPeriod = null) {
   return compileTrialBalanceFromLedger(ledger);
 }
 
-/** 从科目账簿编利润表：仅取 periodNetAmount / ytdNetAmount（已排除结转损益） */
 function buildPLByCodeFromLedger(
   ledger: Awaited<ReturnType<typeof buildReportLedger>>,
-  netKey: 'periodNetAmount' | 'ytdNetAmount'
+  netKey: 'periodNetAmount' | 'ytdNetAmount',
+  rowsKey: 'accountRows' | 'approvedAccountRows' = 'accountRows'
 ) {
   const byCode = new Map<string, number>();
-  for (const row of ledger.accountRows) {
+  for (const row of ledger[rowsKey]) {
     if (!isProfitLossOrCostAccount(row.account)) continue;
     byCode.set(row.account.code, row[netKey]);
   }
@@ -480,11 +590,13 @@ function compileIncomeStatement(byCode: Map<string, number>) {
   return { rows, values };
 }
 
-function mapIncomeStatementRows(periodRows, ytdRows) {
+function mapIncomeStatementRows(periodRows, ytdRows, periodApprovedRows, ytdApprovedRows) {
   return periodRows.map((row, index) => ({
     ...row,
     periodAmount: blankMoney(row.amount),
-    ytdAmount: blankMoney(ytdRows[index]?.amount ?? 0)
+    ytdAmount: blankMoney(ytdRows[index]?.amount ?? 0),
+    periodDraft: moneyDiffers(row.amount, periodApprovedRows[index]?.amount ?? 0),
+    ytdDraft: moneyDiffers(ytdRows[index]?.amount ?? 0, ytdApprovedRows[index]?.amount ?? 0)
   }));
 }
 
@@ -492,15 +604,33 @@ async function getIncomeStatement(startDate, endDate) {
   const ledger = await buildReportLedger(startDate, endDate);
   const periodByCode = buildPLByCodeFromLedger(ledger, 'periodNetAmount');
   const ytdByCode = buildPLByCodeFromLedger(ledger, 'ytdNetAmount');
+  const periodApprovedByCode = buildPLByCodeFromLedger(
+    ledger,
+    'periodNetAmount',
+    'approvedAccountRows'
+  );
+  const ytdApprovedByCode = buildPLByCodeFromLedger(
+    ledger,
+    'ytdNetAmount',
+    'approvedAccountRows'
+  );
   const period = compileIncomeStatement(periodByCode);
   const ytd = compileIncomeStatement(ytdByCode);
+  const periodApproved = compileIncomeStatement(periodApprovedByCode);
+  const ytdApproved = compileIncomeStatement(ytdApprovedByCode);
 
-  const rows = mapIncomeStatementRows(period.rows, ytd.rows);
+  const rows = mapIncomeStatementRows(
+    period.rows,
+    ytd.rows,
+    periodApproved.rows,
+    ytdApproved.rows
+  );
 
   return {
     startDate: ledger.startDate,
     endDate: ledger.endDate,
     yearStart: ledger.yearStart,
+    hasDraftInPeriod: ledger.hasDraftInPeriod,
     rows,
     summary: {
       operatingProfit: period.values.operatingProfit,
@@ -513,10 +643,28 @@ async function getIncomeStatement(startDate, endDate) {
   };
 }
 
+function attachBalanceSheetDraftFlags(displayRows, approvedRows) {
+  return displayRows.map((row, index) => ({
+    ...row,
+    openingDraft: moneyDiffers(row.opening, approvedRows[index]?.opening),
+    endingDraft: moneyDiffers(row.ending, approvedRows[index]?.ending)
+  }));
+}
+
 async function getBalanceSheet(startDate, endDate) {
   const ledger = await buildReportLedger(startDate, endDate);
   const openingCtx = buildBalanceContextFromLedger(ledger, 'openingYearBalance');
   const endingCtx = buildBalanceContextFromLedger(ledger, 'endingBalance');
+  const openingApprovedCtx = buildBalanceContextFromLedger(
+    ledger,
+    'openingYearBalance',
+    'approvedAccountRows'
+  );
+  const endingApprovedCtx = buildBalanceContextFromLedger(
+    ledger,
+    'endingBalance',
+    'approvedAccountRows'
+  );
 
   const assetsCompiled = compileBalanceSheetSide(BALANCE_SHEET_ASSETS, openingCtx, endingCtx);
   const liabilitiesCompiled = compileBalanceSheetSide(
@@ -524,37 +672,64 @@ async function getBalanceSheet(startDate, endDate) {
     openingCtx,
     endingCtx
   );
+  const assetsApprovedCompiled = compileBalanceSheetSide(
+    BALANCE_SHEET_ASSETS,
+    openingApprovedCtx,
+    endingApprovedCtx
+  );
+  const liabilitiesApprovedCompiled = compileBalanceSheetSide(
+    BALANCE_SHEET_LIABILITIES,
+    openingApprovedCtx,
+    endingApprovedCtx
+  );
 
-  const assets = { rows: assetsCompiled.rows };
-  const liabilities = { rows: liabilitiesCompiled.rows };
+  const assets = {
+    rows: attachBalanceSheetDraftFlags(assetsCompiled.rows, assetsApprovedCompiled.rows)
+  };
+  const liabilities = {
+    rows: attachBalanceSheetDraftFlags(
+      liabilitiesCompiled.rows,
+      liabilitiesApprovedCompiled.rows
+    )
+  };
 
   const totalAssetsOpening = assetsCompiled.openingValues.assetsTotal ?? 0;
   const totalAssetsEnding = assetsCompiled.endingValues.assetsTotal ?? 0;
   const totalLEOpening = liabilitiesCompiled.openingValues.liabilitiesEquityTotal ?? 0;
   const totalLEEnding = liabilitiesCompiled.endingValues.liabilitiesEquityTotal ?? 0;
+  const totalAssetsOpeningApproved = assetsApprovedCompiled.openingValues.assetsTotal ?? 0;
+  const totalAssetsEndingApproved = assetsApprovedCompiled.endingValues.assetsTotal ?? 0;
+  const totalLEOpeningApproved =
+    liabilitiesApprovedCompiled.openingValues.liabilitiesEquityTotal ?? 0;
+  const totalLEEndingApproved =
+    liabilitiesApprovedCompiled.endingValues.liabilitiesEquityTotal ?? 0;
 
   return {
     startDate: ledger.startDate,
     endDate: ledger.endDate,
+    hasDraftInPeriod: ledger.hasDraftInPeriod,
     assets,
     liabilities,
     totalAssetsOpening,
     totalAssetsEnding,
     totalLiabilitiesEquityOpening: totalLEOpening,
     totalLiabilitiesEquityEnding: totalLEEnding,
-    balanced: Math.abs(totalAssetsEnding - totalLEEnding) < 0.01
+    balanced: Math.abs(totalAssetsEnding - totalLEEnding) < 0.01,
+    balancedApproved:
+      Math.abs(totalAssetsEndingApproved - totalLEEndingApproved) < 0.01
   };
 }
 
 /** 从科目账簿取各科目余额，供资产负债表编表 */
 function buildBalanceContextFromLedger(
   ledger: Awaited<ReturnType<typeof buildReportLedger>>,
-  balanceKey: 'openingYearBalance' | 'endingBalance'
+  balanceKey: 'openingYearBalance' | 'endingBalance',
+  rowsKey: 'accountRows' | 'approvedAccountRows' = 'accountRows'
 ) {
   const byCode = new Map<string, number>();
   let unreclosedProfit = 0;
 
-  for (const row of ledger.accountRows) {
+  for (const row of ledger[rowsKey]) {
     const bal = row[balanceKey];
     byCode.set(row.account.code, bal);
 

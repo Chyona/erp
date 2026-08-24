@@ -155,10 +155,13 @@ export type StoreName =
 export interface LedgerRow {
   date: string;
   voucherNo: string;
+  voucherId?: string;
   summary: string;
   debit: number;
   credit: number;
   balance: number;
+  isOpening?: boolean;
+  isDraft?: boolean;
 }
 
 export interface LedgerResult {
@@ -229,6 +232,8 @@ export interface BalanceSheetSideRow {
   row?: number | null;
   opening?: number | null;
   ending?: number | null;
+  openingDraft?: boolean;
+  endingDraft?: boolean;
 }
 
 export interface BalanceSheetMergedRow {
@@ -238,9 +243,13 @@ export interface BalanceSheetMergedRow {
   assetRow?: string | number;
   assetEnding?: number | null;
   assetOpening?: number | null;
+  assetOpeningDraft?: boolean;
+  assetEndingDraft?: boolean;
   liabilityLabel?: string;
   liabilityType?: string | null;
   liabilityRow?: string | number;
   liabilityEnding?: number | null;
   liabilityOpening?: number | null;
+  liabilityOpeningDraft?: boolean;
+  liabilityEndingDraft?: boolean;
 }

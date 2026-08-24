@@ -9,7 +9,9 @@ function sideFields(side: Side, row: BalanceSheetSideRow | null) {
       [`${side}Type`]: null,
       [`${side}Row`]: '',
       [`${side}Ending`]: null,
-      [`${side}Opening`]: null
+      [`${side}Opening`]: null,
+      [`${side}EndingDraft`]: false,
+      [`${side}OpeningDraft`]: false
     };
   }
   return {
@@ -17,7 +19,9 @@ function sideFields(side: Side, row: BalanceSheetSideRow | null) {
     [`${side}Type`]: row.type,
     [`${side}Row`]: row.row ?? '',
     [`${side}Ending`]: row.ending ?? null,
-    [`${side}Opening`]: row.opening ?? null
+    [`${side}Opening`]: row.opening ?? null,
+    [`${side}EndingDraft`]: row.endingDraft ?? false,
+    [`${side}OpeningDraft`]: row.openingDraft ?? false
   };
 }
 

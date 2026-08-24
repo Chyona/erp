@@ -46,7 +46,10 @@ function trialAmountColumn(
   title: string,
   dataIndex: string,
   width: number,
-  highlightNegative = false
+  {
+    highlightNegative = false,
+    draftFlagKey
+  }: { highlightNegative?: boolean; draftFlagKey?: string } = {}
 ) {
   return {
     title,
@@ -54,12 +57,19 @@ function trialAmountColumn(
     align: 'right' as const,
     width,
     render: trialBalanceAmountCell,
-    onCell: highlightNegative
-      ? (record: Record<string, unknown>) =>
-          isNegativeAmount(record[dataIndex])
-            ? { className: 'trial-balance-report__cell--negative' }
-            : {}
-      : undefined
+    onCell: (record: Record<string, unknown>) => {
+      const classes: string[] = [];
+      if (highlightNegative && isNegativeAmount(record[dataIndex])) {
+        classes.push('trial-balance-report__cell--negative');
+      }
+      if (
+        draftFlagKey &&
+        (record.draftFlags as Record<string, boolean> | undefined)?.[draftFlagKey]
+      ) {
+        classes.push('report-page__draft-amount');
+      }
+      return classes.length ? { className: classes.join(' ') } : {};
+    }
   };
 }
 
@@ -72,40 +82,60 @@ const trialColumns: ColumnsType<any> = [
   {
     title: '期初余额',
     children: [
-      trialAmountColumn('借方', 'openingDebit', 110, true),
-      trialAmountColumn('贷方', 'openingCredit', 110, true)
+      trialAmountColumn('借方', 'openingDebit', 110, {
+        highlightNegative: true,
+        draftFlagKey: 'openingDebit'
+      }),
+      trialAmountColumn('贷方', 'openingCredit', 110, {
+        highlightNegative: true,
+        draftFlagKey: 'openingCredit'
+      })
     ]
   },
   {
     title: '本期发生额',
     children: [
-      trialAmountColumn('借方', 'periodDebit', 110),
-      trialAmountColumn('贷方', 'periodCredit', 110)
+      trialAmountColumn('借方', 'periodDebit', 110, { draftFlagKey: 'periodDebit' }),
+      trialAmountColumn('贷方', 'periodCredit', 110, { draftFlagKey: 'periodCredit' })
     ]
   },
   {
     title: '本年累计发生额',
     children: [
-      trialAmountColumn('借方', 'ytdDebit', 120),
-      trialAmountColumn('贷方', 'ytdCredit', 120)
+      trialAmountColumn('借方', 'ytdDebit', 120, { draftFlagKey: 'ytdDebit' }),
+      trialAmountColumn('贷方', 'ytdCredit', 120, { draftFlagKey: 'ytdCredit' })
     ]
   },
   {
     title: '期末余额',
     children: [
-      trialAmountColumn('借方', 'endingDebit', 110, true),
-      trialAmountColumn('贷方', 'endingCredit', 110, true)
+      trialAmountColumn('借方', 'endingDebit', 110, {
+        highlightNegative: true,
+        draftFlagKey: 'endingDebit'
+      }),
+      trialAmountColumn('贷方', 'endingCredit', 110, {
+        highlightNegative: true,
+        draftFlagKey: 'endingCredit'
+      })
     ]
   }
 ];
 
-function trialSummaryCell(index: number, value: unknown) {
+function trialSummaryCell(
+  index: number,
+  value: unknown,
+  draftFlagKey?: string,
+  draftFlags?: Record<string, boolean>
+) {
+  const classes = [
+    isNegativeAmount(value) ? 'trial-balance-report__cell--negative' : '',
+    draftFlagKey && draftFlags?.[draftFlagKey] ? 'report-page__draft-amount' : ''
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
-    <Table.Summary.Cell
-      index={index}
-      align="right"
-      className={isNegativeAmount(value) ? 'trial-balance-report__cell--negative' : undefined}
-    >
+    <Table.Summary.Cell index={index} align="right" className={classes || undefined}>
       <strong>{trialBalanceAmountCell(value)}</strong>
     </Table.Summary.Cell>
   );
@@ -213,7 +243,23 @@ function TrialBalanceImbalanceTooltip({ data, period }) {
   );
 }
 
-function TrialBalanceTab({ period, dateRange, refreshToken, onHeaderAlertChange }) {
+function resolveReportHeaderAlert(data, period) {
+  if (!data) return null;
+
+  const periodDebit = Number(data.totals?.periodDebit) || 0;
+  const periodCredit = Number(data.totals?.periodCredit) || 0;
+  const hasPeriodActivity = Math.abs(periodDebit) > 0.005 || Math.abs(periodCredit) > 0.005;
+
+  if (!data.periodOccurrenceBalanced || !data.ytdOccurrenceBalanced) {
+    return { kind: 'imbalance', data, period };
+  }
+  if (!data.periodProfitLossClosed && hasPeriodActivity) {
+    return { kind: 'unclosed', data, period };
+  }
+  return null;
+}
+
+function TrialBalanceTab({ period, dateRange, refreshToken }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -233,32 +279,11 @@ function TrialBalanceTab({ period, dateRange, refreshToken, onHeaderAlertChange 
     handleQuery();
   }, [dateRange, refreshToken]);
 
-  useEffect(() => {
-    if (!data) {
-      onHeaderAlertChange?.(null);
-      return () => onHeaderAlertChange?.(null);
-    }
-
-    const periodDebit = Number(data.totals?.periodDebit) || 0;
-    const periodCredit = Number(data.totals?.periodCredit) || 0;
-    const hasPeriodActivity = Math.abs(periodDebit) > 0.005 || Math.abs(periodCredit) > 0.005;
-
-    if (!data.periodOccurrenceBalanced || !data.ytdOccurrenceBalanced) {
-      onHeaderAlertChange?.({ kind: 'imbalance', data, period });
-    } else if (!data.periodProfitLossClosed && hasPeriodActivity) {
-      // 本期无发生额时不提示「未结转」，避免空报表误导
-      onHeaderAlertChange?.({ kind: 'unclosed', data, period });
-    } else {
-      onHeaderAlertChange?.(null);
-    }
-
-    return () => onHeaderAlertChange?.(null);
-  }, [data, period, onHeaderAlertChange]);
-
   return (
     <div className="report-tab-panel">
       <div className="trial-balance-report">
         <ScrollTable
+          fillPage
           autoHeight
           rowKey="key"
           columns={trialColumns}
@@ -269,7 +294,7 @@ function TrialBalanceTab({ period, dateRange, refreshToken, onHeaderAlertChange 
           size="small"
           tableLayout="fixed"
           scroll={{ x: TRIAL_BALANCE_SCROLL_X }}
-          locale={{ emptyText: '请选择期间并查询（仅统计已审核/已结项凭证）' }}
+          locale={{ emptyText: '请选择期间并查询' }}
           summary={() =>
             data?.rows?.length ? (
               <Table.Summary fixed>
@@ -277,14 +302,14 @@ function TrialBalanceTab({ period, dateRange, refreshToken, onHeaderAlertChange 
                   <Table.Summary.Cell index={0} colSpan={3}>
                     <strong>合计</strong>
                   </Table.Summary.Cell>
-                  {trialSummaryCell(3, data.totals.openingDebit)}
-                  {trialSummaryCell(4, data.totals.openingCredit)}
-                  {trialSummaryCell(5, data.totals.periodDebit)}
-                  {trialSummaryCell(6, data.totals.periodCredit)}
-                  {trialSummaryCell(7, data.totals.ytdDebit)}
-                  {trialSummaryCell(8, data.totals.ytdCredit)}
-                  {trialSummaryCell(9, data.totals.endingDebit)}
-                  {trialSummaryCell(10, data.totals.endingCredit)}
+                  {trialSummaryCell(3, data.totals.openingDebit, 'openingDebit', data.totalDraftFlags)}
+                  {trialSummaryCell(4, data.totals.openingCredit, 'openingCredit', data.totalDraftFlags)}
+                  {trialSummaryCell(5, data.totals.periodDebit, 'periodDebit', data.totalDraftFlags)}
+                  {trialSummaryCell(6, data.totals.periodCredit, 'periodCredit', data.totalDraftFlags)}
+                  {trialSummaryCell(7, data.totals.ytdDebit, 'ytdDebit', data.totalDraftFlags)}
+                  {trialSummaryCell(8, data.totals.ytdCredit, 'ytdCredit', data.totalDraftFlags)}
+                  {trialSummaryCell(9, data.totals.endingDebit, 'endingDebit', data.totalDraftFlags)}
+                  {trialSummaryCell(10, data.totals.endingCredit, 'endingCredit', data.totalDraftFlags)}
                 </Table.Summary.Row>
               </Table.Summary>
             ) : null
@@ -356,7 +381,7 @@ function BalanceSheetTab({ dateRange, refreshToken }) {
 
   return (
     <div className="report-tab-panel">
-      {data && !data.balanced && (
+      {data && !data.balancedApproved && (
         <Alert
           type="warning"
           showIcon
@@ -383,9 +408,31 @@ export default function Reports() {
   const [period, setPeriod] = useState(defaultReportsPeriod);
   const [refreshToken, setRefreshToken] = useState(0);
   const [activeTab, setActiveTab] = useState('trial');
-  const [trialHeaderAlert, setTrialHeaderAlert] = useState(null);
+  const [reportHeaderAlert, setReportHeaderAlert] = useState(null);
   const [exporting, setExporting] = useState(false);
   const dateRange = useMemo(() => reportPeriodToDateRange(period), [period]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadReportAlert = async () => {
+      const start = dateRange[0].format('YYYY-MM-DD');
+      const end = dateRange[1].format('YYYY-MM-DD');
+      try {
+        const data = await ReportsService.getTrialBalance(start, end, period);
+        if (!cancelled) {
+          setReportHeaderAlert(resolveReportHeaderAlert(data, period));
+        }
+      } catch {
+        if (!cancelled) setReportHeaderAlert(null);
+      }
+    };
+
+    void loadReportAlert();
+    return () => {
+      cancelled = true;
+    };
+  }, [dateRange, period, refreshToken]);
 
   const handleExportAll = async (withAttachments = false) => {
     const start = dateRange[0].format('YYYY-MM-DD');
@@ -459,7 +506,6 @@ export default function Reports() {
           period={period}
           dateRange={dateRange}
           refreshToken={refreshToken}
-          onHeaderAlertChange={setTrialHeaderAlert}
         />
       )
     },
@@ -482,16 +528,19 @@ export default function Reports() {
           <Title level={2} style={{ margin: 0 }}>
             财务报表
           </Title>
-          <Text type="secondary">基于已审核、已结项凭证汇总；草稿凭证不参与统计</Text>
+          <Text type="secondary">
+            含未审核凭证预览；<span className="report-page__draft-amount">红色金额</span>
+            表示含未审核贡献。导出表格与页面一致；凭证清单仍仅含已审核。
+          </Text>
         </div>
         <div className="report-page-header__actions">
-          {activeTab === 'trial' && trialHeaderAlert ? (
+          {reportHeaderAlert ? (
             <Tooltip
               title={
-                trialHeaderAlert.kind === 'imbalance' ? (
-                  <TrialBalanceImbalanceTooltip {...trialHeaderAlert} />
+                reportHeaderAlert.kind === 'imbalance' ? (
+                  <TrialBalanceImbalanceTooltip {...reportHeaderAlert} />
                 ) : (
-                  <TrialBalanceUnclosedTooltip period={trialHeaderAlert.period} />
+                  <TrialBalanceUnclosedTooltip period={reportHeaderAlert.period} />
                 )
               }
               placement="bottomRight"
@@ -502,7 +551,7 @@ export default function Reports() {
                 className="report-trial-imbalance-icon"
                 role="img"
                 aria-label={
-                  trialHeaderAlert.kind === 'imbalance'
+                  reportHeaderAlert.kind === 'imbalance'
                     ? '发生额借贷不平衡'
                     : '尚未完成损益结转'
                 }

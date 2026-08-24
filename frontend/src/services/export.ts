@@ -3,6 +3,7 @@ import { ErpApi } from './erpApi';
 import { resolveAttachmentDisplayName } from '../utils/attachmentName';
 import { mergeBalanceSheetRows } from '../utils/balanceSheetRows';
 import { formatStoredTaxExemptionPeriod } from '../utils/reportPeriod';
+import { formatBalanceDirection } from '../utils/ledgerDisplay';
 
 function downloadBlob(content, filename, type = 'text/plain;charset=utf-8') {
   const blob = new Blob(['\ufeff' + content], { type });
@@ -649,13 +650,20 @@ async function exportFinancialReportsWorkbook({
 }
 
 function ledgerToCSV(ledger) {
-  const headers = ['日期', '凭证号', '摘要', '借方', '贷方', '余额'];
+  const headers = ['日期', '凭证字号', '摘要', '借方', '贷方', '方向', '余额', '状态'];
   const rows = [headers.join(',')];
   for (const r of ledger.rows) {
     rows.push(
-      [r.date, r.voucherNo, `"${r.summary.replace(/"/g, '""')}"`, r.debit, r.credit, r.balance].join(
-        ','
-      )
+      [
+        r.date,
+        r.voucherNo,
+        `"${String(r.summary || '').replace(/"/g, '""')}"`,
+        r.debit,
+        r.credit,
+        formatBalanceDirection(ledger.account, r.balance),
+        r.balance,
+        r.isOpening ? '期初余额' : r.isDraft ? '未审核' : '已入账'
+      ].join(',')
     );
   }
   return rows.join('\n');

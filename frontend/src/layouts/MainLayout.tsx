@@ -74,10 +74,10 @@ export default function MainLayout() {
     }
     items.push(
       { key: '/vouchers', icon: <FileTextOutlined />, label: '凭证管理' },
-      { key: '/accounts', icon: <BookOutlined />, label: '会计科目' },
       { key: '/ledger', icon: <ReadOutlined />, label: '明细账' },
       { key: '/reports', icon: <FundOutlined />, label: '财务报表' },
-      { key: '/audit', icon: <AuditOutlined />, label: '审计日志' }
+      { key: '/accounts', icon: <BookOutlined />, label: '会计科目' },
+      { key: '/audit', icon: <AuditOutlined />, label: '审计日志' },
     );
     if (can('users')) {
       items.push({ key: '/users', icon: <TeamOutlined />, label: '用户管理' });

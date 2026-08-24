@@ -71,7 +71,8 @@ export default function IncomeStatementView({ rows = [] }) {
                     <td
                       className={[
                         'income-statement-view__amount',
-                        totalRow ? 'income-statement-view__amount--total' : ''
+                        totalRow ? 'income-statement-view__amount--total' : '',
+                        row.periodDraft ? 'report-page__draft-amount' : ''
                       ]
                         .filter(Boolean)
                         .join(' ')}
@@ -81,7 +82,8 @@ export default function IncomeStatementView({ rows = [] }) {
                     <td
                       className={[
                         'income-statement-view__amount',
-                        totalRow ? 'income-statement-view__amount--total' : ''
+                        totalRow ? 'income-statement-view__amount--total' : '',
+                        row.ytdDraft ? 'report-page__draft-amount' : ''
                       ]
                         .filter(Boolean)
                         .join(' ')}

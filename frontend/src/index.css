@@ -3145,6 +3145,7 @@ body,
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  width: 100%;
 }
 
 .balance-sheet-view__scroll,
@@ -3184,7 +3185,23 @@ body,
 }
 
 .balance-sheet-view__scroll .balance-sheet-view__table {
-  min-width: 960px;
+  min-width: 1280px;
+}
+
+.balance-sheet-view__col--label {
+  width: 300px;
+}
+
+.balance-sheet-view__col--index {
+  width: 100px;
+}
+
+.balance-sheet-view__col--amount {
+  width: 120px;
+}
+
+.balance-sheet-view__col--fill {
+  width: auto;
 }
 
 .income-statement-view {
@@ -3225,29 +3242,47 @@ body,
   border-block-end: 1px solid var(--app-table-border-strong) !important;
 }
 
-.balance-sheet-view__th--label {
+.balance-sheet-view__th--label,
+.balance-sheet-view__label {
+  width: 300px;
+  max-width: 300px;
+  min-width: 0;
   text-align: left;
-  width: 22%;
 }
 
-.balance-sheet-view__th--index {
-  width: 48px;
+.balance-sheet-view__th--index,
+.balance-sheet-view__index {
+  width: 100px;
+  min-width: 100px;
+  max-width: 100px;
+  padding-inline: 4px;
 }
 
-.balance-sheet-view__th--amount {
-  width: 11%;
+.balance-sheet-view__th--amount,
+.balance-sheet-view__amount,
+.balance-sheet-view__amount--year {
+  width: 120px;
+  min-width: 120px;
+  max-width: 120px;
 }
 
 .balance-sheet-view__th--split,
-.balance-sheet-view__table td:nth-child(4) {
-  border-inline-end: 2px solid var(--app-table-border-strong) !important;
+.balance-sheet-view__col--split,
+.balance-sheet-view__label--split {
+  border-inline-start: 2px solid var(--app-table-border-strong) !important;
 }
 
 .balance-sheet-view__label {
-  text-align: left;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.balance-sheet-view__th--fill,
+.balance-sheet-view__fill {
+  border-inline-end: none;
+  padding: 0;
+  width: auto;
 }
 
 .balance-sheet-view__label--section {
@@ -3374,6 +3409,20 @@ body,
   margin-top: 4px;
 }
 
+.report-page__draft-amount {
+  color: #dc2626;
+}
+
+.trial-balance-report .ant-table-cell.report-page__draft-amount,
+.trial-balance-report .ant-table-summary .ant-table-cell.report-page__draft-amount {
+  color: #dc2626;
+}
+
+.income-statement-view__amount.report-page__draft-amount,
+.balance-sheet-view__amount.report-page__draft-amount {
+  color: #dc2626;
+}
+
 .report-page-header__actions {
   display: flex;
   align-items: center;
@@ -3414,8 +3463,9 @@ body,
 }
 
 .report-trial-imbalance-tooltip .ant-tooltip-inner {
-  max-width: min(420px, calc(100vw - 32px));
-  padding: 12px 14px;
+  min-width: 480px;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 12px 16px;
   text-align: left;
 }
 
@@ -5114,4 +5164,422 @@ body,
 
 .amount-calculator__key--eq {
   grid-column: span 4;
+}
+
+.ledger-page {
+  min-height: 0;
+}
+
+.ledger-page__top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.ledger-page__title.ant-typography {
+  margin: 0 !important;
+  flex-shrink: 0;
+}
+
+.ledger-page__toolbar-main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.ledger-page__account-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  max-width: min(360px, 100%);
+  padding: 0 12px;
+  border: 1px solid #dbeafe;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #fff 0%, #f8fbff 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  line-height: 1.2;
+  overflow: hidden;
+}
+
+.ledger-page__account-chip--empty {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+}
+
+.ledger-page__account-chip__label {
+  flex-shrink: 0;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.ledger-page__account-chip__label::after {
+  content: '：';
+}
+
+.ledger-page__account-chip__code {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.ledger-page__account-chip__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.ledger-page__account-chip__placeholder {
+  color: #94a3b8;
+}
+
+.ledger-page__actions {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.ledger-page__refresh {
+  min-width: 88px;
+}
+
+.ledger-page__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.ledger-page__main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ledger-page__main .page-table-body {
+  flex: 1;
+  min-height: 0;
+}
+
+.ledger-page__ledger-table.page-table-body--scroll .ledger-page__row--opening > .ant-table-cell {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #f8fafc !important;
+}
+
+.ledger-page__row--opening > .ant-table-cell {
+  background: #f8fafc !important;
+  border-top: 1px solid #dbeafe;
+  border-bottom: 1px solid #dbeafe;
+  color: #475569;
+}
+
+.ledger-page__row--opening:hover > .ant-table-cell {
+  background: #f1f5f9 !important;
+}
+
+.ledger-page__ledger-table.page-table-body--scroll .ledger-page__row--opening:hover > .ant-table-cell {
+  background: #f1f5f9 !important;
+}
+
+.ledger-page__row--opening > .ant-table-cell:first-child {
+  box-shadow: inset 3px 0 0 #93c5fd;
+}
+
+.ledger-page__ledger-table.page-table-body--scroll .ledger-page__row--opening > .ant-table-cell {
+  box-shadow: 0 1px 0 #dbeafe;
+}
+
+.ledger-page__ledger-table.page-table-body--scroll .ledger-page__row--opening > .ant-table-cell:first-child {
+  box-shadow: inset 3px 0 0 #93c5fd, 0 1px 0 #dbeafe;
+}
+
+.ledger-page__pagination.table-scroll-footer {
+  justify-content: flex-end;
+}
+
+.ledger-page__opening-label {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 4px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.ledger-page__opening-muted {
+  color: #cbd5e1;
+}
+
+.ledger-page__opening-direction {
+  font-weight: 600;
+  color: #64748b;
+}
+
+.ledger-page__opening-balance {
+  color: #0f172a;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.ledger-page__draft-voucher {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+}
+
+.ledger-page__draft-voucher .ledger-page__voucher-link {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ledger-page__draft-tag.ant-tag {
+  flex-shrink: 0;
+  margin-inline-end: 0;
+  padding-inline: 6px;
+  font-size: 11px;
+  line-height: 18px;
+}
+
+.ledger-page__voucher-link {
+  color: inherit;
+}
+
+.ledger-page__voucher-link:hover {
+  color: #1a56db;
+}
+
+.ledger-page__draft-amount {
+  color: #dc2626;
+}
+
+.ledger-page__aside {
+  width: 280px;
+  flex-shrink: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #d1d5db;
+  border-radius: var(--app-table-radius);
+  background: #fff;
+  box-shadow: var(--app-table-shadow);
+  overflow: hidden;
+}
+
+.ledger-page__aside--collapsed {
+  width: 40px;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 8px;
+}
+
+.ledger-page__aside-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.ledger-page__aside-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.ledger-page__aside-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.ledger-page__aside-toggle:hover {
+  color: #1a56db;
+  background: #eff6ff;
+}
+
+.ledger-page__aside-search {
+  margin: 8px 12px 0;
+  flex-shrink: 0;
+}
+
+.ledger-page__aside-tree {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 6px 8px;
+}
+
+.ledger-page__account-tree.ant-tree {
+  background: transparent;
+  font-size: 13px;
+}
+
+.ledger-page__account-tree .ant-tree-treenode {
+  padding: 0;
+  margin-bottom: 0;
+  align-items: center;
+  width: 100%;
+}
+
+.ledger-page__account-tree .ant-tree-switcher {
+  width: 16px;
+  min-width: 16px;
+  flex-shrink: 0;
+  line-height: 24px;
+  margin-inline-end: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ledger-page__account-tree .ant-tree-switcher-noop {
+  width: 8px;
+  min-width: 8px;
+}
+
+.ledger-page__account-tree .ant-tree-switcher:before {
+  border-radius: 2px;
+}
+
+.ledger-page__account-tree .ant-tree-node-content-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  min-height: 24px;
+  line-height: 24px;
+  border-radius: 6px;
+  padding-inline: 4px 6px;
+  overflow: hidden;
+}
+
+.ledger-page__account-tree .ant-tree-iconEle {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  min-width: 20px;
+  height: 20px;
+  line-height: 1;
+  margin-inline-end: 0;
+  flex-shrink: 0;
+  overflow: visible;
+  vertical-align: middle;
+}
+
+.ledger-page__account-tree .ant-tree-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ledger-account-tree__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.ledger-account-tree__icon .anticon {
+  display: block;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.ledger-account-tree__icon--folder {
+  color: #d97706;
+  background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 100%);
+  box-shadow: inset 0 0 0 1px rgba(217, 119, 6, 0.12);
+}
+
+.ledger-account-tree__icon--folder.ledger-account-tree__icon--open {
+  color: #ea580c;
+  background: linear-gradient(180deg, #fff7ed 0%, #ffedd5 100%);
+}
+
+.ledger-account-tree__icon--leaf {
+  color: #2563eb;
+  background: linear-gradient(180deg, #f8fbff 0%, #eff6ff 100%);
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.1);
+}
+
+.ledger-page__account-tree .ant-tree-indent-unit {
+  width: 14px;
+}
+
+.ledger-page__account-tree .ant-tree-node-selected .ant-tree-node-content-wrapper {
+  background: #eff6ff !important;
+  color: #1a56db;
+}
+
+.ledger-page__account-tree .ant-tree-node-selected .ledger-account-tree__icon--leaf {
+  color: #1d4ed8;
+  background: #dbeafe;
+  box-shadow: inset 0 0 0 1px rgba(29, 78, 216, 0.18);
+}
+
+.ledger-page__account-tree .ant-tree-node-selected .ledger-account-tree__icon--folder {
+  color: #c2410c;
+  background: #ffedd5;
+  box-shadow: inset 0 0 0 1px rgba(194, 65, 12, 0.16);
+}
+
+@media (max-width: 960px) {
+  .ledger-page__body {
+    flex-direction: column;
+  }
+
+  .ledger-page__aside,
+  .ledger-page__aside--collapsed {
+    width: 100%;
+    max-height: 240px;
+  }
+
+  .ledger-page__aside--collapsed {
+    max-height: 40px;
+    flex-direction: row;
+    padding: 8px 12px;
+  }
 }
