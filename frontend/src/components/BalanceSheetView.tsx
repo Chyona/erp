@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { useTableHeaderGutter } from '../hooks/useTableHeaderGutter';
 import CopyableReportAmount from './CopyableReportAmount';
 import ReportLabelText from './ReportLabelText';
+import { reportViewRowProps } from '../utils/tableRowGroup';
 
 function BalanceSheetColGroup() {
   return (
@@ -32,9 +33,9 @@ function SideCells({ side, record }) {
     return (
       <>
         <td className={`balance-sheet-view__label ${labelSplitClass}`.trim()} />
-        <td className="balance-sheet-view__index" />
-        <td className="balance-sheet-view__amount" />
-        <td className="balance-sheet-view__amount balance-sheet-view__amount--year" />
+        <td className="report-view__index balance-sheet-view__index" />
+        <td className="report-view__amount balance-sheet-view__amount" />
+        <td className="report-view__amount balance-sheet-view__amount balance-sheet-view__amount--year" />
       </>
     );
   }
@@ -43,9 +44,9 @@ function SideCells({ side, record }) {
     return (
       <>
         <td className={`balance-sheet-view__label ${labelSplitClass}`.trim()} />
-        <td className="balance-sheet-view__index" />
-        <td className="balance-sheet-view__amount" />
-        <td className="balance-sheet-view__amount balance-sheet-view__amount--year" />
+        <td className="report-view__index balance-sheet-view__index" />
+        <td className="report-view__amount balance-sheet-view__amount" />
+        <td className="report-view__amount balance-sheet-view__amount balance-sheet-view__amount--year" />
       </>
     );
   }
@@ -53,41 +54,34 @@ function SideCells({ side, record }) {
   if (type === 'section') {
     return (
       <>
-        <td
-          className={`balance-sheet-view__label balance-sheet-view__label--section ${labelSplitClass}`
-            .trim()}
-        >
-          <ReportLabelText type="section" label={label} />
+        <td className={`balance-sheet-view__label ${labelSplitClass}`.trim()}>
+          <ReportLabelText type="section" label={label} variant="balance-sheet" />
         </td>
-        <td className="balance-sheet-view__index" />
-        <td className="balance-sheet-view__amount" />
-        <td className="balance-sheet-view__amount balance-sheet-view__amount--year" />
+        <td className="report-view__index balance-sheet-view__index" />
+        <td className="report-view__amount balance-sheet-view__amount" />
+        <td className="report-view__amount balance-sheet-view__amount balance-sheet-view__amount--year" />
       </>
     );
   }
 
   const isTotalRow = type === 'subtotal' || type === 'total';
 
-  const labelClass = [
-    'balance-sheet-view__label',
-    labelSplitClass,
-    isTotalRow ? 'balance-sheet-view__label--total' : ''
-  ]
-    .filter(Boolean)
-    .join(' ');
+  const labelClass = ['balance-sheet-view__label', labelSplitClass].filter(Boolean).join(' ');
 
   const indexClass = [
+    'report-view__index',
     'balance-sheet-view__index',
-    isTotalRow ? 'balance-sheet-view__index--total' : ''
+    isTotalRow ? 'report-view__index--total' : ''
   ]
     .filter(Boolean)
     .join(' ');
 
   const amountClass = (extra = '', draft = false) =>
     [
+      'report-view__amount',
       'balance-sheet-view__amount',
       extra,
-      isTotalRow ? 'balance-sheet-view__amount--total' : '',
+      isTotalRow ? 'report-view__amount--total' : '',
       draft ? 'report-page__draft-amount' : ''
     ]
       .filter(Boolean)
@@ -140,8 +134,8 @@ export default function BalanceSheetView({ rows = [] }) {
           <table className="balance-sheet-view__table">
             <BalanceSheetColGroup />
             <tbody>
-              {rows.map((record) => (
-                <tr key={record.key} className="balance-sheet-view__row">
+              {rows.map((record, index) => (
+                <tr key={record.key} {...reportViewRowProps(index, record)}>
                   <SideCells side="asset" record={record} />
                   <SideCells side="liability" record={record} />
                   <td className="balance-sheet-view__fill" />

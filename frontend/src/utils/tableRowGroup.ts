@@ -46,6 +46,20 @@ type TableRowProps = Record<string, unknown> & {
   onMouseLeave?: (event: React.MouseEvent<HTMLTableRowElement>) => void;
 };
 
+export function reportViewRowProps(index: number, record?: unknown, className = 'report-view__row') {
+  const groupIndex = resolveTableRowGroupIndex(record, index);
+  return {
+    className: appTableRowClassName(record, index, className),
+    'data-group-index': groupIndex,
+    onMouseEnter: (event: React.MouseEvent<HTMLTableRowElement>) => {
+      setTableGroupHover(event.currentTarget.closest('tbody'), groupIndex, true);
+    },
+    onMouseLeave: (event: React.MouseEvent<HTMLTableRowElement>) => {
+      setTableGroupHover(event.currentTarget.closest('tbody'), groupIndex, false);
+    }
+  };
+}
+
 export function mergeTableOnRow<T extends object>(
   record: T,
   index: number | undefined,

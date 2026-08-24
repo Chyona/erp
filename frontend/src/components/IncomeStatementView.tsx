@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { useTableHeaderGutter } from '../hooks/useTableHeaderGutter';
 import CopyableReportAmount from './CopyableReportAmount';
 import ReportLabelText from './ReportLabelText';
+import { reportViewRowProps } from '../utils/tableRowGroup';
 
 function isTotalRow(type, label) {
   return type === 'calc' || /合计|总计/.test(label || '');
@@ -46,18 +47,11 @@ export default function IncomeStatementView({ rows = [] }) {
           <table className="income-statement-view__table">
             <IncomeStatementColGroup />
             <tbody>
-              {rows.map((row) => {
+              {rows.map((row, index) => {
                 const totalRow = isTotalRow(row.type, row.label);
                 return (
-                  <tr key={row.key} className="income-statement-view__row">
-                    <td
-                      className={[
-                        'income-statement-view__label',
-                        totalRow ? 'income-statement-view__label--total' : ''
-                      ]
-                        .filter(Boolean)
-                        .join(' ')}
-                    >
+                  <tr key={row.key} {...reportViewRowProps(index, row)}>
+                    <td className="report-view__label-cell">
                       <ReportLabelText
                         type={row.type}
                         label={row.label}
@@ -68,8 +62,8 @@ export default function IncomeStatementView({ rows = [] }) {
                     </td>
                     <td
                       className={[
-                        'income-statement-view__index',
-                        totalRow ? 'income-statement-view__index--total' : ''
+                        'report-view__index',
+                        totalRow ? 'report-view__index--total' : ''
                       ]
                         .filter(Boolean)
                         .join(' ')}
@@ -78,8 +72,8 @@ export default function IncomeStatementView({ rows = [] }) {
                     </td>
                     <td
                       className={[
-                        'income-statement-view__amount',
-                        totalRow ? 'income-statement-view__amount--total' : '',
+                        'report-view__amount',
+                        totalRow ? 'report-view__amount--total' : '',
                         row.periodDraft ? 'report-page__draft-amount' : ''
                       ]
                         .filter(Boolean)
@@ -89,8 +83,8 @@ export default function IncomeStatementView({ rows = [] }) {
                     </td>
                     <td
                       className={[
-                        'income-statement-view__amount',
-                        totalRow ? 'income-statement-view__amount--total' : '',
+                        'report-view__amount',
+                        totalRow ? 'report-view__amount--total' : '',
                         row.ytdDraft ? 'report-page__draft-amount' : ''
                       ]
                         .filter(Boolean)

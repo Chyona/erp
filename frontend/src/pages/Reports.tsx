@@ -10,7 +10,7 @@ import {
   Alert,
   Tooltip
 } from 'antd';
-import { DownloadOutlined, DownOutlined } from '@ant-design/icons';
+import { DownloadOutlined, DownOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { Reports as ReportsService } from '../services/reports';
 import { ExportUtil } from '../services/export';
@@ -533,67 +533,79 @@ export default function Reports() {
     }
   ];
 
-  return (
-    <div className="page-table-layout">
-      <div className="report-page-header">
-        <div className="report-page-header__main">
-          <Text type="secondary">
-            含未审核凭证预览；<span className="report-page__draft-amount">红色金额</span>
-            表示含未审核贡献。导出表格与页面一致；凭证清单仍仅含已审核。
-          </Text>
-        </div>
-        <div className="report-page-header__actions">
-          {reportHeaderAlert ? (
-            <Tooltip
-              title={
-                reportHeaderAlert.kind === 'imbalance' ? (
-                  <TrialBalanceImbalanceTooltip {...reportHeaderAlert} />
-                ) : (
-                  <TrialBalanceUnclosedTooltip period={reportHeaderAlert.period} />
-                )
-              }
-              placement="bottomRight"
-              color="#fff"
-              classNames={{ root: 'report-trial-imbalance-tooltip' }}
-            >
-              <span
-                className="report-trial-imbalance-icon"
-                role="img"
-                aria-label={
-                  reportHeaderAlert.kind === 'imbalance'
-                    ? '发生额借贷不平衡'
-                    : '尚未完成损益结转'
-                }
-              >
-                <UnbalancedScaleIcon />
-              </span>
-            </Tooltip>
-          ) : null}
-          <ReportPeriodFilter
-            value={period}
-            onChange={setPeriod}
-            onRefresh={() => setRefreshToken((token) => token + 1)}
-            beforeRefresh={
-              can('export') ? (
-                <Dropdown
-                  menu={{ items: exportMenuItems, onClick: handleExportMenuClick }}
-                  placement="bottomRight"
-                  disabled={exporting}
-                >
-                  <Button icon={<DownloadOutlined />} loading={exporting}>
-                    导出 <DownOutlined />
-                  </Button>
-                </Dropdown>
-              ) : null
+  const reportToolbar = (
+    <div className="report-tabs__toolbar">
+      {reportHeaderAlert ? (
+        <Tooltip
+          title={
+            reportHeaderAlert.kind === 'imbalance' ? (
+              <TrialBalanceImbalanceTooltip {...reportHeaderAlert} />
+            ) : (
+              <TrialBalanceUnclosedTooltip period={reportHeaderAlert.period} />
+            )
+          }
+          placement="bottomRight"
+          color="#fff"
+          classNames={{ root: 'report-trial-imbalance-tooltip' }}
+        >
+          <span
+            className="report-trial-imbalance-icon"
+            role="img"
+            aria-label={
+              reportHeaderAlert.kind === 'imbalance'
+                ? '发生额借贷不平衡'
+                : '尚未完成损益结转'
             }
-          />
-        </div>
-      </div>
+          >
+            <UnbalancedScaleIcon />
+          </span>
+        </Tooltip>
+      ) : null}
+      <ReportPeriodFilter
+        value={period}
+        onChange={setPeriod}
+        onRefresh={() => setRefreshToken((token) => token + 1)}
+        beforeRefresh={
+          can('export') ? (
+            <Dropdown
+              menu={{ items: exportMenuItems, onClick: handleExportMenuClick }}
+              placement="bottomRight"
+              disabled={exporting}
+            >
+              <Button icon={<DownloadOutlined />} loading={exporting}>
+                导出 <DownOutlined />
+              </Button>
+            </Dropdown>
+          ) : null
+        }
+      />
+    </div>
+  );
+
+  return (
+    <div className="page-table-layout report-page">
       <Tabs
         className="report-tabs"
         destroyOnHidden
         activeKey={activeTab}
         onChange={setActiveTab}
+        tabBarExtraContent={reportToolbar}
+        renderTabBar={(tabBarProps, DefaultTabBar) => (
+          <div className="report-page__tab-head">
+            <DefaultTabBar {...tabBarProps} />
+            <div className="report-page-hint">
+              <InfoCircleOutlined className="report-page-hint__icon" aria-hidden />
+              <span>
+                含未审核凭证预览；<span className="report-page__draft-amount">橙色金额</span>
+                表示含未审核贡献
+              </span>
+              <span className="report-page-hint__sep" aria-hidden>
+                ·
+              </span>
+              <span>导出表格与页面一致；凭证清单仍仅含已审核</span>
+            </div>
+          </div>
+        )}
         items={items}
       />
     </div>

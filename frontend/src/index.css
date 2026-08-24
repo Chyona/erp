@@ -1,3 +1,5 @@
+@import './styles/reportView.css';
+
 body {
   margin: 0;
   background: #f3f4f6;
@@ -3604,339 +3606,6 @@ body,
   background: #fff;
 }
 
-.balance-sheet-report,
-.income-statement-report {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  background: #fff;
-  border: 1px solid #d1d5db;
-  border-radius: var(--app-table-radius);
-  box-shadow: var(--app-table-shadow);
-  position: relative;
-}
-
-.balance-sheet-view,
-.income-statement-view {
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-}
-
-.balance-sheet-view__scroll,
-.income-statement-view__scroll {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-.balance-sheet-view__head,
-.income-statement-view__head {
-  flex-shrink: 0;
-  overflow: hidden;
-  z-index: 2;
-  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
-  box-sizing: border-box;
-  background: var(--app-table-header-bg);
-}
-
-.balance-sheet-view__body,
-.income-statement-view__body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: scroll;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
-  background: #fff;
-}
-
-.balance-sheet-report--loading,
-.income-statement-report--loading {
-  opacity: 0.55;
-  pointer-events: none;
-}
-
-.balance-sheet-view__scroll .balance-sheet-view__table {
-  min-width: 1280px;
-}
-
-.balance-sheet-view__col--label {
-  width: 300px;
-}
-
-.balance-sheet-view__col--index {
-  width: 100px;
-}
-
-.balance-sheet-view__col--amount {
-  width: 120px;
-}
-
-.balance-sheet-view__col--fill {
-  width: auto;
-}
-
-.income-statement-view {
-  width: 100%;
-}
-
-.income-statement-view__col--label {
-  width: 38%;
-}
-
-.income-statement-view__col--index {
-  width: 56px;
-}
-
-.income-statement-view__col--amount {
-  width: 148px;
-}
-
-.balance-sheet-view__table,
-.income-statement-view__table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  table-layout: fixed;
-  font-size: var(--app-table-font-size);
-  line-height: 1.45;
-  color: var(--app-table-text);
-}
-
-.balance-sheet-view__table th,
-.balance-sheet-view__table td,
-.income-statement-view__table th,
-.income-statement-view__table td {
-  box-sizing: border-box;
-  border: none;
-  border-inline-end: 1px solid var(--app-table-border);
-  border-block-end: 1px solid var(--app-table-border);
-  padding: var(--app-table-cell-padding-y) var(--app-table-cell-padding-x);
-  vertical-align: middle;
-}
-
-.balance-sheet-view__th,
-.income-statement-view__th {
-  background: var(--app-table-header-bg);
-  color: var(--app-table-header-color);
-  font-weight: 600;
-  text-align: center;
-  white-space: nowrap;
-  box-shadow: none;
-  border-block-end: 1px solid var(--app-table-border-strong) !important;
-}
-
-.balance-sheet-view__th--label,
-.balance-sheet-view__label {
-  width: 300px;
-  max-width: 300px;
-  min-width: 0;
-  text-align: left;
-}
-
-.balance-sheet-view__th--index,
-.balance-sheet-view__index {
-  width: 100px;
-  min-width: 100px;
-  max-width: 100px;
-  padding-inline: 4px;
-}
-
-.balance-sheet-view__th--amount,
-.balance-sheet-view__amount,
-.balance-sheet-view__amount--year {
-  width: 120px;
-  min-width: 120px;
-  max-width: 120px;
-}
-
-.balance-sheet-view__th--split,
-.balance-sheet-view__col--split,
-.balance-sheet-view__label--split {
-  border-inline-start: 2px solid var(--app-table-border-strong) !important;
-}
-
-.balance-sheet-view__label {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.balance-sheet-view__th--fill,
-.balance-sheet-view__fill {
-  border-inline-end: none;
-  padding: 0;
-  width: auto;
-}
-
-.balance-sheet-view__label--section {
-  font-weight: 600;
-}
-
-.balance-sheet-view__label--total,
-.balance-sheet-view__index--total,
-.balance-sheet-view__amount--total {
-  font-weight: 600;
-}
-
-.balance-sheet-view__index {
-  text-align: center;
-  color: var(--app-table-header-color);
-}
-
-.balance-sheet-view__amount,
-.balance-sheet-view__amount--year {
-  text-align: right;
-  color: var(--app-table-amount);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.balance-sheet-view__row {
-  background: #fff;
-}
-
-.income-statement-view__th--label {
-  text-align: left;
-  width: 38%;
-}
-
-.income-statement-view__th--index {
-  width: 56px;
-}
-
-.income-statement-view__th--amount {
-  width: 148px;
-}
-
-.income-statement-view__th--fill {
-  width: auto;
-}
-
-.income-statement-view__label {
-  text-align: left;
-}
-
-.report-label-text {
-  display: block;
-  max-width: 100%;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.report-label-text--indent-1 {
-  padding-inline-start: 2em;
-}
-
-.report-label-text--indent-2 {
-  padding-inline-start: 4em;
-}
-
-.report-label-text--indent-3 {
-  padding-inline-start: 6em;
-}
-
-.report-label-text--section {
-  font-weight: 600;
-}
-
-.income-statement-view__label--section {
-  font-weight: 600;
-}
-
-.income-statement-view__label--total,
-.income-statement-view__index--total {
-  font-weight: 600;
-}
-
-.income-statement-view__index {
-  text-align: center;
-  color: var(--app-table-header-color);
-}
-
-.income-statement-view__amount {
-  text-align: right;
-  color: var(--app-table-amount);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.income-statement-view__amount--total {
-  color: var(--app-table-text);
-}
-
-.copyable-report-amount {
-  display: inline;
-  cursor: default;
-  white-space: nowrap;
-}
-
-.income-statement-view__amount .ant-tooltip-open,
-.balance-sheet-view__amount .ant-tooltip-open,
-.trial-balance-report .ant-table-cell .ant-tooltip-open {
-  display: inline !important;
-  max-width: none;
-  vertical-align: baseline;
-}
-
-.copyable-report-amount__text {
-  transition: color 0.15s;
-  white-space: nowrap;
-}
-
-.copyable-report-amount:hover .copyable-report-amount__text {
-  color: #6366f1;
-}
-
-.report-page__draft-amount .copyable-report-amount:hover .copyable-report-amount__text {
-  color: #dc2626;
-}
-
-.copyable-report-amount-tooltip .ant-tooltip-inner {
-  min-height: auto;
-  padding: 4px 10px;
-  border-radius: 6px;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
-}
-
-.copyable-report-amount-tooltip .ant-tooltip-arrow::before {
-  background: #fff;
-}
-
-.copyable-report-amount-tooltip__action {
-  display: block;
-  margin: 0;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: #2563eb;
-  font-size: var(--app-font-size-sm);
-  line-height: 1.4;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.copyable-report-amount-tooltip__action:hover {
-  color: #1d4ed8;
-}
-
-.income-statement-view__fill {
-  border-inline-end: none;
-}
-
-.income-statement-view__row {
-  background: #fff;
-}
-
 .balance-sheet-grid--auto {
   flex: 0 0 auto;
   align-items: start;
@@ -3948,41 +3617,51 @@ body,
   overflow: visible;
 }
 
-.report-page-header {
+.report-page__tab-head {
   flex-shrink: 0;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
   margin-bottom: 12px;
 }
 
-.report-page-header__main {
-  flex: 1 1 auto;
-  min-width: 0;
+.report-page-hint {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 6px 12px;
+  font-size: var(--app-font-size-sm);
+  line-height: 1.5;
+  color: var(--app-table-text-muted);
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
 }
 
-.report-page-header .ant-typography-secondary {
-  display: block;
-  margin-top: 0;
+.report-page-hint__icon {
+  flex-shrink: 0;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.report-page {
+  --report-draft-amount-color: #ea580c;
+  --report-draft-amount-hover: #f97316;
+}
+
+.report-page-hint__sep {
+  color: #cbd5e1;
 }
 
 .report-page__draft-amount {
-  color: #dc2626;
+  color: var(--report-draft-amount-color);
 }
 
 .trial-balance-report .ant-table-cell.report-page__draft-amount,
 .trial-balance-report .ant-table-summary .ant-table-cell.report-page__draft-amount {
-  color: #dc2626;
+  color: var(--report-draft-amount-color);
 }
 
-.income-statement-view__amount.report-page__draft-amount,
-.balance-sheet-view__amount.report-page__draft-amount {
-  color: #dc2626;
-}
-
-.report-page-header__actions {
+.report-tabs__toolbar {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -4194,7 +3873,16 @@ body,
 
 .report-tabs .ant-tabs-nav {
   flex-shrink: 0;
-  margin-bottom: 12px;
+  margin-bottom: 0;
+}
+
+.report-tabs .ant-tabs-nav-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
+.report-tabs .ant-tabs-extra-content {
+  flex-shrink: 0;
 }
 
 .report-tabs .ant-tabs-content-holder {
@@ -5924,7 +5612,7 @@ body,
 }
 
 .ledger-page__draft-amount {
-  color: #dc2626;
+  color: #ea580c;
 }
 
 .ledger-page__aside {

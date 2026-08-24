@@ -1,0 +1,326 @@
+/**
+ * Report View — 资产负债表 / 利润表
+ * 模块 class 只管列宽与布局，report-view__* / report-label-text* 管共用视觉
+ */
+
+.balance-sheet-report {
+  --report-balance-label-width: 300px;
+  --report-balance-index-width: 100px;
+  --report-balance-amount-width: 120px;
+  --report-balance-table-min-width: 1280px;
+}
+
+.income-statement-report {
+  --report-income-label-width: 480px;
+  --report-income-index-width: 80px;
+  --report-income-amount-width: 200px;
+}
+
+/* --- 容器 --- */
+.balance-sheet-report,
+.income-statement-report {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-radius: var(--app-table-radius);
+  box-shadow: var(--app-table-shadow);
+  position: relative;
+}
+
+.balance-sheet-view,
+.income-statement-view {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.balance-sheet-view__scroll,
+.income-statement-view__scroll {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.balance-sheet-view__head,
+.income-statement-view__head {
+  flex-shrink: 0;
+  overflow: hidden;
+  z-index: 2;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
+  box-sizing: border-box;
+  background: var(--app-table-header-bg);
+}
+
+.balance-sheet-view__body,
+.income-statement-view__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: scroll;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  background: #fff;
+}
+
+.balance-sheet-report--loading,
+.income-statement-report--loading {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+/* --- 表格基础 --- */
+.balance-sheet-view__scroll .balance-sheet-view__table {
+  min-width: var(--report-balance-table-min-width);
+}
+
+.balance-sheet-view__table,
+.income-statement-view__table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  font-size: var(--app-table-font-size);
+  line-height: 1.45;
+  color: var(--app-table-text);
+}
+
+.balance-sheet-view__table th,
+.balance-sheet-view__table td,
+.income-statement-view__table th,
+.income-statement-view__table td {
+  box-sizing: border-box;
+  border: none;
+  border-inline-end: 1px solid var(--app-table-border);
+  border-block-end: 1px solid var(--app-table-border);
+  padding: var(--app-table-cell-padding-y) var(--app-table-cell-padding-x);
+  vertical-align: middle;
+}
+
+.balance-sheet-view__th,
+.income-statement-view__th {
+  background: var(--app-table-header-bg);
+  color: var(--app-table-header-color);
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+  box-shadow: none;
+  border-block-end: 1px solid var(--app-table-border-strong) !important;
+}
+
+.report-view__row td {
+  background: #fff;
+  transition: background-color 0.15s ease;
+}
+
+.balance-sheet-view__table tbody tr.report-view__row.app-table-group--alt td,
+.income-statement-view__table tbody tr.report-view__row.app-table-group--alt td {
+  background: var(--app-table-row-alt);
+}
+
+.balance-sheet-view__table tbody tr.report-view__row.app-table-group--hover td,
+.income-statement-view__table tbody tr.report-view__row.app-table-group--hover td {
+  background: var(--app-table-row-hover) !important;
+}
+
+.balance-sheet-view__table tbody tr.report-view__row.app-table-group--hover.app-table-group--alt td,
+.income-statement-view__table tbody tr.report-view__row.app-table-group--hover.app-table-group--alt td {
+  background: var(--app-table-row-hover-alt) !important;
+}
+
+/* --- 列宽：资产负债表 --- */
+.balance-sheet-view__col--label,
+.balance-sheet-view__th--label,
+.balance-sheet-view__label {
+  width: var(--report-balance-label-width);
+}
+
+.balance-sheet-view__th--label,
+.balance-sheet-view__label {
+  max-width: var(--report-balance-label-width);
+  min-width: 0;
+  text-align: left;
+}
+
+.balance-sheet-view__col--index,
+.balance-sheet-view__th--index,
+.balance-sheet-view__index {
+  width: var(--report-balance-index-width);
+}
+
+.balance-sheet-view__th--index,
+.balance-sheet-view__index {
+  min-width: var(--report-balance-index-width);
+  max-width: var(--report-balance-index-width);
+  padding-inline: 4px;
+}
+
+.balance-sheet-view__col--amount,
+.balance-sheet-view__th--amount,
+.balance-sheet-view__amount,
+.balance-sheet-view__amount--year {
+  width: var(--report-balance-amount-width);
+  min-width: var(--report-balance-amount-width);
+  max-width: var(--report-balance-amount-width);
+}
+
+.balance-sheet-view__col--fill,
+.balance-sheet-view__th--fill,
+.balance-sheet-view__fill {
+  border-inline-end: none;
+  padding: 0;
+  width: auto;
+}
+
+.balance-sheet-view__th--split,
+.balance-sheet-view__col--split,
+.balance-sheet-view__label--split {
+  border-inline-start: 2px solid var(--app-table-border-strong) !important;
+}
+
+.balance-sheet-view__label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --- 列宽：利润表 --- */
+.income-statement-view__col--label,
+.income-statement-view__th--label {
+  width: var(--report-income-label-width);
+}
+
+.income-statement-view__th--label,
+.report-view__label-cell {
+  text-align: left;
+}
+
+.income-statement-view__col--index,
+.income-statement-view__th--index {
+  width: var(--report-income-index-width);
+}
+
+.income-statement-view__col--amount,
+.income-statement-view__th--amount {
+  width: var(--report-income-amount-width);
+}
+
+.income-statement-view__th--fill,
+.income-statement-view__fill {
+  border-inline-end: none;
+  width: auto;
+}
+
+/* --- 共用单元格 --- */
+.report-view__label-cell {
+  text-align: left;
+}
+
+.report-view__index {
+  text-align: center;
+  color: var(--app-table-header-color);
+}
+
+.report-view__amount {
+  text-align: right;
+  color: var(--app-table-amount);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.report-view__amount--total {
+  color: var(--app-table-text);
+}
+
+.report-label-text {
+  display: block;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.report-label-text--indent-1 {
+  padding-inline-start: 2em;
+}
+
+.report-label-text--indent-2 {
+  padding-inline-start: 4em;
+}
+
+.report-label-text--indent-3 {
+  padding-inline-start: 6em;
+}
+
+.report-label-text--section,
+.report-label-text--total,
+.report-view__index--total {
+  font-weight: 600;
+}
+
+.report-view__amount.report-page__draft-amount {
+  color: var(--report-draft-amount-color, #ea580c);
+}
+
+/* --- 可复制金额 --- */
+.copyable-report-amount {
+  display: inline;
+  cursor: default;
+  white-space: nowrap;
+}
+
+.report-view__amount .ant-tooltip-open,
+.trial-balance-report .ant-table-cell .ant-tooltip-open {
+  display: inline !important;
+  max-width: none;
+  vertical-align: baseline;
+}
+
+.copyable-report-amount__text {
+  transition: color 0.15s;
+  white-space: nowrap;
+}
+
+.copyable-report-amount:hover .copyable-report-amount__text {
+  color: #6366f1;
+}
+
+.report-page__draft-amount .copyable-report-amount:hover .copyable-report-amount__text {
+  color: var(--report-draft-amount-hover, #f97316);
+}
+
+.copyable-report-amount-tooltip .ant-tooltip-inner {
+  min-height: auto;
+  padding: 4px 10px;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+}
+
+.copyable-report-amount-tooltip .ant-tooltip-arrow::before {
+  background: #fff;
+}
+
+.copyable-report-amount-tooltip__action {
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #2563eb;
+  font-size: var(--app-font-size-sm);
+  line-height: 1.4;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.copyable-report-amount-tooltip__action:hover {
+  color: #1d4ed8;
+}

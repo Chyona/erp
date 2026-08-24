@@ -44,7 +44,7 @@ export default function CopyableReportAmount({
       placement="bottom"
       color="#fff"
       mouseEnterDelay={0.1}
-      overlayClassName="copyable-report-amount-tooltip"
+      classNames={{ root: 'copyable-report-amount-tooltip' }}
       title={
         <button
           type="button"

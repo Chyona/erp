@@ -39,13 +39,18 @@ export default function ReportLabelText({
   showSectionStyle = false,
   variant = 'balance-sheet'
 }: ReportLabelTextProps) {
+  const emphasisClass = total
+    ? 'report-label-text--total'
+    : type === 'section' || (showSectionStyle && /^[一二三四]、/.test(label))
+      ? 'report-label-text--section'
+      : '';
+
   return (
     <span
       className={[
         'report-label-text',
         reportLabelIndentClass(type, label, variant),
-        showSectionStyle && /^[一二三四]、/.test(label) ? 'report-label-text--section' : '',
-        total ? 'report-label-text--total' : ''
+        emphasisClass
       ]
         .filter(Boolean)
         .join(' ')}
