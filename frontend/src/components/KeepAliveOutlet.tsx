@@ -1,5 +1,5 @@
 import { useOutlet } from 'react-router-dom';
-import { usePageTabs } from '../context/PageTabsContext';
+import { TabPaneProvider, usePageTabs } from '../context/PageTabsContext';
 
 export default function KeepAliveOutlet() {
   const outlet = useOutlet();
@@ -12,16 +12,17 @@ export default function KeepAliveOutlet() {
   return (
     <div className="page-tabs-content">
       {tabs.map((tab) => {
-        const cached = cacheRef.current.get(tab.key);
-        if (!cached) return null;
-        const active = tab.key === activeKey;
+        const isActive = tab.key === activeKey;
+        let content = cacheRef.current.get(tab.key);
+        if (!content && isActive) content = outlet;
+        if (!content) return null;
         return (
           <div
             key={tab.key}
-            className={`page-tab-pane${active ? ' page-tab-pane--active' : ''}`}
-            aria-hidden={!active}
+            className={`page-tab-pane${isActive ? ' page-tab-pane--active' : ''}`}
+            aria-hidden={!isActive}
           >
-            {cached}
+            <TabPaneProvider tabKey={tab.key}>{content}</TabPaneProvider>
           </div>
         );
       })}

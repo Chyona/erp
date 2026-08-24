@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { Table, Button, Space, Typography, App, Upload, Tooltip, Checkbox, Popover, Pagination, Empty } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import ScrollTable from './ScrollTable';
+import AppTable from './AppTable';
 import { DeleteOutlined, EyeOutlined, PaperClipOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { enrichAttachmentDisplayNames, attachmentNameContextFromVoucher } from '../utils/attachmentName';
@@ -68,6 +69,7 @@ function renderVoucherTotalsSummaryRow(
 
 function buildGroupedRows(vouchers, showSubtotal) {
   const rows = [];
+  let groupIndex = 0;
 
   for (const voucher of vouchers) {
     const entries = voucher.entries || [];
@@ -81,7 +83,8 @@ function buildGroupedRows(vouchers, showSubtotal) {
         rowType: 'entry',
         voucher,
         entry,
-        groupRowSpan: index === 0 ? groupSpan : 0
+        groupRowSpan: index === 0 ? groupSpan : 0,
+        groupIndex
       });
     });
 
@@ -90,9 +93,12 @@ function buildGroupedRows(vouchers, showSubtotal) {
         key: `${voucher.id}-subtotal`,
         rowType: 'subtotal',
         voucher,
-        groupRowSpan: 0
+        groupRowSpan: 0,
+        groupIndex
       });
     }
+
+    groupIndex += 1;
   }
 
   return rows;
@@ -170,9 +176,20 @@ function renderMultilineText(value: string | undefined, splitPattern = /[,，、
     .filter(Boolean);
   if (!parts.length) return '';
   const text = parts.join('、');
+  if (parts.length === 1) {
+    return (
+      <span className="voucher-grouped-table__invoice-numbers" title={text}>
+        {parts[0]}
+      </span>
+    );
+  }
   return (
-    <span className="voucher-grouped-table__multiline" title={text}>
-      {text}
+    <span className="voucher-grouped-table__invoice-numbers" title={text}>
+      {parts.map((part, index) => (
+        <span key={`${part}-${index}`} className="voucher-grouped-table__invoice-numbers-line">
+          {part}
+        </span>
+      ))}
     </span>
   );
 }
@@ -798,8 +815,12 @@ export default function VoucherTable({
     {
       title: '发票号',
       key: 'invoiceNumbers',
-      width: 180,
-      onCell: (record) => resolveCellProps(record, 'invoiceNumbers', true),
+      width: 200,
+      className: 'voucher-grouped-table__invoice-col',
+      onCell: (record) => ({
+        ...resolveCellProps(record, 'invoiceNumbers', true),
+        className: 'voucher-grouped-table__invoice-col'
+      }),
       render: (_, record) =>
         isEmptyPlaceholderRow(record) ? null : renderMultilineText(record.voucher.invoiceNumbers)
     },
@@ -813,10 +834,10 @@ export default function VoucherTable({
         isEmptyPlaceholderRow(record)
           ? null
           : resolveOperatorDisplayName(
-              record.voucher.preparedBy,
-              operatorLookup,
-              record.voucher.createdByAccountId
-            )
+            record.voucher.preparedBy,
+            operatorLookup,
+            record.voucher.createdByAccountId
+          )
     },
     {
       title: '审核人',
@@ -965,7 +986,7 @@ export default function VoucherTable({
 
   return (
     <>
-      <Table {...(tableProps as Record<string, unknown>)} />
+      <AppTable {...(tableProps as Record<string, unknown>)} />
       {listChromeFooter}
     </>
   );

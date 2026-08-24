@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ColumnsType } from 'antd/es/table';
-import { Alert, App, Button, Space, Table, Typography } from 'antd';
+import { Alert, App, Button, Space, Typography } from 'antd';
+import AppTable from './AppTable';
 import {
   CheckCircleFilled,
   CloseCircleFilled,
@@ -9,6 +10,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { ProfitLossClosing } from '../services/profitLossClosing';
 import { useApp } from '../context/AppContext';
+import { useTabDataRefresh } from '../context/PageTabsContext';
 import { confirmDanger } from '../utils/confirmAction';
 import ReportPeriodFilter from './ReportPeriodFilter';
 import {
@@ -60,6 +62,7 @@ export default function ProfitLossClosingPanel({
 }) {
   const { message, modal } = App.useApp();
   const { refreshKey, refresh } = useApp();
+  const tabDataRefresh = useTabDataRefresh();
   const navigate = useNavigate();
   const [period, setPeriod] = useState(defaultProfitLossClosingPeriod);
   const [summary, setSummary] = useState<Awaited<
@@ -86,7 +89,7 @@ export default function ProfitLossClosingPanel({
 
   useEffect(() => {
     loadSummary();
-  }, [periodKey, refreshKey]);
+  }, [periodKey, refreshKey, tabDataRefresh]);
 
   const previewData = useMemo(() => {
     if (!summary?.accountLines) return [];
@@ -335,7 +338,7 @@ export default function ProfitLossClosingPanel({
             待结转科目明细
           </Text>
           <div className="app-table">
-            <Table
+            <AppTable
               size="small"
               bordered
               loading={loading}

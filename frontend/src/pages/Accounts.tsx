@@ -3,6 +3,7 @@ import { Button, Modal, Form, Input, Select, App } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { Accounts } from '../services/accounts';
 import { useApp } from '../context/AppContext';
+import { useTabDataRefresh } from '../context/PageTabsContext';
 import { useAuth } from '../context/AuthContext';
 import { useAsyncLoading } from '../hooks/useAsyncLoading';
 import ScrollTable from '../components/ScrollTable';
@@ -13,6 +14,7 @@ const CATEGORIES = ['资产', '负债', '所有者权益', '成本', '损益'];
 export default function AccountsPage() {
   const { message, modal } = App.useApp();
   const { accounts, setAccounts, refreshKey, refresh } = useApp();
+  const tabDataRefresh = useTabDataRefresh();
   const { can } = useAuth();
   const canWrite = can('accounts.write');
   const [list, setList] = useState([]);
@@ -29,7 +31,7 @@ export default function AccountsPage() {
       setAccounts(accs);
       setList(categoryFilter ? accs.filter((a) => a.category === categoryFilter) : accs);
     });
-  }, [refreshKey, categoryFilter, setAccounts, runListLoad]);
+  }, [refreshKey, tabDataRefresh, categoryFilter, setAccounts, runListLoad]);
 
   const openModal = (account = null) => {
     setEditing(account);

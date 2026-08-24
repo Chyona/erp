@@ -3,10 +3,9 @@ import { Card, Row, Col, Statistic, List } from 'antd';
 import { Voucher } from '../services/voucher';
 import VoucherTable from '../components/VoucherTable';
 import VoucherDetailModal from '../components/VoucherDetailModal';
-import WorkbenchPanel from '../components/WorkbenchPanel';
 import { useAsyncLoading } from '../hooks/useAsyncLoading';
 import { useApp } from '../context/AppContext';
-import { useAuth } from '../context/AuthContext';
+import { useTabDataRefresh } from '../context/PageTabsContext';
 
 const TIPS = [
   '每笔业务必须附有原始凭证（发票、收据、合同等），并在凭证中上传附件留存',
@@ -18,7 +17,7 @@ const TIPS = [
 
 export default function Dashboard() {
   const { refreshKey } = useApp();
-  const { can } = useAuth();
+  const tabDataRefresh = useTabDataRefresh();
   const [stats, setStats] = useState({ total: 0, month: 0, totalDebit: 0, totalAttachments: 0 });
   const [recent, setRecent] = useState([]);
   const [viewId, setViewId] = useState(null);
@@ -35,7 +34,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadDashboard();
-  }, [refreshKey]);
+  }, [refreshKey, tabDataRefresh]);
 
   return (
     <div>
@@ -61,8 +60,6 @@ export default function Dashboard() {
           </Card>
         </Col>
       </Row>
-
-      {can('closing.view') ? <WorkbenchPanel readOnly={!can('closing')} /> : null}
 
       <Card title="最近凭证" style={{ marginBottom: 20 }} loading={pageLoading}>
         <VoucherTable vouchers={recent} compact loading={pageLoading} onView={setViewId} />

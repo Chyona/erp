@@ -874,6 +874,7 @@ async function getGeneralLedger(startDate: string, endDate: string) {
   const endingSums = buildAccountSums(vouchers, { toDate: endDate });
 
   const rows = [];
+  let groupIndex = 0;
 
   for (const account of accounts) {
     const opening = sumSums(openingSums, account.code);
@@ -897,7 +898,8 @@ async function getGeneralLedger(startDate: string, endDate: string) {
     const base = {
       accountCode: account.code,
       accountName: account.name,
-      period: periodLabel
+      period: periodLabel,
+      groupIndex
     };
 
     rows.push({
@@ -930,6 +932,7 @@ async function getGeneralLedger(startDate: string, endDate: string) {
       balance: roundMoney(endingBalance),
       accountRowSpan: 0
     });
+    groupIndex += 1;
   }
 
   return {

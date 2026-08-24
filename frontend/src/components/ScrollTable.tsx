@@ -1,8 +1,13 @@
 import { Empty, Table, type TableProps } from 'antd';
-import { useRef, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useRef, type CSSProperties, type ReactNode } from 'react';
 import { useTableHeaderGutter } from '../hooks/useTableHeaderGutter';
 import { useTableHorizontalScrollBar } from '../hooks/useTableHorizontalScrollBar';
 import { useTableScrollY } from '../hooks/useTableScrollY';
+import {
+  appTableRowClassName,
+  mergeTableOnRow,
+  shouldExcludeTableStripe
+} from '../utils/tableRowGroup';
 
 function renderTableEmpty(description: string) {
   return (
@@ -30,6 +35,7 @@ type ScrollTableProps<T> = Omit<TableProps<T>, 'footer'> & {
   wrapStyle?: CSSProperties;
   footer?: ReactNode;
   scrollBarBelowSummary?: boolean;
+  striped?: boolean;
 };
 
 export default function ScrollTable<T extends object = Record<string, unknown>>({
@@ -42,6 +48,9 @@ export default function ScrollTable<T extends object = Record<string, unknown>>(
   scrollBarBelowSummary = false,
   bordered = true,
   size = 'small',
+  rowClassName,
+  striped = true,
+  onRow,
   ...props
 }: ScrollTableProps<T>) {
   const rowCount = props.dataSource?.length ?? 0;
@@ -67,6 +76,25 @@ export default function ScrollTable<T extends object = Record<string, unknown>>(
     [rowCount, props.summary, scrollY, scrollBarBelowSummary]
   );
 
+  const mergedRowClassName = useCallback(
+    (record: T, index: number, indent: number) => {
+      const userClass =
+        typeof rowClassName === 'function'
+          ? rowClassName(record, index, indent)
+          : rowClassName ?? '';
+      if (!striped || shouldExcludeTableStripe(record, userClass)) {
+        return userClass;
+      }
+      return appTableRowClassName(record, index, userClass);
+    },
+    [rowClassName, striped]
+  );
+
+  const mergedOnRow = useCallback(
+    (record: T, index?: number) => mergeTableOnRow(record, index, onRow),
+    [onRow]
+  );
+
   const scrollConfig = {
     ...scroll,
     ...(useVerticalScroll && scrollY ? { y: scrollY } : {})
@@ -90,6 +118,8 @@ export default function ScrollTable<T extends object = Record<string, unknown>>(
         bordered={bordered}
         size={size}
         scroll={scrollConfig}
+        rowClassName={mergedRowClassName}
+        onRow={mergedOnRow}
         locale={normalizeTableLocale(props.locale)}
       />
       {scrollBarBelowSummary ? (

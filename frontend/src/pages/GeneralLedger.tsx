@@ -5,6 +5,7 @@ import { DownloadOutlined } from '@ant-design/icons';
 import { Reports as ReportsService } from '../services/reports';
 import { ExportUtil } from '../services/export';
 import { useApp } from '../context/AppContext';
+import { useTabDataRefresh } from '../context/PageTabsContext';
 import { useAuth } from '../context/AuthContext';
 import { useAsyncLoading } from '../hooks/useAsyncLoading';
 import ScrollTable from '../components/ScrollTable';
@@ -38,6 +39,7 @@ function formatBalance(value: number) {
 export default function GeneralLedger() {
   const { message } = App.useApp();
   const { refreshKey } = useApp();
+  const tabDataRefresh = useTabDataRefresh();
   const { can } = useAuth();
   const [period, setPeriod] = useState(defaultReportPeriod);
   const [refreshToken, setRefreshToken] = useState(0);
@@ -55,7 +57,7 @@ export default function GeneralLedger() {
       const result = await ReportsService.getGeneralLedger(start, end);
       setData(result);
     });
-  }, [dateRange, refreshKey, refreshToken, run]);
+  }, [dateRange, refreshKey, tabDataRefresh, refreshToken, run]);
 
   const columns: ColumnsType<GeneralLedgerRow> = [
     {

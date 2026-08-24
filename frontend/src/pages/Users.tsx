@@ -7,10 +7,10 @@ import {
   Modal,
   Select,
   Space,
-  Table,
   Tag,
   Typography
 } from 'antd';
+import AppTable from '../components/AppTable';
 import {
   createSystemAccount,
   deleteSystemAccount,
@@ -21,7 +21,7 @@ import {
 } from '../services/systemAccounts';
 import { ROLE_LABEL, type Role } from '../utils/permissions';
 import { toUserMessage } from '../utils/userMessage';
-import { useAuth } from '../context/AuthContext';
+import { useTabDataRefresh } from '../context/PageTabsContext';
 import { Navigate } from 'react-router-dom';
 
 /** 邮箱选填：有内容时才校验格式，空值/纯空格不校验 */
@@ -61,6 +61,7 @@ export default function Users() {
   const [editForm] = Form.useForm();
   const [resetForm] = Form.useForm();
   const allowed = can('users');
+  const tabDataRefresh = useTabDataRefresh();
 
   const load = async () => {
     setLoading(true);
@@ -82,7 +83,7 @@ export default function Users() {
   useEffect(() => {
     if (!allowed) return;
     void load();
-  }, [allowed]);
+  }, [allowed, tabDataRefresh]);
 
   if (!allowed) {
     return <Navigate to="/" replace />;
@@ -173,7 +174,7 @@ export default function Users() {
         admin 仅可改资料与密码，不可删除或降权。
       </Typography.Paragraph>
 
-      <Table
+      <AppTable
         rowKey="id"
         loading={loading}
         dataSource={rows}

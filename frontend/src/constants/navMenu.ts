@@ -44,7 +44,7 @@ function filterSections(sections: NavSection[], can: CanFn): NavSection[] {
 }
 
 export function buildNavMenu(can: CanFn): NavMenuEntry[] {
-  const entries: NavMenuEntry[] = [{ type: 'link', key: 'dashboard', label: '工作台', path: '/' }];
+  const entries: NavMenuEntry[] = [];
 
   const voucherItems: NavLinkItem[] = [];
   if (can('voucher.create')) {
@@ -76,6 +76,23 @@ export function buildNavMenu(can: CanFn): NavMenuEntry[] {
   });
 
   entries.push({ type: 'link', key: 'reports', label: '报表', path: '/reports' });
+
+  if (can('closing.view')) {
+    entries.push({
+      type: 'group',
+      key: 'closing',
+      label: '结项',
+      sections: [
+        {
+          title: '结项处理',
+          items: [
+            { key: '/closing/period-end', label: '季末结转', path: '/closing/period-end' },
+            { key: '/closing/reimbursement', label: '月底报销', path: '/closing/reimbursement' }
+          ]
+        }
+      ]
+    });
+  }
 
   const systemSections: NavSection[] = [
     {
@@ -123,6 +140,9 @@ export function resolveNavActiveKey(pathname: string): string {
   if (pathname.startsWith('/general-ledger')) return '/general-ledger';
   if (pathname.startsWith('/ledger')) return '/ledger';
   if (pathname.startsWith('/reports')) return '/reports';
+  if (pathname.startsWith('/closing/reimbursement')) return '/closing/reimbursement';
+  if (pathname.startsWith('/closing/period-end')) return '/closing/period-end';
+  if (pathname.startsWith('/closing')) return '/closing/period-end';
   if (pathname.startsWith('/accounts')) return '/accounts';
   if (pathname.startsWith('/audit')) return '/audit';
   if (pathname.startsWith('/users')) return '/users';

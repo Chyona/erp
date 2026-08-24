@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Button, Form, Input, Select, Typography, App, Card, Popconfirm, Space, Table } from 'antd';
+import { Button, Form, Input, Select, Typography, App, Card, Popconfirm, Space } from 'antd';
+import AppTable from '../components/AppTable';
 import { ErpApi } from '../services/erpApi';
 import { Voucher } from '../services/voucher';
 import { TaxDeclaration } from '../services/taxDeclaration';
 import { formatQuarterLabel } from '../utils/reportPeriod';
 import { useApp } from '../context/AppContext';
+import { useTabDataRefresh } from '../context/PageTabsContext';
 import { useAuth } from '../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 
@@ -19,6 +21,7 @@ const FIELDS = [
 export default function Settings() {
   const { message } = App.useApp();
   const { setCompanyName, refresh, refreshKey } = useApp();
+  const tabDataRefresh = useTabDataRefresh();
   const { can } = useAuth();
   const [form] = Form.useForm();
   const [deleteVoucherNo, setDeleteVoucherNo] = useState('');
@@ -34,7 +37,7 @@ export default function Settings() {
   useEffect(() => {
     if (!allowed) return;
     loadDeclaredQuarters();
-  }, [refreshKey, allowed]);
+  }, [refreshKey, tabDataRefresh, allowed]);
 
   useEffect(() => {
     if (!allowed) return;
@@ -149,7 +152,7 @@ export default function Settings() {
         <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
           已申报的季度数据不可增删改、不可反结转。仅在确需更正时可取消申报标记。
         </Typography.Paragraph>
-        <Table
+        <AppTable
           size="small"
           bordered
           rowKey="periodKey"

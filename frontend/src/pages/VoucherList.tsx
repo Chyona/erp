@@ -18,6 +18,7 @@ import VoucherTimeFilter from '../components/VoucherTimeFilter';
 import { loadStoredTimeFilter, saveStoredTimeFilter } from '../utils/voucherTimeFilter';
 import type { VoucherTimeFilterState } from '../utils/voucherTimeFilter';
 import { useApp } from '../context/AppContext';
+import { useTabDataRefresh } from '../context/PageTabsContext';
 import { useAuth } from '../context/AuthContext';
 import { useOperatorDisplayLookup } from '../hooks/useOperatorDisplayLookup';
 import { resolveOperatorDisplayName } from '../utils/operatorDisplayName';
@@ -56,6 +57,7 @@ export default function VoucherList() {
   const navigate = useNavigate();
   const { message, modal } = App.useApp();
   const { refreshKey, accounts, refresh } = useApp();
+  const tabDataRefresh = useTabDataRefresh();
   const { can } = useAuth();
   const operatorLookup = useOperatorDisplayLookup();
   const [vouchers, setVouchers] = useState([]);
@@ -95,7 +97,7 @@ export default function VoucherList() {
 
   useEffect(() => {
     loadList();
-  }, [refreshKey]);
+  }, [refreshKey, tabDataRefresh]);
 
   const applyFilters = (patch: Partial<VoucherFilters>, options: { closePanel?: boolean } = {}) => {
     const next = { ...filters, ...patch };

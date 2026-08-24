@@ -12,10 +12,10 @@ import {
   Popover,
   Select,
   Space,
-  Table,
   Typography,
   Upload
 } from 'antd';
+import AppTable from './AppTable';
 import {
   CloseOutlined,
   FileExcelOutlined,
@@ -387,7 +387,8 @@ export default function VoucherImportModal({ open, accounts, onClose, onSuccess 
           credit: entry.credit,
           balanced,
           remark: voucher.remark,
-          groupRowSpan: entryIndex === 0 ? groupSpan : 0
+          groupRowSpan: entryIndex === 0 ? groupSpan : 0,
+          groupIndex: voucherIndex
         });
       });
     });
@@ -726,7 +727,7 @@ export default function VoucherImportModal({ open, accounts, onClose, onSuccess 
           </div>
 
           <div className="voucher-import-modal__table app-table">
-            <Table
+            <AppTable
               size="small"
               bordered
               tableLayout="fixed"

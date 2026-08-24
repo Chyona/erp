@@ -2,18 +2,19 @@ import { useEffect, useState } from 'react';
 import type { ColumnsType } from 'antd/es/table';
 import {
   Button,
-  Table,
   Typography,
   Alert,
   Space,
   Tag,
   App
 } from 'antd';
+import AppTable from './AppTable';
 import { useNavigate } from 'react-router-dom';
 import { TaxExemption } from '../services/taxExemption';
 import { ProfitLossClosing } from '../services/profitLossClosing';
 import { INVOICE_TYPE_LABEL } from '../constants/invoice';
 import { useApp } from '../context/AppContext';
+import { useTabDataRefresh } from '../context/PageTabsContext';
 import { confirmDanger } from '../utils/confirmAction';
 import ReportPeriodFilter from './ReportPeriodFilter';
 import {
@@ -97,6 +98,7 @@ export default function TaxExemptionPanel({
 }) {
   const { message, modal } = App.useApp();
   const { refreshKey, refresh } = useApp();
+  const tabDataRefresh = useTabDataRefresh();
   const navigate = useNavigate();
   const [period, setPeriod] = useState(defaultTaxExemptionPeriod);
   const [summary, setSummary] = useState(null);
@@ -119,7 +121,7 @@ export default function TaxExemptionPanel({
 
   useEffect(() => {
     loadSummary();
-  }, [periodKey, period.type, refreshKey]);
+  }, [periodKey, period.type, refreshKey, tabDataRefresh]);
 
   const handleCreate = async () => {
     if (!summary?.ordinaryPending.length) {
@@ -361,7 +363,7 @@ export default function TaxExemptionPanel({
             待结转普票明细
           </Text>
           <div className="app-table pending-tax-detail-table">
-            <Table
+            <AppTable
               size="small"
               bordered
               rowKey="id"
@@ -381,7 +383,7 @@ export default function TaxExemptionPanel({
             专票销售（不参与结转）
           </Text>
           <div className="app-table">
-            <Table
+            <AppTable
               size="small"
               bordered
               rowKey="id"

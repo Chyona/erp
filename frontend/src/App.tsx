@@ -14,6 +14,8 @@ import Accounts from './pages/Accounts';
 import Ledger from './pages/Ledger';
 import GeneralLedger from './pages/GeneralLedger';
 import Reports from './pages/Reports';
+import ClosingPeriodEnd from './pages/ClosingPeriodEnd';
+import ClosingReimbursement from './pages/ClosingReimbursement';
 import Audit from './pages/Audit';
 import Users from './pages/Users';
 import Settings from './pages/Settings';
@@ -29,7 +31,10 @@ export default function App() {
           colorPrimary: '#1a56db',
           borderRadius: 8,
           fontFamily: '"Microsoft YaHei", "PingFang SC", -apple-system, sans-serif',
-          colorBgSpotlight: '#ffffff'
+          colorBgSpotlight: '#ffffff',
+          fontSize: 16,
+          fontSizeSM: 12,
+          fontSizeLG: 18
         },
         components: {
           Tooltip: {
@@ -40,10 +45,22 @@ export default function App() {
             headerColor: '#374151',
             headerSplitColor: '#e5e7eb',
             borderColor: '#e5e7eb',
-            rowHoverBg: '#f8fafc',
+            rowHoverBg: '#eef6ff',
             cellPaddingBlock: 8,
             cellPaddingInline: 12,
-            fontSize: 13
+            fontSize: 14
+          },
+          Form: {
+            labelFontSize: 16
+          },
+          Input: {
+            fontSize: 16
+          },
+          Select: {
+            fontSize: 16
+          },
+          Button: {
+            contentFontSize: 16
           }
         }
       }}
@@ -65,6 +82,8 @@ export default function App() {
                     <Route path="general-ledger" element={<GeneralLedger />} />
                     <Route path="ledger" element={<Ledger />} />
                     <Route path="reports" element={<Reports />} />
+                    <Route path="closing/period-end" element={<ClosingPeriodEnd />} />
+                    <Route path="closing/reimbursement" element={<ClosingReimbursement />} />
                     <Route path="audit" element={<Audit />} />
                     <Route path="users" element={<Users />} />
                     <Route path="settings" element={<Settings />} />

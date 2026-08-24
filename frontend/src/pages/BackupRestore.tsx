@@ -5,7 +5,7 @@ import { ExclamationCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { Backup, formatBackupSize, formatBackupSource } from '../services/backup';
 import { useApp } from '../context/AppContext';
-import { useAuth } from '../context/AuthContext';
+import { useTabDataRefresh } from '../context/PageTabsContext';
 import { useAsyncLoading } from '../hooks/useAsyncLoading';
 import ScrollTable from '../components/ScrollTable';
 import { confirmWarning } from '../utils/confirmAction';
@@ -25,6 +25,7 @@ export default function BackupRestore() {
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
   const { reinitApp } = useApp();
+  const tabDataRefresh = useTabDataRefresh();
   const { can } = useAuth();
   const canBackup = can('backup');
   const canRestore = can('restore');
@@ -47,7 +48,7 @@ export default function BackupRestore() {
   useEffect(() => {
     if (!allowed) return;
     void run(loadRecords);
-  }, [allowed, loadRecords, run]);
+  }, [allowed, loadRecords, run, tabDataRefresh]);
 
   const selectedRows = useMemo(
     () => records.filter((item) => selectedRowKeys.includes(item.id)),

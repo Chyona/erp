@@ -10,10 +10,10 @@ import {
   Input,
   Modal,
   Space,
-  Table,
   Tag,
   Typography
 } from 'antd';
+import AppTable from './AppTable';
 import { CheckOutlined, DeleteOutlined, DownOutlined } from '@ant-design/icons';
 import { VoucherTemplates } from '../services/voucherTemplates';
 
@@ -293,7 +293,7 @@ function ExampleCard({ example, accounts, onApply, applyLabel = '套用此模板
         </div>
         <Tag color="blue">{example.businessType}</Tag>
       </div>
-      <Table
+      <AppTable
         rowKey={(r) => r.summary + r.accountCode}
         columns={columns}
         dataSource={example.entries}

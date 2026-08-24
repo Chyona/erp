@@ -2,17 +2,18 @@ import { useEffect, useState } from 'react';
 import type { ColumnsType } from 'antd/es/table';
 import {
   Button,
-  Table,
   Typography,
   Alert,
   Space,
   Tag,
   App
 } from 'antd';
+import AppTable from './AppTable';
 import { CheckCircleFilled } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { Reimbursement } from '../services/reimbursement';
 import { useApp } from '../context/AppContext';
+import { useTabDataRefresh } from '../context/PageTabsContext';
 import { confirmDanger } from '../utils/confirmAction';
 import ReportPeriodFilter from './ReportPeriodFilter';
 import WorkbenchPanelIntro from './WorkbenchPanelIntro';
@@ -28,6 +29,7 @@ const { Text } = Typography;
 export default function MonthEndReimbursementPanel({ readOnly = false }: { readOnly?: boolean }) {
   const { message, modal } = App.useApp();
   const { refreshKey, refresh } = useApp();
+  const tabDataRefresh = useTabDataRefresh();
   const navigate = useNavigate();
   const [period, setPeriod] = useState({ ...defaultReportPeriod(), type: 'month' });
   const [summary, setSummary] = useState(null);
@@ -52,7 +54,7 @@ export default function MonthEndReimbursementPanel({ readOnly = false }: { readO
 
   useEffect(() => {
     loadSummary();
-  }, [periodKey, refreshKey]);
+  }, [periodKey, refreshKey, tabDataRefresh]);
 
   const handleCreate = async (person) => {
     const group = summary?.personGroups.find((g) => g.person === person);
@@ -249,7 +251,7 @@ export default function MonthEndReimbursementPanel({ readOnly = false }: { readO
                 按垫付人汇总
               </Text>
               <div className="app-table">
-                <Table
+                <AppTable
                   size="small"
                   bordered
                   rowKey="person"
@@ -268,7 +270,7 @@ export default function MonthEndReimbursementPanel({ readOnly = false }: { readO
                 垫付明细
               </Text>
               <div className="app-table">
-                <Table
+                <AppTable
                   size="small"
                   bordered
                   rowKey="id"

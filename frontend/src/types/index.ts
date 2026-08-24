@@ -265,6 +265,7 @@ export interface GeneralLedgerRow {
   direction: string;
   balance: number;
   accountRowSpan: number;
+  groupIndex: number;
 }
 
 export interface BackupRecord {

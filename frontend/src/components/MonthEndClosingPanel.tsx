@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ColumnsType } from 'antd/es/table';
-import { Alert, App, Button, Space, Table, Typography } from 'antd';
+import { Alert, App, Button, Space, Typography } from 'antd';
+import AppTable from './AppTable';
 import {
   CheckCircleFilled,
   CloseCircleFilled,
@@ -10,6 +11,7 @@ import { MonthEndClosing } from '../services/monthEndClosing';
 import { TaxDeclaration } from '../services/taxDeclaration';
 import VoucherDetailModal from './VoucherDetailModal';
 import { useApp } from '../context/AppContext';
+import { useTabDataRefresh } from '../context/PageTabsContext';
 import { confirmDanger } from '../utils/confirmAction';
 import ReportPeriodFilter from './ReportPeriodFilter';
 import WorkbenchPanelIntro from './WorkbenchPanelIntro';
@@ -68,6 +70,7 @@ const previewColumns: ColumnsType<any> = [
 export default function MonthEndClosingPanel({ readOnly = false }: { readOnly?: boolean }) {
   const { message, modal } = App.useApp();
   const { refreshKey, refresh } = useApp();
+  const tabDataRefresh = useTabDataRefresh();
   const [period, setPeriod] = useState(defaultProfitLossClosingPeriod);
   const [summary, setSummary] = useState<Awaited<
     ReturnType<typeof MonthEndClosing.getUnifiedSummary>
@@ -95,7 +98,7 @@ export default function MonthEndClosingPanel({ readOnly = false }: { readOnly?: 
 
   useEffect(() => {
     loadSummary();
-  }, [periodKey, refreshKey]);
+  }, [periodKey, refreshKey, tabDataRefresh]);
 
   const previewData = useMemo(() => {
     if (!summary?.profitLoss.accountLines) return [];
@@ -434,7 +437,7 @@ export default function MonthEndClosingPanel({ readOnly = false }: { readOnly?: 
             待结转普票明细
           </Text>
           <div className="app-table pending-tax-detail-table" style={{ marginBottom: 16 }}>
-            <Table
+            <AppTable
               size="small"
               bordered
               loading={loading}
@@ -463,7 +466,7 @@ export default function MonthEndClosingPanel({ readOnly = false }: { readOnly?: 
             </Text>
           )}
           <div className="app-table">
-            <Table
+            <AppTable
               size="small"
               bordered
               loading={loading}

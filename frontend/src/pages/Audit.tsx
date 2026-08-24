@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Typography } from 'antd';
 import { ErpApi } from '../services/erpApi';
 import { useApp } from '../context/AppContext';
+import { useTabDataRefresh } from '../context/PageTabsContext';
 import { useAsyncLoading } from '../hooks/useAsyncLoading';
 import ScrollTable from '../components/ScrollTable';
 import type { AuditLog } from '../types';
@@ -19,6 +20,7 @@ function formatOperator(log: AuditLog): string {
 
 export default function Audit() {
   const { refreshKey } = useApp();
+  const tabDataRefresh = useTabDataRefresh();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const { loading, run } = useAsyncLoading(true);
 
@@ -27,7 +29,7 @@ export default function Audit() {
       const all = await ErpApi.getAll('auditLogs');
       setLogs(all.sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 200));
     });
-  }, [refreshKey, run]);
+  }, [refreshKey, tabDataRefresh, run]);
 
   const columns = [
     {

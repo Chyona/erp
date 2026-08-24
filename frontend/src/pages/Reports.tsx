@@ -26,6 +26,7 @@ import {
 } from '../utils/reportPeriod';
 import { mergeBalanceSheetRows } from '../utils/balanceSheetRows';
 import { useAuth } from '../context/AuthContext';
+import { useTabDataRefresh } from '../context/PageTabsContext';
 
 const { Text } = Typography;
 
@@ -182,7 +183,7 @@ function TrialBalanceUnclosedTooltip({ period }) {
         <div className="report-trial-imbalance-tooltip__action-title">如何处理</div>
         <ol className="report-trial-imbalance-tooltip__steps">
           <li>
-            前往工作台 <strong>「{closingLabel}」</strong>，完成 <strong>{periodLabel}</strong>{' '}
+            前往 <strong>「结项 → 季末结转」</strong>，完成 <strong>{periodLabel}</strong>{' '}
             损益结转
           </li>
           <li>
@@ -405,12 +406,18 @@ function BalanceSheetTab({ dateRange, refreshToken }) {
 export default function Reports() {
   const { message } = App.useApp();
   const { can } = useAuth();
+  const tabDataRefresh = useTabDataRefresh();
   const [period, setPeriod] = useState(defaultReportsPeriod);
   const [refreshToken, setRefreshToken] = useState(0);
   const [activeTab, setActiveTab] = useState('trial');
   const [reportHeaderAlert, setReportHeaderAlert] = useState(null);
   const [exporting, setExporting] = useState(false);
   const dateRange = useMemo(() => reportPeriodToDateRange(period), [period]);
+
+  useEffect(() => {
+    if (!tabDataRefresh) return;
+    setRefreshToken((token) => token + 1);
+  }, [tabDataRefresh]);
 
   useEffect(() => {
     let cancelled = false;

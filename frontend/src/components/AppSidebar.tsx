@@ -1,14 +1,14 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
+import ClosingNavIcon from './icons/ClosingNavIcon';
 import {
+  AccountBookFilled,
+  AccountBookOutlined,
   AuditOutlined,
-  BookFilled,
   BookOutlined,
   FileTextFilled,
   FileTextOutlined,
   FundFilled,
   FundOutlined,
-  HomeFilled,
-  HomeOutlined,
   SettingFilled,
   SettingOutlined
 } from '@ant-design/icons';
@@ -29,16 +29,17 @@ type NavIconSet = {
 };
 
 const GROUP_ICONS: Record<string, NavIconSet> = {
-  dashboard: { outline: <HomeOutlined />, filled: <HomeFilled /> },
   voucher: { outline: <FileTextOutlined />, filled: <FileTextFilled /> },
-  ledger: { outline: <BookOutlined />, filled: <BookFilled /> },
+  ledger: { outline: <AccountBookOutlined />, filled: <AccountBookFilled /> },
   reports: { outline: <FundOutlined />, filled: <FundFilled /> },
+  closing: { outline: <ClosingNavIcon />, filled: <ClosingNavIcon filled /> },
   system: { outline: <SettingOutlined />, filled: <SettingFilled /> }
 };
 
 const SECTION_ICONS: Record<string, React.ReactNode> = {
   凭证处理: <FileTextOutlined />,
-  账簿查询: <BookOutlined />,
+  账簿查询: <AccountBookOutlined />,
+  结项处理: <ClosingNavIcon />,
   基础资料: <BookOutlined />,
   操作记录: <AuditOutlined />,
   系统管理: <SettingOutlined />
@@ -133,7 +134,6 @@ export default function AppSidebar({ collapsed, theme }: AppSidebarProps) {
         className={`sidebar-nav__item${isHighlighted ? ' sidebar-nav__item--highlight' : ''}${
           isActive ? ' sidebar-nav__item--active' : ''
         }`}
-        title={entry.label}
         onMouseEnter={() => {
           if (entry.type === 'group') openFlyout(entry.key);
           else {
@@ -166,8 +166,10 @@ export default function AppSidebar({ collapsed, theme }: AppSidebarProps) {
     hoveredGroup && typeof document !== 'undefined'
       ? createPortal(
           <div
-            className="sidebar-nav-flyout"
-            style={{ top: flyoutTop, left: flyoutLeft }}
+            className={`sidebar-nav-flyout${
+              hoveredGroup.sections.length > 1 ? ' sidebar-nav-flyout--multi' : ''
+            }`}
+            style={{ top: flyoutTop, left: `calc(${flyoutLeft} + 8px)` }}
             onMouseEnter={clearHideTimer}
             onMouseLeave={scheduleHide}
           >

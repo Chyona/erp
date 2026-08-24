@@ -8,6 +8,7 @@ import { Voucher } from '../services/voucher';
 import { Accounts } from '../services/accounts';
 import { ExportUtil } from '../services/export';
 import { useApp } from '../context/AppContext';
+import { useTabDataRefresh } from '../context/PageTabsContext';
 import { useAuth } from '../context/AuthContext';
 import { useAsyncLoading } from '../hooks/useAsyncLoading';
 import ScrollTable from '../components/ScrollTable';
@@ -28,6 +29,7 @@ const LEDGER_TABLE_SCROLL_X = 962;
 export default function Ledger() {
   const { message } = App.useApp();
   const { refreshKey } = useApp();
+  const tabDataRefresh = useTabDataRefresh();
   const { can } = useAuth();
   const navigate = useNavigate();
   const [accountList, setAccountList] = useState<Account[]>([]);
@@ -47,7 +49,7 @@ export default function Ledger() {
       setAccountList(accs);
       setAccountId((current) => current || accs[0]?.id || '');
     });
-  }, [refreshKey, runAccountsLoad]);
+  }, [refreshKey, tabDataRefresh, runAccountsLoad]);
 
   const loadLedger = useCallback(
     async (nextAccountId: string, startDate: string, endDate: string) => {
@@ -66,7 +68,7 @@ export default function Ledger() {
 
   useEffect(() => {
     void loadLedger(accountId, dateRange.startDate, dateRange.endDate);
-  }, [accountId, dateRange.startDate, dateRange.endDate, refreshKey, loadLedger]);
+  }, [accountId, dateRange.startDate, dateRange.endDate, refreshKey, tabDataRefresh, loadLedger]);
 
   const handleTimeQuery = (startDate: string, endDate: string) => {
     setDateRange({ startDate, endDate });
