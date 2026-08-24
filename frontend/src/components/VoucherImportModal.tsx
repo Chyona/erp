@@ -16,6 +16,7 @@ import {
   Upload
 } from 'antd';
 import AppTable from './AppTable';
+import EllipsisText from './EllipsisText';
 import {
   CloseOutlined,
   FileExcelOutlined,
@@ -92,9 +93,9 @@ function SelectedFileBar({
   return (
     <div className="voucher-import-modal__source-file">
       <PaperClipOutlined className="voucher-import-modal__source-file-icon" />
-      <span className="voucher-import-modal__source-file-name" title={name}>
+      <EllipsisText className="voucher-import-modal__source-file-name" tooltip={name}>
         {name}
-      </span>
+      </EllipsisText>
       <button
         type="button"
         className="voucher-import-modal__source-file-remove"
@@ -256,7 +257,6 @@ export default function VoucherImportModal({ open, accounts, onClose, onSuccess 
             variant="borderless"
             className="voucher-import-modal__edit-input"
             value={row.summary}
-            title={row.summary}
             onChange={(e) => updateVoucherField(row.voucherIndex, 'summary', e.target.value)}
           />
         )
@@ -342,7 +342,6 @@ export default function VoucherImportModal({ open, accounts, onClose, onSuccess 
             variant="borderless"
             className="voucher-import-modal__edit-input"
             value={row.remark || ''}
-            title={row.remark || ''}
             onChange={(e) => updateVoucherField(row.voucherIndex, 'remark', e.target.value)}
           />
         )

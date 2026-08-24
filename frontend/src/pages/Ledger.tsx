@@ -12,6 +12,7 @@ import { useTabDataRefresh } from '../context/PageTabsContext';
 import { useAuth } from '../context/AuthContext';
 import { useAsyncLoading } from '../hooks/useAsyncLoading';
 import ScrollTable from '../components/ScrollTable';
+import EllipsisText from '../components/EllipsisText';
 import VoucherTimeFilter from '../components/VoucherTimeFilter';
 import LedgerAccountTree from '../components/LedgerAccountTree';
 import {
@@ -291,15 +292,17 @@ export default function Ledger() {
           />
           <div
             className={`ledger-page__account-chip${selectedAccount ? '' : ' ledger-page__account-chip--empty'}`}
-            title={
-              selectedAccount ? `${selectedAccount.code} ${selectedAccount.name}` : '请选择科目'
-            }
           >
             <span className="ledger-page__account-chip__label">科目</span>
             {selectedAccount ? (
               <>
                 <span className="ledger-page__account-chip__code">{selectedAccount.code}</span>
-                <span className="ledger-page__account-chip__name">{selectedAccount.name}</span>
+                <EllipsisText
+                  className="ledger-page__account-chip__name"
+                  tooltip={`${selectedAccount.code} ${selectedAccount.name}`}
+                >
+                  {selectedAccount.name}
+                </EllipsisText>
               </>
             ) : (
               <span className="ledger-page__account-chip__placeholder">请选择科目</span>

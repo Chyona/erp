@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Typography } from 'antd';
 import { ErpApi } from '../services/erpApi';
 import { useApp } from '../context/AppContext';
 import { useTabDataRefresh } from '../context/PageTabsContext';
 import { useAsyncLoading } from '../hooks/useAsyncLoading';
 import ScrollTable from '../components/ScrollTable';
+import SensitiveColumnHeader from '../components/SensitiveColumnHeader';
+import { formatSensitiveText } from '../utils/maskSensitiveText';
 import type { AuditLog } from '../types';
 
 const { Paragraph } = Typography;
@@ -22,6 +24,7 @@ export default function Audit() {
   const { refreshKey } = useApp();
   const tabDataRefresh = useTabDataRefresh();
   const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [showOperatorPlain, setShowOperatorPlain] = useState(false);
   const { loading, run } = useAsyncLoading(true);
 
   useEffect(() => {
@@ -31,24 +34,34 @@ export default function Audit() {
     });
   }, [refreshKey, tabDataRefresh, run]);
 
-  const columns = [
-    {
-      title: '时间',
-      dataIndex: 'timestamp',
-      width: 180,
-      render: (t: string) => new Date(t).toLocaleString('zh-CN')
-    },
-    {
-      title: '操作人',
-      key: 'operator',
-      width: 160,
-      ellipsis: true,
-      render: (_: unknown, record: AuditLog) => formatOperator(record)
-    },
-    { title: '操作', dataIndex: 'action', width: 120 },
-    { title: '对象', dataIndex: 'target', width: 120 },
-    { title: '详情', dataIndex: 'details', ellipsis: true }
-  ];
+  const columns = useMemo(
+    () => [
+      {
+        title: '时间',
+        dataIndex: 'timestamp',
+        width: 180,
+        render: (t: string) => new Date(t).toLocaleString('zh-CN')
+      },
+      {
+        title: (
+          <SensitiveColumnHeader
+            label="操作人"
+            visible={showOperatorPlain}
+            onToggle={() => setShowOperatorPlain((value) => !value)}
+          />
+        ),
+        key: 'operator',
+        width: 176,
+        ellipsis: true,
+        render: (_: unknown, record: AuditLog) =>
+          formatSensitiveText(formatOperator(record), showOperatorPlain)
+      },
+      { title: '操作', dataIndex: 'action', width: 120 },
+      { title: '对象', dataIndex: 'target', width: 120 },
+      { title: '详情', dataIndex: 'details', ellipsis: true }
+    ],
+    [showOperatorPlain]
+  );
 
   return (
     <div className="page-table-layout">

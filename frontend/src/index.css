@@ -12,6 +12,57 @@ body {
   box-sizing: border-box;
 }
 
+.ellipsis-text {
+  display: block;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ant-table-cell .ellipsis-text,
+.ant-table-cell-content .ellipsis-text {
+  width: 100%;
+  max-width: 100%;
+}
+
+.sensitive-column-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+}
+
+.sensitive-column-header__label {
+  min-width: 0;
+}
+
+.sensitive-column-header__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  opacity: 0.55;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.sensitive-column-header__toggle:hover {
+  opacity: 1;
+  color: #1677ff;
+  background: rgba(22, 119, 255, 0.08);
+}
+
 .app-spin .ant-spin-text {
   white-space: nowrap;
   word-break: keep-all;

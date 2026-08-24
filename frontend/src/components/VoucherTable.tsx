@@ -3,6 +3,8 @@ import { Table, Button, Space, Typography, App, Upload, Tooltip, Checkbox, Popov
 import type { ColumnsType } from 'antd/es/table';
 import ScrollTable from './ScrollTable';
 import AppTable from './AppTable';
+import EllipsisText from './EllipsisText';
+import SensitiveColumnHeader from './SensitiveColumnHeader';
 import { DeleteOutlined, EyeOutlined, PaperClipOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { enrichAttachmentDisplayNames, attachmentNameContextFromVoucher } from '../utils/attachmentName';
@@ -17,7 +19,9 @@ import VoucherAttachmentColumn from './VoucherAttachmentColumn';
 import { confirmDeleteWithPassword } from '../utils/confirmDeleteWithPassword';
 import { isAttachmentDuplicateError } from '../utils/attachmentDuplicate';
 import { useOperatorDisplayLookup } from '../hooks/useOperatorDisplayLookup';
+import { normalizeTableColumns } from '../utils/normalizeTableColumns';
 import { resolveOperatorDisplayName } from '../utils/operatorDisplayName';
+import { formatSensitiveText } from '../utils/maskSensitiveText';
 
 const { Link } = Typography;
 
@@ -178,13 +182,13 @@ function renderMultilineText(value: string | undefined, splitPattern = /[,，、
   const text = parts.join('、');
   if (parts.length === 1) {
     return (
-      <span className="voucher-grouped-table__invoice-numbers" title={text}>
+      <EllipsisText className="voucher-grouped-table__invoice-numbers" tooltip={text}>
         {parts[0]}
-      </span>
+      </EllipsisText>
     );
   }
   return (
-    <span className="voucher-grouped-table__invoice-numbers" title={text}>
+    <span className="voucher-grouped-table__invoice-numbers">
       {parts.map((part, index) => (
         <span key={`${part}-${index}`} className="voucher-grouped-table__invoice-numbers-line">
           {part}
@@ -236,6 +240,8 @@ export default function VoucherTable({
   const [attachPanelVoucher, setAttachPanelVoucher] = useState<VoucherRecord | null>(null);
   const [attachPanelItems, setAttachPanelItems] = useState<Attachment[]>([]);
   const [attachPanelLoading, setAttachPanelLoading] = useState(false);
+  const [showPreparedByPlain, setShowPreparedByPlain] = useState(false);
+  const [showReviewedByPlain, setShowReviewedByPlain] = useState(false);
   const listUploadTailRef = useRef(new Map<string, Promise<void>>());
   const listUploadToastRef = useRef({
     count: 0,
@@ -797,9 +803,9 @@ export default function VoucherTable({
         if (isEmptyPlaceholderRow(record)) return null;
         const remark = record.voucher.remark || '';
         return (
-          <span className="voucher-grouped-table__remark" title={remark}>
+          <EllipsisText className="voucher-grouped-table__remark" tooltip={remark}>
             {remark}
-          </span>
+          </EllipsisText>
         );
       }
     },
@@ -825,30 +831,44 @@ export default function VoucherTable({
         isEmptyPlaceholderRow(record) ? null : renderMultilineText(record.voucher.invoiceNumbers)
     },
     {
-      title: '制单人',
+      title: (
+        <SensitiveColumnHeader
+          label="制单人"
+          visible={showPreparedByPlain}
+          onToggle={() => setShowPreparedByPlain((value) => !value)}
+        />
+      ),
       key: 'preparedBy',
-      width: 80,
+      width: 96,
       ellipsis: true,
       onCell: (record) => resolveCellProps(record, 'preparedBy', true),
-      render: (_, record) =>
-        isEmptyPlaceholderRow(record)
-          ? null
-          : resolveOperatorDisplayName(
-            record.voucher.preparedBy,
-            operatorLookup,
-            record.voucher.createdByAccountId
-          )
+      render: (_, record) => {
+        if (isEmptyPlaceholderRow(record)) return null;
+        const name = resolveOperatorDisplayName(
+          record.voucher.preparedBy,
+          operatorLookup,
+          record.voucher.createdByAccountId
+        );
+        return formatSensitiveText(name, showPreparedByPlain);
+      }
     },
     {
-      title: '审核人',
+      title: (
+        <SensitiveColumnHeader
+          label="审核人"
+          visible={showReviewedByPlain}
+          onToggle={() => setShowReviewedByPlain((value) => !value)}
+        />
+      ),
       key: 'reviewedBy',
-      width: 80,
+      width: 96,
       ellipsis: true,
       onCell: (record) => resolveCellProps(record, 'reviewedBy', true),
-      render: (_, record) =>
-        isEmptyPlaceholderRow(record)
-          ? null
-          : resolveOperatorDisplayName(record.voucher.reviewedBy, operatorLookup)
+      render: (_, record) => {
+        if (isEmptyPlaceholderRow(record)) return null;
+        const name = resolveOperatorDisplayName(record.voucher.reviewedBy, operatorLookup);
+        return formatSensitiveText(name, showReviewedByPlain);
+      }
     },
     {
       title: '状态',
@@ -896,11 +916,12 @@ export default function VoucherTable({
   ];
 
   if (compact) {
+    const normalizedCompactColumns = normalizeTableColumns(compactColumns as ColumnsType<VoucherRecord>);
     return (
       <Table
         rowKey="id"
         loading={loading}
-        columns={compactColumns as ColumnsType<any>}
+        columns={normalizedCompactColumns as ColumnsType<any>}
         dataSource={vouchers}
         pagination={false}
         locale={{ emptyText: '暂无凭证数据' }}

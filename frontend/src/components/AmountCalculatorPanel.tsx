@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Button } from 'antd';
+import EllipsisText from './EllipsisText';
 import { evaluateAmountExpression } from '../utils/amountGrid';
 
 const KEY_ROWS = [
@@ -49,8 +50,8 @@ export default function AmountCalculatorPanel({
 
   return (
     <div className="amount-calculator" onMouseDown={(e) => e.preventDefault()}>
-      <div className="amount-calculator__display" title={display}>
-        {display || '0'}
+      <div className="amount-calculator__display">
+        <EllipsisText tooltip={display}>{display || '0'}</EllipsisText>
       </div>
       {error ? <div className="amount-calculator__error">{error}</div> : null}
       <div className="amount-calculator__keys">

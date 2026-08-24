@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal, Button, Space, App, Alert, Tooltip } from 'antd';
 import { FilePdfOutlined, LeftOutlined, RightOutlined } from '@ant-design/icons';
 import { Voucher } from '../services/voucher';
@@ -13,6 +13,7 @@ import { isCarryForwardVoucher, CARRY_FORWARD_VOUCHER_READONLY_TIP } from '../ut
 import { CarryForwardBadge } from './StatusBadge';
 import { enrichAttachmentDisplayNames, attachmentNameContextFromVoucher } from '../utils/attachmentName';
 import AttachmentPreviewModal, { isPdfAttachment } from './AttachmentPreviewModal';
+import EllipsisText from './EllipsisText';
 
 function AttachmentThumbnail({ attachment, onClick }) {
   const isPdf = isPdfAttachment(attachment);
@@ -23,7 +24,6 @@ function AttachmentThumbnail({ attachment, onClick }) {
       type="button"
       className="attachment-thumb"
       onClick={() => onClick(attachment)}
-      title={label}
     >
       <div className="attachment-thumb__visual">
         {isPdf ? (
@@ -32,7 +32,9 @@ function AttachmentThumbnail({ attachment, onClick }) {
           <img src={attachment.url} alt="" className="attachment-thumb__img" />
         )}
       </div>
-      <span className="attachment-thumb__name">{label}</span>
+      <EllipsisText className="attachment-thumb__name" tooltip={label}>
+        {label}
+      </EllipsisText>
     </button>
   );
 }
@@ -121,6 +123,19 @@ export default function VoucherDetailModal({
   const canGoOlder = Boolean(adjacent.older) && !loading;
   const canGoNewer = Boolean(adjacent.newer) && !loading;
 
+  const displayVoucher = useMemo(() => {
+    if (!voucher) return null;
+    return {
+      ...voucher,
+      preparedBy: resolveOperatorDisplayName(
+        voucher.preparedBy,
+        operatorLookup,
+        voucher.createdByAccountId
+      ),
+      reviewedBy: resolveOperatorDisplayName(voucher.reviewedBy, operatorLookup)
+    };
+  }, [voucher, operatorLookup]);
+
   const navigateTo = useCallback((id: string) => {
     if (!id) return;
     setActiveId((prev) => (prev === id ? prev : id));
@@ -147,23 +162,11 @@ export default function VoucherDetailModal({
   }, [open, adjacent, canGoOlder, canGoNewer, navigateTo]);
 
   const handlePrint = () => {
-    if (!voucher || !canPrintVoucher(voucher)) {
+    if (!displayVoucher || !canPrintVoucher(displayVoucher)) {
       message.warning('无权打印该凭证');
       return;
     }
-    const html = ExportUtil.renderPrintVoucher(
-      {
-        ...voucher,
-        preparedBy: resolveOperatorDisplayName(
-          voucher.preparedBy,
-          operatorLookup,
-          voucher.createdByAccountId
-        ),
-        reviewedBy: resolveOperatorDisplayName(voucher.reviewedBy, operatorLookup)
-      },
-      company,
-      attachments
-    );
+    const html = ExportUtil.renderPrintVoucher(displayVoucher, company, attachments);
     ExportUtil.printVoucher(html);
   };
 
@@ -319,11 +322,11 @@ export default function VoucherDetailModal({
                 style={{ marginBottom: 16 }}
               />
             ) : null}
-            {voucher ? (
+            {displayVoucher ? (
               <>
                 <div
                   dangerouslySetInnerHTML={{
-                    __html: ExportUtil.renderPrintVoucher(voucher, company, attachments)
+                    __html: ExportUtil.renderPrintVoucher(displayVoucher, company, attachments)
                   }}
                 />
                 {attachments.length > 0 && (

@@ -1291,6 +1291,7 @@ export default function VoucherForm() {
               readOnly={readOnly}
               redLetter={isRedLetter}
               reviewedBy={displayReviewedBy}
+              showReviewedBy={voucherStatus !== Voucher.STATUS.DRAFT}
               attachmentPanelOpen={attachmentPanelOpen}
               onAttachmentPanelClose={() => setAttachmentPanelOpen(false)}
               onAttachmentPanelToggle={toggleAttachmentPanel}

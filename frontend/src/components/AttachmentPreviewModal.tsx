@@ -11,6 +11,7 @@ import {
 
 import { downloadAttachment } from '../utils/attachmentName';
 import { fetchPdfBuffer, renderPdfPageImages } from '../utils/pdfPreview';
+import EllipsisText from './EllipsisText';
 
 export type AttachmentLike = {
   id?: string;
@@ -32,9 +33,11 @@ function attachmentLabel(att: AttachmentLike | null | undefined) {
 
 function PreviewFileTitle({ label }: { label: string }) {
   return (
-    <div className="attachment-preview-title" title={label}>
+    <div className="attachment-preview-title">
       <PaperClipOutlined className="attachment-preview-title__icon" aria-hidden />
-      <span className="attachment-preview-title__text">{label}</span>
+      <EllipsisText className="attachment-preview-title__text" tooltip={label}>
+        {label}
+      </EllipsisText>
     </div>
   );
 }

@@ -7,6 +7,7 @@ import {
   PlusCircleOutlined
 } from '@ant-design/icons';
 import AmountGrid, { AmountGridHeader } from './AmountGrid';
+import EllipsisText from './EllipsisText';
 import VoucherAttachmentColumn from './VoucherAttachmentColumn';
 import VoucherAttachmentControls from './VoucherAttachmentControls';
 import { amountToChineseUppercase, formatAccountingPeriod } from '../utils/amountGrid';
@@ -53,6 +54,7 @@ function VoucherEntrySheet({
   readOnly = false,
   redLetter = false,
   reviewedBy = '',
+  showReviewedBy = false,
   businessTypeField,
   accountingPeriodLabel,
   dateReadOnly = false,
@@ -210,9 +212,12 @@ function VoucherEntrySheet({
                             <span className="voucher-sheet__readonly-text">{entry?.summary || ''}</span>
                           ) : (
                             <>
-                              <span className="voucher-sheet__cell-preview" title={entry?.summary || ''}>
+                              <EllipsisText
+                                className="voucher-sheet__cell-preview"
+                                tooltip={entry?.summary || ''}
+                              >
                                 {entry?.summary || ''}
-                              </span>
+                              </EllipsisText>
                               <div className="voucher-sheet__cell-editor">
                                 <Input
                                   variant="borderless"
@@ -233,9 +238,12 @@ function VoucherEntrySheet({
                             <span className="voucher-sheet__readonly-text">{accountPreview || ''}</span>
                           ) : (
                             <>
-                              <span className="voucher-sheet__cell-preview" title={accountPreview || ''}>
+                              <EllipsisText
+                                className="voucher-sheet__cell-preview"
+                                tooltip={accountPreview || ''}
+                              >
                                 {accountPreview || ''}
-                              </span>
+                              </EllipsisText>
                               <div className="voucher-sheet__cell-editor">
                                 <Select
                                   variant="borderless"
@@ -358,10 +366,12 @@ function VoucherEntrySheet({
               <span className="voucher-sheet__meta-label">制单人：</span>
               <span className="voucher-sheet__footer-value">{signatory || '—'}</span>
             </Space>
-            <Space size={4}>
-              <span className="voucher-sheet__meta-label">审核人：</span>
-              <span className="voucher-sheet__footer-value">{reviewedBy || '—'}</span>
-            </Space>
+            {showReviewedBy ? (
+              <Space size={4}>
+                <span className="voucher-sheet__meta-label">审核人：</span>
+                <span className="voucher-sheet__footer-value">{reviewedBy || '—'}</span>
+              </Space>
+            ) : null}
           </Space>
         </div>
         {footerActions && (

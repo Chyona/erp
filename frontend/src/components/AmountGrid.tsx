@@ -109,7 +109,6 @@ export default function AmountGrid({
           <div
             key={unit + i}
             className={`amount-grid__cell`}
-            title={unit}
           >
             <span className="amount-grid__digit">{digits[i]}</span>
           </div>
@@ -131,7 +130,6 @@ export default function AmountGrid({
         <div
           key={unit + i}
           className={`amount-grid__cell`}
-          title={unit}
         >
           <span className="amount-grid__digit">{digits[i]}</span>
         </div>

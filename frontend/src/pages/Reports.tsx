@@ -416,6 +416,7 @@ export default function Reports() {
   const [refreshToken, setRefreshToken] = useState(0);
   const [activeTab, setActiveTab] = useState('trial');
   const [reportHeaderAlert, setReportHeaderAlert] = useState(null);
+  const [hasDraftInPeriod, setHasDraftInPeriod] = useState(false);
   const [exporting, setExporting] = useState(false);
   const dateRange = useMemo(() => reportPeriodToDateRange(period), [period]);
 
@@ -434,9 +435,13 @@ export default function Reports() {
         const data = await ReportsService.getTrialBalance(start, end, period);
         if (!cancelled) {
           setReportHeaderAlert(resolveReportHeaderAlert(data, period));
+          setHasDraftInPeriod(Boolean(data.hasDraftInPeriod));
         }
       } catch {
-        if (!cancelled) setReportHeaderAlert(null);
+        if (!cancelled) {
+          setReportHeaderAlert(null);
+          setHasDraftInPeriod(false);
+        }
       }
     };
 
@@ -593,17 +598,19 @@ export default function Reports() {
         renderTabBar={(tabBarProps, DefaultTabBar) => (
           <div className="report-page__tab-head">
             <DefaultTabBar {...tabBarProps} />
-            <div className="report-page-hint">
-              <InfoCircleOutlined className="report-page-hint__icon" aria-hidden />
-              <span>
-                含未审核凭证预览；<span className="report-page__draft-amount">橙色金额</span>
-                表示含未审核贡献
-              </span>
-              <span className="report-page-hint__sep" aria-hidden>
-                ·
-              </span>
-              <span>导出表格与页面一致；凭证清单仍仅含已审核</span>
-            </div>
+            {hasDraftInPeriod ? (
+              <div className="report-page-hint">
+                <InfoCircleOutlined className="report-page-hint__icon" aria-hidden />
+                <span>
+                  含未审核凭证预览；<span className="report-page__draft-amount">橙色金额</span>
+                  表示含未审核贡献
+                </span>
+                <span className="report-page-hint__sep" aria-hidden>
+                  ·
+                </span>
+                <span>导出表格与页面一致；凭证清单仍仅含已审核</span>
+              </div>
+            ) : null}
           </div>
         )}
         items={items}

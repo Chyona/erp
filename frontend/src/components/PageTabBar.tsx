@@ -1,6 +1,7 @@
 import { Dropdown } from 'antd';
 import type { MenuProps } from 'antd';
 import { CloseOutlined, DownOutlined, HomeOutlined } from '@ant-design/icons';
+import EllipsisText from '../components/EllipsisText';
 import { usePageTabs } from '../context/PageTabsContext';
 import { isHomeTabKey } from '../utils/pageTabs';
 
@@ -53,7 +54,6 @@ export default function PageTabBar() {
                 role="tab"
                 aria-selected={active}
                 aria-label={isHome ? tab.title : undefined}
-                title={tab.title}
                 className={`page-tab-bar__item${active ? ' page-tab-bar__item--active' : ''}${
                   isHome ? ' page-tab-bar__item--home' : ''
                 }`}
@@ -64,7 +64,9 @@ export default function PageTabBar() {
                     <HomeOutlined />
                   </span>
                 ) : (
-                  <span className="page-tab-bar__label">{tab.title}</span>
+                  <EllipsisText className="page-tab-bar__label" tooltip={tab.title}>
+                    {tab.title}
+                  </EllipsisText>
                 )}
                 {tab.closable ? (
                   <button

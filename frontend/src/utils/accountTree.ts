@@ -35,7 +35,7 @@ export function buildAccountTree(accounts: Account[]): AccountTreeNode[] {
   for (const account of sorted) {
     nodeMap.set(account.code, {
       key: account.id,
-      title: `${account.code} ${account.name}`,
+      title: '',
       account
     });
   }

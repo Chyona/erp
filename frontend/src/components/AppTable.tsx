@@ -1,5 +1,6 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Table, type TableProps } from 'antd';
+import { normalizeTableColumns } from '../utils/normalizeTableColumns';
 import { appTableRowClassName, mergeTableOnRow, shouldExcludeTableStripe } from '../utils/tableRowGroup';
 
 type AppTableProps<T extends object> = TableProps<T> & {
@@ -10,8 +11,10 @@ export default function AppTable<T extends object = Record<string, unknown>>({
   rowClassName,
   striped = true,
   onRow,
+  columns,
   ...props
 }: AppTableProps<T>) {
+  const normalizedColumns = useMemo(() => normalizeTableColumns(columns), [columns]);
   const mergedRowClassName: TableProps<T>['rowClassName'] = (record, index, indent) => {
     const userClass =
       typeof rowClassName === 'function'
@@ -28,5 +31,12 @@ export default function AppTable<T extends object = Record<string, unknown>>({
     [onRow]
   );
 
-  return <Table {...props} rowClassName={mergedRowClassName} onRow={mergedOnRow} />;
+  return (
+    <Table
+      {...props}
+      columns={normalizedColumns}
+      rowClassName={mergedRowClassName}
+      onRow={mergedOnRow}
+    />
+  );
 }

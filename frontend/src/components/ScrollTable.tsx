@@ -1,5 +1,6 @@
 import { Empty, Table, type TableProps } from 'antd';
-import { useCallback, useRef, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useMemo, useRef, type CSSProperties, type ReactNode } from 'react';
+import { normalizeTableColumns } from '../utils/normalizeTableColumns';
 import { useTableHeaderGutter } from '../hooks/useTableHeaderGutter';
 import { useTableHorizontalScrollBar } from '../hooks/useTableHorizontalScrollBar';
 import { useTableScrollY } from '../hooks/useTableScrollY';
@@ -51,8 +52,10 @@ export default function ScrollTable<T extends object = Record<string, unknown>>(
   rowClassName,
   striped = true,
   onRow,
+  columns,
   ...props
 }: ScrollTableProps<T>) {
+  const normalizedColumns = useMemo(() => normalizeTableColumns(columns), [columns]);
   const rowCount = props.dataSource?.length ?? 0;
   const hasInternalPagination = Boolean(props.pagination);
   const needScrollY =
@@ -115,6 +118,7 @@ export default function ScrollTable<T extends object = Record<string, unknown>>(
     <div className={bodyClass} ref={wrapRef} style={wrapStyle}>
       <Table
         {...props}
+        columns={normalizedColumns}
         bordered={bordered}
         size={size}
         scroll={scrollConfig}

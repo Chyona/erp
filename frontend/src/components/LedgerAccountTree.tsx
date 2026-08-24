@@ -10,6 +10,7 @@ import {
 } from '@ant-design/icons';
 import type { Account } from '../types';
 import type { AntTreeNodeProps } from 'antd/es/tree';
+import EllipsisText from './EllipsisText';
 import {
   buildAccountTree,
   collectAccountTreeKeys,
@@ -17,6 +18,15 @@ import {
   normalizeAccountTree,
   type AccountTreeNode
 } from '../utils/accountTree';
+
+function renderAccountTreeTitle(node: AccountTreeNode) {
+  const label = `${node.account.code} ${node.account.name}`;
+  return (
+    <EllipsisText className="ant-tree-title" tooltip={label}>
+      {label}
+    </EllipsisText>
+  );
+}
 
 type LedgerAccountTreeProps = {
   accounts: Account[];
@@ -136,6 +146,7 @@ export default function LedgerAccountTree({
           className="ledger-page__account-tree"
           treeData={filteredTree}
           icon={renderTreeNodeIcon}
+          titleRender={(nodeData) => renderAccountTreeTitle(nodeData as AccountTreeNode)}
           selectedKeys={selectedId ? [selectedId] : []}
           expandedKeys={expandedKeys}
           onExpand={(keys) => setExpandedKeys(keys.map(String))}

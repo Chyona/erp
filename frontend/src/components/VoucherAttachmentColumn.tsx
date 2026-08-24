@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Button, Popconfirm, Upload, Tooltip, Spin } from 'antd';
+import EllipsisText from './EllipsisText';
 import {
   ClearOutlined,
   CloseOutlined,
@@ -107,9 +108,9 @@ export default function VoucherAttachmentColumn({
               return (
                 <div key={att.id} className="voucher-attach-panel__item">
                   <div className="voucher-attach-panel__item-head">
-                    <span className="voucher-attach-panel__name" title={label}>
+                    <EllipsisText className="voucher-attach-panel__name" tooltip={label}>
                       {label}
-                    </span>
+                    </EllipsisText>
                     {canModify ? (
                       <Popconfirm
                         title="确定删除该附件？"

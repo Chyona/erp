@@ -14,6 +14,7 @@ import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { PageTabsProvider } from '../context/PageTabsContext';
 import PageTabBar from '../components/PageTabBar';
+import EllipsisText from '../components/EllipsisText';
 import KeepAliveOutlet from '../components/KeepAliveOutlet';
 import AppSidebar from '../components/AppSidebar';
 import { changePasswordRequest } from '../services/auth';
@@ -109,8 +110,8 @@ export default function MainLayout() {
       >
         <div className="sidebar-logo">
           <span className="logo-icon">📒</span>
-          <span className="sidebar-logo__title" title={APP_CONFIG.name}>
-            {APP_CONFIG.shortName}
+          <span className="sidebar-logo__title">
+            <EllipsisText tooltip={APP_CONFIG.name}>{APP_CONFIG.shortName}</EllipsisText>
           </span>
         </div>
         <AppSidebar collapsed={collapsed} theme={siderTheme} />
@@ -149,12 +150,13 @@ export default function MainLayout() {
               <button
                 type="button"
                 className="topbar-user"
-                title={`${displayName} · 账户菜单`}
                 aria-label={`${displayName}，打开账户菜单`}
                 aria-haspopup="menu"
               >
                 <Avatar size={28} icon={<UserOutlined />} className="topbar-user__avatar" />
-                <span className="topbar-user__name">{displayName}</span>
+                <EllipsisText className="topbar-user__name" tooltip={displayName}>
+                  {displayName}
+                </EllipsisText>
                 <DownOutlined className="topbar-user__caret" aria-hidden="true" />
               </button>
             </Dropdown>
