@@ -6,7 +6,7 @@ import { useAsyncLoading } from '../hooks/useAsyncLoading';
 import ScrollTable from '../components/ScrollTable';
 import type { AuditLog } from '../types';
 
-const { Title, Paragraph } = Typography;
+const { Paragraph } = Typography;
 
 function formatOperator(log: AuditLog): string {
   const name = (log.operatorNickname || '').trim() || (log.operatorUsername || '').trim();
@@ -51,9 +51,6 @@ export default function Audit() {
   return (
     <div className="page-table-layout">
       <div className="page-table-toolbar">
-        <Title level={2} style={{ margin: '0 0 8px' }}>
-          审计日志
-        </Title>
         <Paragraph type="secondary" style={{ margin: 0 }}>
           所有操作均自动记录操作人，便于税务查账时追溯数据来源与变更历史
         </Paragraph>

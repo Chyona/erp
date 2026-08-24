@@ -21,7 +21,7 @@ import {
 } from '../utils/voucherTimeFilter';
 import { formatBalanceDirection, formatLedgerAmount } from '../utils/ledgerDisplay';
 
-const { Title, Link } = Typography;
+const { Link } = Typography;
 
 const LEDGER_TABLE_SCROLL_X = 962;
 
@@ -280,9 +280,6 @@ export default function Ledger() {
   return (
     <div className="page-table-layout ledger-page">
       <div className="ledger-page__top">
-        <Title level={2} className="ledger-page__title">
-          明细账
-        </Title>
         <div className="ledger-page__toolbar-main">
           <VoucherTimeFilter
             value={timeFilter}

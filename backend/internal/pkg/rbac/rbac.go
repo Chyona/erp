@@ -109,7 +109,7 @@ func (a *Actor) CanMutateVoucher(createdBy uint, status string) bool {
 	return status == "draft" || status == ""
 }
 
-// CanCreateVoucher 是否可新建凭证。
+// CanCreateVoucher 是否可录凭证。
 func (a *Actor) CanCreateVoucher() bool {
 	return a != nil && (a.IsAdmin() || a.IsUser())
 }

@@ -501,7 +501,7 @@ export default function VoucherExamples({ accounts, onApply, getSnapshot }) {
         ) : (
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description="暂无自定义模板，可先录入凭证后通过「保存为凭证模板」添加"
+            description="暂无自定义模板，可先录凭证后通过「保存为凭证模板」添加"
             className="voucher-examples-drawer__empty"
           />
         )}

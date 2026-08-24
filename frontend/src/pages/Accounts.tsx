@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Modal, Form, Input, Select, Typography, App } from 'antd';
+import { Button, Modal, Form, Input, Select, App } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { Accounts } from '../services/accounts';
 import { useApp } from '../context/AppContext';
@@ -7,8 +7,6 @@ import { useAuth } from '../context/AuthContext';
 import { useAsyncLoading } from '../hooks/useAsyncLoading';
 import ScrollTable from '../components/ScrollTable';
 import { confirmDanger } from '../utils/confirmAction';
-
-const { Title } = Typography;
 
 const CATEGORIES = ['资产', '负债', '所有者权益', '成本', '损益'];
 
@@ -114,18 +112,7 @@ export default function AccountsPage() {
 
   return (
     <div className="page-table-layout">
-      <div className="page-header">
-        <Title level={2} style={{ margin: 0 }}>
-          会计科目
-        </Title>
-        {canWrite ? (
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()}>
-            新增科目
-          </Button>
-        ) : null}
-      </div>
-
-      <div className="page-table-toolbar">
+      <div className="page-table-toolbar page-table-toolbar--split">
         <Select
           placeholder="全部类别"
           allowClear
@@ -134,6 +121,11 @@ export default function AccountsPage() {
           onChange={(v) => setCategoryFilter(v || '')}
           options={CATEGORIES.map((c) => ({ value: c, label: c }))}
         />
+        {canWrite ? (
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => openModal()}>
+            新增科目
+          </Button>
+        ) : null}
       </div>
 
       <ScrollTable

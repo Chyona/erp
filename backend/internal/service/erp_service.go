@@ -267,7 +267,7 @@ func (s *erpService) applyVoucherWritePolicy(ctx context.Context, voucher *model
 			return err
 		}
 		if !actor.CanCreateVoucher() {
-			return errors.New("无权新建凭证")
+			return errors.New("无权录凭证")
 		}
 		voucher.CreatedByAccountID = actor.AccountID
 		if strings.TrimSpace(voucher.PreparedBy) == "" {

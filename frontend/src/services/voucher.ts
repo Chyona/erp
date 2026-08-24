@@ -307,7 +307,7 @@ async function save(voucherData: VoucherInput, approve = false): Promise<Voucher
     normalized.preparedBy = existingPreparedBy
       ? normalizePreparedByForSave(existingPreparedBy, operatorName, operatorUsername)
       : normalizePreparedByForSave(normalized.preparedBy, operatorName, operatorUsername) ||
-        operatorName;
+      operatorName;
   }
 
   // 审核人：仅在审核时写入当前登录用户昵称（无昵称用用户名）；草稿不写审核人
@@ -1098,9 +1098,9 @@ async function prepareInsertSlot(voucherType, date, beforeNumber) {
     '插入凭证',
     '凭证',
     `在 ${yearMonth} 预留字号 ${voucherType}-${reservedNumber}` +
-      (anchor
-        ? `（原 ${formatVoucherAuditDetail(anchor)} 及其后凭证顺延）`
-        : `（其后 ${toShift.length} 张顺延）`)
+    (anchor
+      ? `（原 ${formatVoucherAuditDetail(anchor)} 及其后凭证顺延）`
+      : `（其后 ${toShift.length} 张顺延）`)
   );
   return reservedNumber;
 }
@@ -1208,7 +1208,7 @@ function formatMoney(n) {
   );
 }
 
-/** 翻页到「新建凭证」占位（比最新已存凭证更新） */
+/** 翻页到「录凭证」占位（比最新已存凭证更新） */
 export const NEW_VOUCHER_NAV = { __isNewVoucher: true as const };
 
 export type VoucherFormNavTarget = VoucherRecord | typeof NEW_VOUCHER_NAV;
@@ -1217,7 +1217,7 @@ export function isNewVoucherNav(target: unknown): target is typeof NEW_VOUCHER_N
   return Boolean(target && typeof target === 'object' && '__isNewVoucher' in target);
 }
 
-/** 录凭证页翻页：日期新→旧；新建凭证视为最新一页 */
+/** 录凭证页翻页：日期新→旧；录凭证视为最新一页 */
 async function getFormAdjacent(currentId: string | null): Promise<{
   older: VoucherRecord | null;
   newer: VoucherFormNavTarget | null;

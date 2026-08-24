@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Card, Row, Col, Statistic, Typography, List } from 'antd';
+import { Card, Row, Col, Statistic, List } from 'antd';
 import { Voucher } from '../services/voucher';
 import VoucherTable from '../components/VoucherTable';
 import VoucherDetailModal from '../components/VoucherDetailModal';
@@ -7,8 +7,6 @@ import WorkbenchPanel from '../components/WorkbenchPanel';
 import { useAsyncLoading } from '../hooks/useAsyncLoading';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
-
-const { Title } = Typography;
 
 const TIPS = [
   '每笔业务必须附有原始凭证（发票、收据、合同等），并在凭证中上传附件留存',
@@ -41,7 +39,6 @@ export default function Dashboard() {
 
   return (
     <div>
-      <Title level={2}>工作台</Title>
       <Row gutter={16} style={{ marginBottom: 24 }}>
         <Col xs={12} sm={12} lg={6}>
           <Card loading={pageLoading}>

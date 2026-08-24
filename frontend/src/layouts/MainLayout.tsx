@@ -1,16 +1,7 @@
-import { Layout, Menu, Button, Typography, App, Space, Modal, Form, Input, Dropdown, Avatar } from 'antd';
+import { Layout, Typography, App, Space, Modal, Form, Input, Dropdown, Avatar } from 'antd';
 import type { MenuProps } from 'antd';
 import {
-  DashboardOutlined,
-  FileTextOutlined,
-  PlusOutlined,
-  BookOutlined,
-  ReadOutlined,
-  FundOutlined,
-  AuditOutlined,
-  SettingOutlined,
   LogoutOutlined,
-  TeamOutlined,
   LockOutlined,
   UserOutlined,
   DownOutlined,
@@ -19,8 +10,12 @@ import {
   MenuFoldOutlined,
   MenuUnfoldOutlined
 } from '@ant-design/icons';
-import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { PageTabsProvider } from '../context/PageTabsContext';
+import PageTabBar from '../components/PageTabBar';
+import KeepAliveOutlet from '../components/KeepAliveOutlet';
+import AppSidebar from '../components/AppSidebar';
 import { ErpApi } from '../services/erpApi';
 import { ExportUtil } from '../services/export';
 import { changePasswordRequest } from '../services/auth';
@@ -37,7 +32,6 @@ type SiderTheme = 'dark' | 'light';
 
 export default function MainLayout() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { message, modal } = App.useApp();
   const { companyName, reinitApp } = useApp();
   const { user, logout, can } = useAuth();
@@ -64,34 +58,6 @@ export default function MainLayout() {
       return next;
     });
   };
-
-  const navItems = useMemo(() => {
-    const items = [
-      { key: '/', icon: <DashboardOutlined />, label: '工作台' },
-    ];
-    if (can('voucher.create')) {
-      items.push({ key: '/vouchers/new', icon: <PlusOutlined />, label: '新建凭证' });
-    }
-    items.push(
-      { key: '/vouchers', icon: <FileTextOutlined />, label: '凭证管理' },
-      { key: '/ledger', icon: <ReadOutlined />, label: '明细账' },
-      { key: '/reports', icon: <FundOutlined />, label: '财务报表' },
-      { key: '/accounts', icon: <BookOutlined />, label: '会计科目' },
-      { key: '/audit', icon: <AuditOutlined />, label: '审计日志' },
-    );
-    if (can('users')) {
-      items.push({ key: '/users', icon: <TeamOutlined />, label: '用户管理' });
-    }
-    if (can('settings')) {
-      items.push({ key: '/settings', icon: <SettingOutlined />, label: '系统设置' });
-    }
-    return items;
-  }, [can]);
-
-  const menuKey = location.pathname.includes('/edit') || location.pathname.startsWith('/vouchers/new')
-    ? '/vouchers/new'
-    : navItems.find((item) => item.key !== '/' && location.pathname.startsWith(item.key))?.key ||
-    (location.pathname === '/' ? '/' : location.pathname);
 
   const handleBackup = async () => {
     if (!can('backup')) {
@@ -200,13 +166,11 @@ export default function MainLayout() {
             {APP_CONFIG.shortName}
           </span>
         </div>
-        <Menu
+        <AppSidebar
+          collapsed={collapsed}
           theme={siderTheme}
-          mode="inline"
-          selectedKeys={[menuKey]}
-          items={navItems}
-          onClick={({ key }) => navigate(key)}
-          className="sidebar-menu"
+          onBackup={() => void handleBackup()}
+          onRestore={() => void handleRestore()}
         />
         <div className="sidebar-toolbar">
           <button
@@ -234,8 +198,6 @@ export default function MainLayout() {
             {companyName || '请先在设置中填写企业信息'}
           </Typography.Text>
           <Space size={12} className="topbar__actions">
-            {can('backup') ? <Button onClick={handleBackup}>备份数据</Button> : null}
-            {can('restore') ? <Button onClick={handleRestore}>恢复数据</Button> : null}
             <Dropdown
               menu={{ items: userMenuItems }}
               trigger={['hover']}
@@ -257,7 +219,10 @@ export default function MainLayout() {
           </Space>
         </Header>
         <Content className="main-content">
-          <Outlet />
+          <PageTabsProvider>
+            <PageTabBar />
+            <KeepAliveOutlet />
+          </PageTabsProvider>
         </Content>
       </Layout>
 

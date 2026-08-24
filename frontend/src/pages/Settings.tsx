@@ -8,8 +8,6 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 
-const { Title } = Typography;
-
 const FIELDS = [
   'companyName',
   'companyTaxId',
@@ -77,7 +75,6 @@ export default function Settings() {
 
   return (
     <div>
-      <Title level={2}>系统设置</Title>
       <Form form={form} layout="vertical" onFinish={handleSave} style={{ maxWidth: 720 }}>
         <Card title="企业信息" style={{ marginBottom: 16 }}>
           <Form.Item

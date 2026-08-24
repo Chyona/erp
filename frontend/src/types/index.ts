@@ -253,3 +253,16 @@ export interface BalanceSheetMergedRow {
   liabilityOpeningDraft?: boolean;
   liabilityEndingDraft?: boolean;
 }
+
+export interface GeneralLedgerRow {
+  key: string;
+  accountCode: string;
+  accountName: string;
+  period: string;
+  summary: string;
+  debit: number | null;
+  credit: number | null;
+  direction: string;
+  balance: number;
+  accountRowSpan: number;
+}

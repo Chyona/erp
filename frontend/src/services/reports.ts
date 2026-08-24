@@ -850,8 +850,99 @@ function compileBalanceSheetSide(
   return { rows, openingValues, endingValues };
 }
 
+function formatLedgerDirection(account: Account, balance: number) {
+  if (Math.abs(balance) < 0.005) return '平';
+  if (account.direction === 'credit') {
+    return balance > 0 ? '贷' : '借';
+  }
+  return balance > 0 ? '借' : '贷';
+}
+
+function formatPeriodLabel(endDate: string) {
+  return `${endDate.slice(0, 4)}${endDate.slice(5, 7)}`;
+}
+
+async function getGeneralLedger(startDate: string, endDate: string) {
+  const accounts = await Accounts.getAll();
+  const vouchers = await getVouchersUpTo(endDate);
+  const yearStart = `${endDate.slice(0, 4)}-01-01`;
+  const periodLabel = formatPeriodLabel(endDate);
+
+  const openingSums = buildAccountSums(vouchers, { beforeDate: startDate });
+  const periodSums = buildAccountSums(vouchers, { fromDate: startDate, toDate: endDate });
+  const ytdSums = buildAccountSums(vouchers, { fromDate: yearStart, toDate: endDate });
+  const endingSums = buildAccountSums(vouchers, { toDate: endDate });
+
+  const rows = [];
+
+  for (const account of accounts) {
+    const opening = sumSums(openingSums, account.code);
+    const period = sumSums(periodSums, account.code);
+    const ytd = sumSums(ytdSums, account.code);
+    const ending = sumSums(endingSums, account.code);
+
+    const openingBalance = accountBalance(opening.debit, opening.credit, account.direction);
+    const endingBalance = accountBalance(ending.debit, ending.credit, account.direction);
+
+    const hasActivity =
+      Math.abs(openingBalance) >= 0.005 ||
+      Math.abs(period.debit) >= 0.005 ||
+      Math.abs(period.credit) >= 0.005 ||
+      Math.abs(ytd.debit) >= 0.005 ||
+      Math.abs(ytd.credit) >= 0.005 ||
+      Math.abs(endingBalance) >= 0.005;
+
+    if (!hasActivity) continue;
+
+    const base = {
+      accountCode: account.code,
+      accountName: account.name,
+      period: periodLabel
+    };
+
+    rows.push({
+      key: `${account.code}-opening`,
+      ...base,
+      summary: '期初余额',
+      debit: null,
+      credit: null,
+      direction: formatLedgerDirection(account, openingBalance),
+      balance: roundMoney(openingBalance),
+      accountRowSpan: 3
+    });
+    rows.push({
+      key: `${account.code}-period`,
+      ...base,
+      summary: '本期合计',
+      debit: blankMoney(period.debit),
+      credit: blankMoney(period.credit),
+      direction: formatLedgerDirection(account, endingBalance),
+      balance: roundMoney(endingBalance),
+      accountRowSpan: 0
+    });
+    rows.push({
+      key: `${account.code}-ytd`,
+      ...base,
+      summary: '本年累计',
+      debit: blankMoney(ytd.debit),
+      credit: blankMoney(ytd.credit),
+      direction: formatLedgerDirection(account, endingBalance),
+      balance: roundMoney(endingBalance),
+      accountRowSpan: 0
+    });
+  }
+
+  return {
+    startDate,
+    endDate,
+    periodLabel,
+    rows
+  };
+}
+
 export const Reports = {
   getTrialBalance,
   getIncomeStatement,
-  getBalanceSheet
+  getBalanceSheet,
+  getGeneralLedger
 };

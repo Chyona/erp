@@ -725,6 +725,26 @@ function trialBalanceToCSV(data) {
   return rows.join('\n');
 }
 
+function generalLedgerToCSV(data, periodLabel) {
+  const headers = ['科目编码', '科目名称', '期间', '摘要', '借方', '贷方', '方向', '余额'];
+  const rows = [`总账,${periodLabel}`, headers.join(',')];
+  for (const r of data.rows) {
+    rows.push(
+      [
+        r.accountCode,
+        `"${String(r.accountName || '').replace(/"/g, '""')}"`,
+        r.period,
+        r.summary,
+        fmtAmount(r.debit),
+        fmtAmount(r.credit),
+        r.direction,
+        fmtAmount(r.balance)
+      ].join(',')
+    );
+  }
+  return rows.join('\n');
+}
+
 function incomeStatementToCSV(data) {
   const rows = [`利润表,${data.startDate} 至 ${data.endDate}`, '项目,行次,本期金额,本年累计金额'];
   for (const line of data.rows) {
@@ -1025,6 +1045,7 @@ export const ExportUtil = {
   vouchersToCSV,
   vouchersToExcelBlob,
   ledgerToCSV,
+  generalLedgerToCSV,
   trialBalanceToCSV,
   incomeStatementToCSV,
   balanceSheetToCSV,

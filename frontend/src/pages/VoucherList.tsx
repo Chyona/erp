@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Checkbox, Dropdown, Space, Typography, App } from 'antd';
+import { Button, Checkbox, Dropdown, Space, App } from 'antd';
 import {
   PlusOutlined,
   DownloadOutlined,
@@ -24,8 +24,6 @@ import { resolveOperatorDisplayName } from '../utils/operatorDisplayName';
 import { isCarryForwardVoucher } from '../utils/carryForwardVoucher';
 import { useAsyncLoading } from '../hooks/useAsyncLoading';
 import type { VoucherFilters } from '../types';
-
-const { Title } = Typography;
 
 function countActiveFilters(filters: VoucherFilters) {
   const keys: (keyof VoucherFilters)[] = [
@@ -271,17 +269,6 @@ export default function VoucherList() {
 
   return (
     <div className="page-table-layout">
-      <div className="page-header">
-        <Title level={2} style={{ margin: 0 }}>
-          凭证管理
-        </Title>
-        {can('voucher.create') ? (
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/vouchers/new')}>
-            新建凭证
-          </Button>
-        ) : null}
-      </div>
-
       <div className="page-table-toolbar voucher-list-toolbar">
         <div className="voucher-list-toolbar__main">
           <VoucherTimeFilter
@@ -310,7 +297,12 @@ export default function VoucherList() {
         </div>
 
         <div className="voucher-list-toolbar__actions">
-          <Space>
+          <Space wrap>
+            {can('voucher.create') ? (
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/vouchers/new')}>
+                新增
+              </Button>
+            ) : null}
           </Space>
           <Space wrap>
             {can('voucher.approve') ? (

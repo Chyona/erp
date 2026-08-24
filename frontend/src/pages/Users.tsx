@@ -24,8 +24,6 @@ import { toUserMessage } from '../utils/userMessage';
 import { useAuth } from '../context/AuthContext';
 import { Navigate } from 'react-router-dom';
 
-const { Title } = Typography;
-
 /** 邮箱选填：有内容时才校验格式，空值/纯空格不校验 */
 const optionalEmailRules = [
   {
@@ -164,10 +162,7 @@ export default function Users() {
 
   return (
     <div>
-      <div className="page-header" style={{ marginBottom: 16 }}>
-        <Title level={2} style={{ margin: 0 }}>
-          用户管理
-        </Title>
+      <div className="page-header page-header--actions-only">
         <Button type="primary" onClick={() => setCreateOpen(true)}>
           新建账号
         </Button>

@@ -1006,7 +1006,7 @@ export async function handleErpMockRequest(
       }
       if (method === 'DELETE') {
         store.auditLogs.clear();
-        ok(res, null, '已清空审计日志');
+        ok(res, null, '已清空操作日志');
         return true;
       }
     }
@@ -1015,7 +1015,7 @@ export async function handleErpMockRequest(
       const id = decodeURIComponent(logMatch[1]);
       const item = store.auditLogs.get(id);
       if (!item) {
-        fail(res, 404, '审计日志不存在');
+        fail(res, 404, '操作日志不存在');
         return true;
       }
       ok(res, item);

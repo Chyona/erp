@@ -12,6 +12,7 @@ import VoucherList from './pages/VoucherList';
 import VoucherForm from './pages/VoucherForm';
 import Accounts from './pages/Accounts';
 import Ledger from './pages/Ledger';
+import GeneralLedger from './pages/GeneralLedger';
 import Reports from './pages/Reports';
 import Audit from './pages/Audit';
 import Users from './pages/Users';
@@ -60,6 +61,7 @@ export default function App() {
                     <Route path="vouchers/new" element={<VoucherForm />} />
                     <Route path="vouchers/:id/edit" element={<VoucherForm />} />
                     <Route path="accounts" element={<Accounts />} />
+                    <Route path="general-ledger" element={<GeneralLedger />} />
                     <Route path="ledger" element={<Ledger />} />
                     <Route path="reports" element={<Reports />} />
                     <Route path="audit" element={<Audit />} />

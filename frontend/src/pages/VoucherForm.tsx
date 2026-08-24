@@ -14,6 +14,8 @@ import {
 } from 'antd';
 import { useAsyncLoading } from '../hooks/useAsyncLoading';
 import { disableFutureDate } from '../utils/dateConstraints';
+import { usePageTabs } from '../context/PageTabsContext';
+import { getTabKey } from '../utils/pageTabs';
 import { useNavigate, useParams, useSearchParams, useLocation, Navigate } from 'react-router-dom';
 import dayjs from '../utils/dayjsSetup';
 import { Voucher, isNewVoucherNav } from '../services/voucher';
@@ -123,6 +125,8 @@ export default function VoucherForm() {
     setSnapshotVersion((v) => v + 1);
   }, []);
   const navigate = useNavigate();
+  const [tabKey] = useState(() => getTabKey(location.pathname, location.search));
+  const { updateTabTitle } = usePageTabs();
   const { message, modal } = App.useApp();
   const { accounts, refresh } = useApp();
   const { user, canAccessOwnVoucher, canMutateVoucher } = useAuth();
@@ -217,6 +221,20 @@ export default function VoucherForm() {
       attachmentIds: attachments.map((a) => a.id).sort()
     });
   }, [form, voucherNumber, entries, attachments]);
+
+  useEffect(() => {
+    if (isEdit) {
+      if (voucherNumber) {
+        updateTabTitle(tabKey, `凭证 ${VOUCHER_TYPE}-${voucherNumber}`);
+      }
+      return;
+    }
+    if (insertNumber) {
+      updateTabTitle(tabKey, `插入凭证 ${insertNumber}`);
+      return;
+    }
+    updateTabTitle(tabKey, '录凭证');
+  }, [tabKey, isEdit, voucherNumber, insertNumber, updateTabTitle]);
 
   const hasUnsavedChanges = useCallback(() => {
     if (savedSnapshotRef.current === null) return false;

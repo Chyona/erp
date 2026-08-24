@@ -27,7 +27,7 @@ import {
 import { mergeBalanceSheetRows } from '../utils/balanceSheetRows';
 import { useAuth } from '../context/AuthContext';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 function isNegativeAmount(v: unknown) {
   return v != null && Number(v) < -0.005;
@@ -525,9 +525,6 @@ export default function Reports() {
     <div className="page-table-layout">
       <div className="report-page-header">
         <div className="report-page-header__main">
-          <Title level={2} style={{ margin: 0 }}>
-            财务报表
-          </Title>
           <Text type="secondary">
             含未审核凭证预览；<span className="report-page__draft-amount">红色金额</span>
             表示含未审核贡献。导出表格与页面一致；凭证清单仍仅含已审核。
