@@ -71,6 +71,8 @@ func main() {
 	}
 	erpService := service.NewErpService(erpRepo, accountRepo, storeClient)
 	erpHandler := v1handler.NewErpHandler(erpService, accountService)
+	backupService := service.NewBackupService("./data/erp-backups")
+	backupHandler := v1handler.NewBackupHandler(backupService, erpService)
 	appService := service.NewAppService(erpRepo)
 	appHandler := v1handler.NewAppHandler(appService)
 	llmClient := llm.NewClient(cfg.LLM)
@@ -112,7 +114,7 @@ func main() {
 
 	erpData := erpAPI.Group("")
 	erpData.Use(middleware.Auth(jwtManager), middleware.RequirePasswordSetupDone(), middleware.DenyReadonlyOnMutate())
-	routesv1.RegisterErpRoutes(erpData, erpHandler, appHandler, importHandler)
+	routesv1.RegisterErpRoutes(erpData, erpHandler, appHandler, importHandler, backupHandler)
 
 	docs.SwaggerInfo.Host = cfg.Server.Addr()
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))

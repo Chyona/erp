@@ -16,12 +16,9 @@ import { PageTabsProvider } from '../context/PageTabsContext';
 import PageTabBar from '../components/PageTabBar';
 import KeepAliveOutlet from '../components/KeepAliveOutlet';
 import AppSidebar from '../components/AppSidebar';
-import { ErpApi } from '../services/erpApi';
-import { ExportUtil } from '../services/export';
 import { changePasswordRequest } from '../services/auth';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
-import { confirmWarning } from '../utils/confirmAction';
 import { APP_CONFIG } from '../config/app';
 import { toUserMessage } from '../utils/userMessage';
 
@@ -32,9 +29,9 @@ type SiderTheme = 'dark' | 'light';
 
 export default function MainLayout() {
   const navigate = useNavigate();
-  const { message, modal } = App.useApp();
-  const { companyName, reinitApp } = useApp();
-  const { user, logout, can } = useAuth();
+  const { message } = App.useApp();
+  const { companyName } = useApp();
+  const { user, logout } = useAuth();
   const [pwdOpen, setPwdOpen] = useState(false);
   const [pwdForm] = Form.useForm();
   const [pwdSaving, setPwdSaving] = useState(false);
@@ -57,56 +54,6 @@ export default function MainLayout() {
       localStorage.setItem(SIDER_THEME_KEY, next);
       return next;
     });
-  };
-
-  const handleBackup = async () => {
-    if (!can('backup')) {
-      message.warning('当前账号无权备份');
-      return;
-    }
-    const data = await ErpApi.exportAll();
-    const json = JSON.stringify(data, null, 2);
-    ExportUtil.downloadBlob(
-      json,
-      `凭证系统备份_${new Date().toISOString().slice(0, 10)}.json`,
-      'application/json'
-    );
-    await ErpApi.addAuditLog('备份', '全库', `${data.vouchers.length} 条凭证`);
-    message.success('备份文件已下载');
-  };
-
-  const handleRestore = async () => {
-    if (!can('restore')) {
-      message.warning('当前账号无权恢复数据');
-      return;
-    }
-    const ok = await confirmWarning(modal, {
-      title: '确定恢复数据？',
-      content: '恢复备份将覆盖现有全部数据（凭证、科目、设置等），此操作不可撤销。',
-      okText: '选择备份文件'
-    });
-    if (!ok) return;
-
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    input.onchange = async (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-      try {
-        const text = await file.text();
-        const data = JSON.parse(text);
-        if (!data.vouchers) throw new Error('无效的备份文件');
-        await ErpApi.importAll(data);
-        await ErpApi.addAuditLog('恢复', '全库', `从备份恢复 ${data.vouchers.length} 条凭证`);
-        message.success('数据恢复成功');
-        await reinitApp();
-        navigate('/');
-      } catch (err) {
-        message.error('恢复失败：' + toUserMessage(err));
-      }
-    };
-    input.click();
   };
 
   const handleChangePassword = async () => {
@@ -151,7 +98,7 @@ export default function MainLayout() {
   return (
     <Layout className="app-layout">
       <Sider
-        width={160}
+        width={120}
         collapsedWidth={64}
         collapsible
         collapsed={collapsed}
@@ -166,12 +113,7 @@ export default function MainLayout() {
             {APP_CONFIG.shortName}
           </span>
         </div>
-        <AppSidebar
-          collapsed={collapsed}
-          theme={siderTheme}
-          onBackup={() => void handleBackup()}
-          onRestore={() => void handleRestore()}
-        />
+        <AppSidebar collapsed={collapsed} theme={siderTheme} />
         <div className="sidebar-toolbar">
           <button
             type="button"

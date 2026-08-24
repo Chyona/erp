@@ -10,6 +10,7 @@ import {
   type MockRole
 } from './authUsers';
 import { erpMockStore, mockId, type MockAttachment, type MockVoucher } from './erpStore';
+import { mockBackupStore } from './backupStore';
 
 type Json = Record<string, unknown> | unknown[] | string | number | boolean | null;
 
@@ -471,6 +472,117 @@ export async function handleErpMockRequest(
       store.importAll(body ?? {});
       ok(res, null, '导入成功');
       return true;
+    }
+
+    if (path === '/backups') {
+      if (auth?.role === 'readonly') {
+        fail(res, 403, '当前账号无权查看备份');
+        return true;
+      }
+      if (method === 'GET') {
+        ok(res, mockBackupStore.list());
+        return true;
+      }
+      if (method === 'POST') {
+        const body = (await parseJSON<{ name?: string }>(req)) ?? {};
+        ok(res, mockBackupStore.create(body.name));
+        return true;
+      }
+    }
+    if (method === 'POST' && path === '/backups/upload') {
+      if (auth?.role !== 'admin') {
+        fail(res, 403, '需要管理员权限');
+        return true;
+      }
+      const contentType = String(req.headers['content-type'] || '');
+      const buf = await readBodyBuffer(req);
+      const { fields, file } = parseMockMultipart(buf, contentType);
+      if (!file?.data) {
+        fail(res, 400, '请上传备份文件');
+        return true;
+      }
+      try {
+        const record = mockBackupStore.upload(fields.name, file.data.toString('utf8'));
+        ok(res, record);
+      } catch (err) {
+        fail(res, 400, err instanceof Error ? err.message : '无效的备份文件');
+      }
+      return true;
+    }
+    if (method === 'POST' && path === '/backups/batch-delete') {
+      if (auth?.role !== 'admin') {
+        fail(res, 403, '需要管理员权限');
+        return true;
+      }
+      const body = (await parseJSON<{ ids?: string[] }>(req)) ?? {};
+      mockBackupStore.batchRemove(body.ids ?? []);
+      ok(res, null, '删除成功');
+      return true;
+    }
+    const backupMatch = /^\/backups\/([^/]+)(?:\/(download|restore))?$/.exec(path);
+    if (backupMatch) {
+      const id = decodeURIComponent(backupMatch[1]);
+      const action = backupMatch[2];
+      if (action === 'download') {
+        if (auth?.role === 'readonly') {
+          fail(res, 403, '当前账号无权下载备份');
+          return true;
+        }
+        try {
+          const { record, content } = mockBackupStore.download(id);
+          const filename = record.name.endsWith('.bak') ? record.name : `${record.name}.bak`;
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/octet-stream');
+          res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+          res.end(content);
+        } catch (err) {
+          fail(res, 404, err instanceof Error ? err.message : '备份不存在');
+        }
+        return true;
+      }
+      if (action === 'restore') {
+        if (auth?.role !== 'admin') {
+          fail(res, 403, '需要管理员权限');
+          return true;
+        }
+        if (method !== 'POST') {
+          fail(res, 405, 'Method Not Allowed');
+          return true;
+        }
+        try {
+          mockBackupStore.restore(id);
+          ok(res, null, '恢复成功');
+        } catch (err) {
+          fail(res, 404, err instanceof Error ? err.message : '恢复失败');
+        }
+        return true;
+      }
+      if (method === 'PUT') {
+        if (auth?.role !== 'admin') {
+          fail(res, 403, '需要管理员权限');
+          return true;
+        }
+        const body = (await parseJSON<{ name?: string }>(req)) ?? {};
+        if (!body.name?.trim()) {
+          fail(res, 400, '备份名称不能为空');
+          return true;
+        }
+        try {
+          ok(res, mockBackupStore.rename(id, body.name));
+        } catch (err) {
+          fail(res, 404, err instanceof Error ? err.message : '备份不存在');
+        }
+        return true;
+      }
+      if (method === 'DELETE') {
+        if (auth?.role !== 'admin') {
+          fail(res, 403, '需要管理员权限');
+          return true;
+        }
+        mockBackupStore.remove(id);
+        ok(res, null, '删除成功');
+        return true;
+      }
     }
 
     // accounts

@@ -1,4 +1,4 @@
-import { getApiBase } from './apiClient';
+import { apiRequest } from './apiClient';
 
 const IMAGE_EXT = /\.(png|jpe?g|webp|bmp|gif)$/i;
 const IMAGE_MIME = /^image\//i;
@@ -78,24 +78,13 @@ export async function imageFileToRows(
   const { mimeType, base64 } = await fileToBase64(file);
 
   onProgress?.('正在用视觉大模型识别图片中的分录表，请稍候…', 25);
-  const url = `${getApiBase()}/vouchers/parse-import-image`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ imageBase64: base64, mimeType })
-  });
+  const data = await apiRequest<{ rows?: string[][]; engine?: string }>(
+    'POST',
+    '/vouchers/parse-import-image',
+    { imageBase64: base64, mimeType }
+  );
 
-  let json: { code: number; message: string; data?: { rows?: string[][] } };
-  try {
-    json = await res.json();
-  } catch {
-    throw new Error(`识别服务响应异常（HTTP ${res.status}）`);
-  }
-  if (!res.ok || json.code !== 0) {
-    throw new Error(json.message || `识别失败（HTTP ${res.status}）`);
-  }
-
-  const rows = json.data?.rows || [];
+  const rows = data?.rows || [];
   if (!rows.length) {
     throw new Error('未能从截图中识别出表格，请换更清晰的分录表截图后重试');
   }

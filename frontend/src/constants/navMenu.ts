@@ -1,12 +1,9 @@
 import type { Permission } from '../utils/permissions';
 
-export type NavAction = 'backup' | 'restore';
-
 export type NavLinkItem = {
   key: string;
   label: string;
   path?: string;
-  action?: NavAction;
   permission?: Permission;
 };
 
@@ -98,11 +95,8 @@ export function buildNavMenu(can: CanFn): NavMenuEntry[] {
   if (can('settings')) {
     adminItems.push({ key: '/settings', label: '系统设置', path: '/settings' });
   }
-  if (can('backup')) {
-    adminItems.push({ key: 'backup', label: '备份数据', action: 'backup' });
-  }
-  if (can('restore')) {
-    adminItems.push({ key: 'restore', label: '恢复数据', action: 'restore' });
+  if (can('backup') || can('restore')) {
+    adminItems.push({ key: '/backup-restore', label: '备份与恢复', path: '/backup-restore' });
   }
   if (adminItems.length) {
     systemSections.push({ title: '系统管理', items: adminItems });
@@ -133,6 +127,7 @@ export function resolveNavActiveKey(pathname: string): string {
   if (pathname.startsWith('/audit')) return '/audit';
   if (pathname.startsWith('/users')) return '/users';
   if (pathname.startsWith('/settings')) return '/settings';
+  if (pathname.startsWith('/backup-restore')) return '/backup-restore';
   if (pathname === '/') return '/';
   return pathname;
 }

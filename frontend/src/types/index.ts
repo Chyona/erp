@@ -266,3 +266,11 @@ export interface GeneralLedgerRow {
   balance: number;
   accountRowSpan: number;
 }
+
+export interface BackupRecord {
+  id: string;
+  name: string;
+  createdAt: string;
+  size: number;
+  source: 'manual' | 'upload' | string;
+}

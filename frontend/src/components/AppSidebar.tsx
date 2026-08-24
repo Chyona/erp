@@ -1,13 +1,15 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   AuditOutlined,
+  BookFilled,
   BookOutlined,
-  CloudDownloadOutlined,
-  CloudUploadOutlined,
-  DashboardOutlined,
+  FileTextFilled,
   FileTextOutlined,
+  FundFilled,
   FundOutlined,
-  ReadOutlined,
+  HomeFilled,
+  HomeOutlined,
+  SettingFilled,
   SettingOutlined
 } from '@ant-design/icons';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -16,45 +18,50 @@ import {
   buildNavMenu,
   isNavGroupActive,
   resolveNavActiveKey,
-  type NavAction,
   type NavMenuEntry,
   type NavMenuGroup
 } from '../constants/navMenu';
 import { useAuth } from '../context/AuthContext';
 
-const GROUP_ICONS: Record<string, React.ReactNode> = {
-  dashboard: <DashboardOutlined />,
-  voucher: <FileTextOutlined />,
-  ledger: <ReadOutlined />,
-  reports: <FundOutlined />,
-  system: <SettingOutlined />
+type NavIconSet = {
+  outline: React.ReactNode;
+  filled: React.ReactNode;
+};
+
+const GROUP_ICONS: Record<string, NavIconSet> = {
+  dashboard: { outline: <HomeOutlined />, filled: <HomeFilled /> },
+  voucher: { outline: <FileTextOutlined />, filled: <FileTextFilled /> },
+  ledger: { outline: <BookOutlined />, filled: <BookFilled /> },
+  reports: { outline: <FundOutlined />, filled: <FundFilled /> },
+  system: { outline: <SettingOutlined />, filled: <SettingFilled /> }
 };
 
 const SECTION_ICONS: Record<string, React.ReactNode> = {
   凭证处理: <FileTextOutlined />,
-  账簿查询: <ReadOutlined />,
+  账簿查询: <BookOutlined />,
   基础资料: <BookOutlined />,
   操作记录: <AuditOutlined />,
   系统管理: <SettingOutlined />
 };
 
-const ACTION_ICONS: Partial<Record<NavAction, React.ReactNode>> = {
-  backup: <CloudDownloadOutlined />,
-  restore: <CloudUploadOutlined />
-};
+function NavIcon({ icons, active }: { icons: NavIconSet; active: boolean }) {
+  return (
+    <span className={`sidebar-nav__icon${active ? ' sidebar-nav__icon--filled' : ''}`}>
+      {active ? icons.filled : icons.outline}
+    </span>
+  );
+}
 
 type AppSidebarProps = {
   collapsed: boolean;
   theme: 'dark' | 'light';
-  onBackup: () => void;
-  onRestore: () => void;
 };
 
-export default function AppSidebar({ collapsed, theme, onBackup, onRestore }: AppSidebarProps) {
+export default function AppSidebar({ collapsed, theme }: AppSidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { can } = useAuth();
-  const [hoverKey, setHoverKey] = useState<string | null>(null);
+  const [highlightKey, setHighlightKey] = useState<string | null>(null);
   const [flyoutTop, setFlyoutTop] = useState(0);
   const hideTimerRef = useRef<number | null>(null);
   const itemRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
@@ -70,10 +77,10 @@ export default function AppSidebar({ collapsed, theme, onBackup, onRestore }: Ap
   }, [menuEntries, activeKey]);
 
   const hoveredGroup = useMemo(() => {
-    if (!hoverKey) return null;
-    const entry = menuEntries.find((item) => item.key === hoverKey);
+    if (!highlightKey) return null;
+    const entry = menuEntries.find((item) => item.key === highlightKey);
     return entry?.type === 'group' ? entry : null;
-  }, [hoverKey, menuEntries]);
+  }, [highlightKey, menuEntries]);
 
   const clearHideTimer = useCallback(() => {
     if (hideTimerRef.current != null) {
@@ -84,7 +91,7 @@ export default function AppSidebar({ collapsed, theme, onBackup, onRestore }: Ap
 
   const scheduleHide = useCallback(() => {
     clearHideTimer();
-    hideTimerRef.current = window.setTimeout(() => setHoverKey(null), 160);
+    hideTimerRef.current = window.setTimeout(() => setHighlightKey(null), 160);
   }, [clearHideTimer]);
 
   const openFlyout = useCallback(
@@ -95,34 +102,25 @@ export default function AppSidebar({ collapsed, theme, onBackup, onRestore }: Ap
         const rect = el.getBoundingClientRect();
         setFlyoutTop(Math.max(72, Math.min(rect.top, window.innerHeight - 280)));
       }
-      setHoverKey(key);
+      setHighlightKey(key);
     },
     [clearHideTimer]
   );
 
-  const handleLeafClick = (path?: string, action?: NavAction) => {
-    if (action === 'backup') {
-      onBackup();
-      setHoverKey(null);
-      return;
-    }
-    if (action === 'restore') {
-      onRestore();
-      setHoverKey(null);
-      return;
-    }
+  const handleLeafClick = (path?: string) => {
     if (path) {
       navigate(path);
-      setHoverKey(null);
+      setHighlightKey(null);
     }
   };
 
   const renderNavButton = (entry: NavMenuEntry) => {
-    const icon = GROUP_ICONS[entry.key] ?? <SettingOutlined />;
+    const icons = GROUP_ICONS[entry.key] ?? GROUP_ICONS.system;
     const isLink = entry.type === 'link';
     const isActive = isLink
       ? activeKey === entry.path
-      : entry.key === activeGroupKey || entry.key === hoverKey;
+      : entry.key === activeGroupKey || entry.key === highlightKey;
+    const isHighlighted = isActive || highlightKey === entry.key;
 
     return (
       <button
@@ -132,25 +130,31 @@ export default function AppSidebar({ collapsed, theme, onBackup, onRestore }: Ap
           if (node) itemRefs.current.set(entry.key, node);
           else itemRefs.current.delete(entry.key);
         }}
-        className={`sidebar-nav__item${isActive ? ' sidebar-nav__item--active' : ''}`}
+        className={`sidebar-nav__item${isHighlighted ? ' sidebar-nav__item--highlight' : ''}${
+          isActive ? ' sidebar-nav__item--active' : ''
+        }`}
         title={entry.label}
         onMouseEnter={() => {
           if (entry.type === 'group') openFlyout(entry.key);
-          else clearHideTimer();
+          else {
+            clearHideTimer();
+            setHighlightKey(entry.key);
+          }
         }}
         onMouseLeave={() => {
           if (entry.type === 'group') scheduleHide();
+          else setHighlightKey(null);
         }}
         onClick={() => {
           if (entry.type === 'link') {
             navigate(entry.path);
-            setHoverKey(null);
+            setHighlightKey(null);
           } else {
             openFlyout(entry.key);
           }
         }}
       >
-        <span className="sidebar-nav__icon">{icon}</span>
+        <NavIcon icons={icons} active={isHighlighted} />
         {!collapsed ? <span className="sidebar-nav__label">{entry.label}</span> : null}
       </button>
     );
@@ -183,13 +187,8 @@ export default function AppSidebar({ collapsed, theme, onBackup, onRestore }: Ap
                         key={item.key}
                         type="button"
                         className={`sidebar-nav-flyout__link${isItemActive ? ' sidebar-nav-flyout__link--active' : ''}`}
-                        onClick={() => handleLeafClick(item.path, item.action)}
+                        onClick={() => handleLeafClick(item.path)}
                       >
-                        {item.action ? (
-                          <span className="sidebar-nav-flyout__link-icon">
-                            {ACTION_ICONS[item.action]}
-                          </span>
-                        ) : null}
                         {item.label}
                       </button>
                     );
@@ -204,7 +203,7 @@ export default function AppSidebar({ collapsed, theme, onBackup, onRestore }: Ap
 
   return (
     <nav className={`sidebar-nav sidebar-nav--${theme}`} aria-label="主导航">
-      {menuEntries.map(renderNavButton)}
+      <div className="sidebar-nav__main">{menuEntries.map(renderNavButton)}</div>
       {flyout}
     </nav>
   );

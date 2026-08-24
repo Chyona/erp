@@ -8,7 +8,7 @@ import (
 // RegisterErpRoutes 注册 ERP 数据存储路由（/openapi/erp/v1）。
 // 统一批量入口（须注册在 /:id 之前）：
 //   POST /{store}/batch  { action, ids?|items? }  — 数组长度 1 即单条
-func RegisterErpRoutes(rg *gin.RouterGroup, erpHandler *v1handler.ErpHandler, appHandler *v1handler.AppHandler, importHandler *v1handler.ImportHandler) {
+func RegisterErpRoutes(rg *gin.RouterGroup, erpHandler *v1handler.ErpHandler, appHandler *v1handler.AppHandler, importHandler *v1handler.ImportHandler, backupHandler *v1handler.BackupHandler) {
 	rg.POST("/app/init", appHandler.Init)
 
 	accounts := rg.Group("/accounts")
@@ -78,5 +78,19 @@ func RegisterErpRoutes(rg *gin.RouterGroup, erpHandler *v1handler.ErpHandler, ap
 	{
 		data.GET("/export", erpHandler.ExportAll)
 		data.POST("/import", erpHandler.ImportAll)
+	}
+
+	if backupHandler != nil {
+		backups := rg.Group("/backups")
+		{
+			backups.GET("", backupHandler.ListBackups)
+			backups.POST("", backupHandler.CreateBackup)
+			backups.POST("/upload", backupHandler.UploadBackup)
+			backups.POST("/batch-delete", backupHandler.BatchDeleteBackups)
+			backups.GET("/:id/download", backupHandler.DownloadBackup)
+			backups.PUT("/:id", backupHandler.RenameBackup)
+			backups.DELETE("/:id", backupHandler.DeleteBackup)
+			backups.POST("/:id/restore", backupHandler.RestoreBackup)
+		}
 	}
 }

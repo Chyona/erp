@@ -17,6 +17,7 @@ import Reports from './pages/Reports';
 import Audit from './pages/Audit';
 import Users from './pages/Users';
 import Settings from './pages/Settings';
+import BackupRestore from './pages/BackupRestore';
 import './utils/dayjsSetup';
 
 export default function App() {
@@ -67,6 +68,7 @@ export default function App() {
                     <Route path="audit" element={<Audit />} />
                     <Route path="users" element={<Users />} />
                     <Route path="settings" element={<Settings />} />
+                    <Route path="backup-restore" element={<BackupRestore />} />
                   </Route>
                 </Route>
               </Routes>

@@ -8,7 +8,8 @@ const ROUTE_TITLES: Record<string, string> = {
   '/reports': '报表',
   '/audit': '操作日志',
   '/users': '用户管理',
-  '/settings': '系统设置'
+  '/settings': '系统设置',
+  '/backup-restore': '备份与恢复'
 };
 
 export const PAGE_TABS_MAX = 20;
