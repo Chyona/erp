@@ -123,8 +123,8 @@ body {
 }
 
 :root {
-  --app-font-size: 16px;
-  --app-font-size-sm: 14px;
+  --app-font-size: 14px;
+  --app-font-size-sm: 12px;
   --app-font-size-xs: 12px;
   --app-table-header-bg: #f0f2f5;
   --app-table-header-color: #374151;
@@ -254,27 +254,27 @@ body,
 }
 
 .app-sider--dark {
-  --sider-bg: #1a2d42;
+  --sider-bg: #1e2d40;
   --sider-logo-text: #5eb3ff;
-  --sider-border: rgba(255, 255, 255, 0.08);
-  --sider-item-color: #c5d4e3;
-  --sider-item-hover-bg: rgba(43, 66, 91, 0.92);
+  --sider-border: rgba(255, 255, 255, 0.06);
+  --sider-item-color: rgba(255, 255, 255, 0.72);
+  --sider-item-hover-bg: rgba(94, 179, 255, 0.14);
   --sider-item-hover-color: #5eb3ff;
-  --sider-item-active-bg: rgba(43, 66, 91, 0.92);
+  --sider-item-active-bg: rgba(94, 179, 255, 0.14);
   --sider-item-active-color: #5eb3ff;
   --sider-footer-color: #7f95ab;
-  --sider-toolbar-color: #b0c4d6;
+  --sider-toolbar-color: rgba(255, 255, 255, 0.55);
   --sider-toolbar-hover-color: #ffffff;
 }
 
 .app-sider--light {
   --sider-bg: linear-gradient(180deg, #d9ebff 0%, #eaf4ff 42%, #f7fbff 100%);
   --sider-logo-text: #1890ff;
-  --sider-border: rgba(24, 144, 255, 0.12);
-  --sider-item-color: #4a5568;
-  --sider-item-hover-bg: rgba(255, 255, 255, 0.72);
+  --sider-border: rgba(24, 144, 255, 0.1);
+  --sider-item-color: #5c6b7a;
+  --sider-item-hover-bg: rgba(24, 144, 255, 0.12);
   --sider-item-hover-color: #1890ff;
-  --sider-item-active-bg: #ffffff;
+  --sider-item-active-bg: rgba(24, 144, 255, 0.12);
   --sider-item-active-color: #1890ff;
   --sider-footer-color: #8c9bab;
   --sider-toolbar-color: #5c6b7a;
@@ -362,7 +362,7 @@ body,
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  padding: 10px 0 8px;
+  padding: 8px 0;
   display: flex;
   flex-direction: column;
 }
@@ -374,8 +374,8 @@ body,
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding-bottom: 4px;
+  gap: 2px;
+  padding: 0 6px 4px;
 }
 
 .sidebar-nav__footer {
@@ -390,14 +390,15 @@ body,
 
 .sidebar-nav__item {
   display: flex;
+  flex-direction: row;
   align-items: center;
-  gap: 8px;
-  width: calc(100% - 12px);
-  margin: 4px 6px;
-  min-height: 40px;
-  padding: 0 8px;
+  gap: 4px;
+  width: 100%;
+  margin-block: 4px;
+  min-height: 36px;
+  padding: 8px;
   border: none;
-  border-radius: 10px;
+  border-radius: 6px;
   background: transparent;
   color: var(--sider-item-color);
   cursor: pointer;
@@ -407,47 +408,48 @@ body,
 
 .sidebar-nav__item:hover,
 .sidebar-nav__item--highlight {
-  background: var(--sider-item-hover-bg);
-  color: var(--sider-item-hover-color);
+  background: var(--sider-item-active-bg);
+  color: var(--sider-item-active-color);
 }
 
 .sidebar-nav__item--active {
   background: var(--sider-item-active-bg);
   color: var(--sider-item-active-color);
-  font-weight: 500;
+}
+
+.sidebar-nav__item--active:hover {
+  background: var(--sider-item-active-bg);
+  color: var(--sider-item-active-color);
 }
 
 .app-sider--light .sidebar-nav__item--active,
 .app-sider--light .sidebar-nav__item--highlight {
-  box-shadow: 0 1px 4px rgba(24, 144, 255, 0.1);
+  box-shadow: none;
 }
 
 .sidebar-nav__icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
-  font-size: 18px;
+  width: 24px;
+  height: 24px;
+  font-size: 16px;
   flex-shrink: 0;
   color: inherit;
-  transition: color 0.18s ease, transform 0.18s ease;
+  transition: color 0.18s ease;
 }
 
 .sidebar-nav__icon .anticon {
   display: block;
   line-height: 1;
+  font-size: 16px;
 }
 
 .sidebar-nav__icon .closing-nav-icon {
   display: block;
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   flex-shrink: 0;
-}
-
-.sidebar-nav__icon--filled .anticon {
-  transform: scale(1.02);
 }
 
 .sidebar-nav__label {
@@ -459,13 +461,16 @@ body,
   font-size: 16px;
   line-height: 1.25;
   letter-spacing: 0.01em;
+  text-align: left;
+}
+
+.app-sider.ant-layout-sider-collapsed .sidebar-nav__main {
+  padding-inline: 8px;
 }
 
 .app-sider.ant-layout-sider-collapsed .sidebar-nav__item {
   justify-content: center;
   padding: 0;
-  width: calc(100% - 16px);
-  margin-inline: 8px;
 }
 
 .app-sider.ant-layout-sider-collapsed .sidebar-nav__label {
@@ -625,7 +630,9 @@ body,
 
 .sidebar-logo__title {
   margin: 0;
-  font-size: 15px;
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
   font-weight: 600;
   line-height: 1.3;
   color: var(--sider-logo-text);
@@ -644,7 +651,7 @@ body,
 }
 
 .logo-icon {
-  font-size: 22px;
+  font-size: 20px;
   line-height: 1;
   flex-shrink: 0;
 }
@@ -858,10 +865,12 @@ body,
 }
 
 .page-tab-bar__label {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--app-font-size-sm);
+  font-size: var(--app-font-size);
   line-height: 1.2;
 }
 

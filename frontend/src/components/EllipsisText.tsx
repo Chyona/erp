@@ -7,8 +7,8 @@ type EllipsisTextProps = {
   children: ReactNode;
   className?: string;
   style?: CSSProperties;
-  /** Tooltip text; defaults to plain-text children when truncated */
-  tooltip?: string;
+  /** Tooltip text when truncated; `false` disables tooltip entirely */
+  tooltip?: string | false;
 };
 
 function toPlainText(node: ReactNode): string {
@@ -21,13 +21,17 @@ function toPlainText(node: ReactNode): string {
 
 export function renderEllipsisCell(
   value: string | number | null | undefined,
-  tooltip?: string
+  tooltip?: string | false
 ): ReactNode {
   if (value == null || value === '') return value ?? '';
   const text = String(value);
-  return (
-    <EllipsisText tooltip={tooltip ?? text}>{text}</EllipsisText>
-  );
+  return <EllipsisText tooltip={tooltip ?? text}>{text}</EllipsisText>;
+}
+
+function resolveEllipsisConfig(tooltip?: string | false) {
+  if (tooltip === false) return true;
+  if (typeof tooltip === 'string' && tooltip) return { tooltip };
+  return { tooltip: true };
 }
 
 export default function EllipsisText({
@@ -38,14 +42,13 @@ export default function EllipsisText({
 }: EllipsisTextProps) {
   if (children == null || children === '') return null;
 
-  const tip = tooltip ?? toPlainText(children);
   const classNames = ['ellipsis-text', className].filter(Boolean).join(' ');
 
   return (
     <Text
       className={classNames || undefined}
       style={{ width: '100%', maxWidth: '100%', marginBottom: 0, ...style }}
-      ellipsis={tip ? { tooltip: tip } : true}
+      ellipsis={resolveEllipsisConfig(tooltip)}
     >
       {children}
     </Text>

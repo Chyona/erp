@@ -758,7 +758,7 @@ export default function VoucherTable({
     {
       title: '科目',
       key: 'account',
-      width: 140,
+      width: 150,
       ellipsis: true,
       onCell: (record) => resolveCellProps(record, 'account'),
       render: (_, record) => {
@@ -771,7 +771,7 @@ export default function VoucherTable({
     {
       title: '借方金额',
       key: 'debit',
-      width: 100,
+      width: 120,
       align: 'right',
       onCell: (record) => resolveCellProps(record, 'debit'),
       render: (_, record) => {
@@ -784,7 +784,7 @@ export default function VoucherTable({
     {
       title: '贷方金额',
       key: 'credit',
-      width: 100,
+      width: 120,
       align: 'right',
       onCell: (record) => resolveCellProps(record, 'credit'),
       render: (_, record) => {
@@ -808,7 +808,7 @@ export default function VoucherTable({
     {
       title: '附件',
       key: 'attachments',
-      width: 100,
+      width: 80,
       align: 'center',
       className: 'voucher-grouped-table__attach-col',
       onCell: (record) => resolveCellProps(record, 'attachments', true),

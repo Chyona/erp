@@ -32,9 +32,9 @@ export default function App() {
           borderRadius: 8,
           fontFamily: '"Microsoft YaHei", "PingFang SC", -apple-system, sans-serif',
           colorBgSpotlight: '#ffffff',
-          fontSize: 16,
+          fontSize: 14,
           fontSizeSM: 12,
-          fontSizeLG: 18
+          fontSizeLG: 16
         },
         components: {
           Tooltip: {
@@ -51,16 +51,16 @@ export default function App() {
             fontSize: 14
           },
           Form: {
-            labelFontSize: 16
+            labelFontSize: 14
           },
           Input: {
-            fontSize: 16
+            fontSize: 14
           },
           Select: {
-            fontSize: 16
+            fontSize: 14
           },
           Button: {
-            contentFontSize: 16
+            contentFontSize: 14
           }
         }
       }}

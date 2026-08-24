@@ -110,9 +110,7 @@ export default function MainLayout() {
       >
         <div className="sidebar-logo">
           <span className="logo-icon">📒</span>
-          <span className="sidebar-logo__title">
-            <EllipsisText tooltip={APP_CONFIG.name}>{APP_CONFIG.shortName}</EllipsisText>
-          </span>
+          <span className="sidebar-logo__title">{APP_CONFIG.shortName}</span>
         </div>
         <AppSidebar collapsed={collapsed} theme={siderTheme} />
         <div className="sidebar-toolbar">

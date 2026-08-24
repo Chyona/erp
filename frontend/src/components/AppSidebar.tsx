@@ -22,7 +22,6 @@ import {
   type NavMenuGroup
 } from '../constants/navMenu';
 import { useAuth } from '../context/AuthContext';
-import EllipsisText from './EllipsisText';
 
 type NavIconSet = {
   outline: React.ReactNode;
@@ -121,8 +120,8 @@ export default function AppSidebar({ collapsed, theme }: AppSidebarProps) {
     const isLink = entry.type === 'link';
     const isActive = isLink
       ? activeKey === entry.path
-      : entry.key === activeGroupKey || entry.key === highlightKey;
-    const isHighlighted = isActive || highlightKey === entry.key;
+      : entry.key === activeGroupKey;
+    const isHighlighted = !isActive && highlightKey === entry.key;
 
     return (
       <button
@@ -155,12 +154,8 @@ export default function AppSidebar({ collapsed, theme }: AppSidebarProps) {
           }
         }}
       >
-        <NavIcon icons={icons} active={isHighlighted} />
-        {!collapsed ? (
-          <EllipsisText className="sidebar-nav__label" tooltip={entry.label}>
-            {entry.label}
-          </EllipsisText>
-        ) : null}
+        <NavIcon icons={icons} active={isActive || isHighlighted} />
+        {!collapsed ? <span className="sidebar-nav__label">{entry.label}</span> : null}
       </button>
     );
   };
