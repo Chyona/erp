@@ -13,6 +13,12 @@ type LoginForm = {
   password: string;
 };
 
+function safeRedirectPath(raw: string): string {
+  const path = String(raw || '').trim();
+  if (!path.startsWith('/') || path.startsWith('//')) return '/';
+  return path;
+}
+
 export default function Login() {
   const { isAuthenticated, mustChangePassword, login } = useAuth();
   const navigate = useNavigate();
@@ -28,7 +34,9 @@ export default function Login() {
   }
 
   const searchFrom = new URLSearchParams(location.search).get('from') || '';
-  const from = (location.state as { from?: string } | null)?.from || searchFrom || '/';
+  const from = safeRedirectPath(
+    (location.state as { from?: string } | null)?.from || searchFrom || '/'
+  );
 
   const onFinish = async (values: LoginForm) => {
     setSubmitting(true);
@@ -73,7 +81,7 @@ export default function Login() {
           layout="vertical"
           size="large"
           onFinish={onFinish}
-          initialValues={{ username: 'admin', password: '' }}
+          initialValues={{ username: '', password: '' }}
           requiredMark={false}
         >
           <Form.Item
@@ -102,7 +110,7 @@ export default function Login() {
         </Form>
         {import.meta.env.VITE_USE_MOCK === 'true' ? (
           <Typography.Paragraph type="secondary" style={{ marginTop: 16, marginBottom: 0, fontSize: 12 }}>
-            Mock：admin/admin（管理员，已设密）；user/user、readonly/readonly（首次登录需设密）
+            Mock 模式：请使用 mock 账号登录（首次登录可能需设密）
           </Typography.Paragraph>
         ) : (
           <Typography.Paragraph type="secondary" style={{ marginTop: 16, marginBottom: 0, fontSize: 12 }}>

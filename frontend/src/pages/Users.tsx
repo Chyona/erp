@@ -325,7 +325,7 @@ export default function Users() {
             name="password"
             label="初始密码"
             extra="用户首次登录后需自行设置新密码"
-            rules={[{ required: true, min: 6, message: '至少 6 位' }]}
+            rules={[{ required: true, min: 8, message: '至少 8 位' }]}
           >
             <Input.Password />
           </Form.Item>
@@ -383,7 +383,25 @@ export default function Users() {
                 ? '修改后立即生效'
                 : '用户下次登录后需再次设置自己的密码'
             }
-            rules={[{ required: true, min: 6, message: '至少 6 位' }]}
+            rules={[{ required: true, min: 8, message: '至少 8 位' }]}
+          >
+            <Input.Password />
+          </Form.Item>
+          <Form.Item
+            name="confirmPassword"
+            label="确认密码"
+            dependencies={['password']}
+            rules={[
+              { required: true, message: '请再次输入密码' },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (!value || getFieldValue('password') === value) {
+                    return Promise.resolve();
+                  }
+                  return Promise.reject(new Error('两次输入的密码不一致'));
+                }
+              })
+            ]}
           >
             <Input.Password />
           </Form.Item>

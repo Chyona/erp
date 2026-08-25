@@ -1,19 +1,23 @@
 package middleware
 
 import (
+	"errors"
 	"strings"
 
+	"erp/internal/model"
 	"erp/internal/pkg/authjwt"
 	"erp/internal/pkg/rbac"
 	"erp/internal/pkg/response"
+	"erp/internal/repository"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 const authHeaderKey = "Authorization"
 const authContextKey = "auth_claims"
 
-// Auth JWT Bearer 鉴权中间件。
-func Auth(jwtManager *authjwt.Manager) gin.HandlerFunc {
+// Auth JWT Bearer 鉴权中间件；每次请求从数据库刷新角色与账号状态。
+func Auth(jwtManager *authjwt.Manager, accountRepo repository.AccountRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		header := c.GetHeader(authHeaderKey)
 		if header == "" {
@@ -43,10 +47,50 @@ func Auth(jwtManager *authjwt.Manager) gin.HandlerFunc {
 			return
 		}
 
+		account, dbErr := accountRepo.GetByID(c.Request.Context(), claims.AccountID)
+		if dbErr != nil {
+			if errors.Is(dbErr, gorm.ErrRecordNotFound) {
+				response.Unauthorized(c, "账号不存在或已删除")
+			} else {
+				response.InternalError(c, "校验登录状态失败")
+			}
+			c.Abort()
+			return
+		}
+		if account.Status != 1 {
+			response.Unauthorized(c, "账号已禁用")
+			c.Abort()
+			return
+		}
+
+		claims.Username = account.Username
+		if account.Nickname != "" {
+			claims.Nickname = account.Nickname
+		}
+		claims.Role = resolveAccountRole(account)
+		claims.MustChangePassword = account.MustChangePassword
+
 		c.Set(authContextKey, claims)
 		c.Request = c.Request.WithContext(rbac.WithActor(c.Request.Context(), claims.ToActor()))
 		c.Next()
 	}
+}
+
+func resolveAccountRole(account *model.Account) string {
+	raw := strings.TrimSpace(account.Role)
+	if raw == "" && account.Username == "admin" {
+		return rbac.RoleAdmin
+	}
+	return rbac.NormalizeRole(raw)
+}
+
+// SetTestClaims 单元测试注入 JWT 声明（勿用于生产代码）。
+func SetTestClaims(c *gin.Context, claims *authjwt.Claims) {
+	if claims == nil {
+		return
+	}
+	c.Set(authContextKey, claims)
+	c.Request = c.Request.WithContext(rbac.WithActor(c.Request.Context(), claims.ToActor()))
 }
 
 // RequireRoles 仅允许指定角色继续。

@@ -30,7 +30,7 @@ func main() {
 			Use:   "schema",
 			Short: "初始化数据库表结构",
 			RunE: func(cmd *cobra.Command, args []string) error {
-				return withDB(func(db *gorm.DB, logger *zap.Logger) error {
+				return withDB(func(db *gorm.DB, logger *zap.Logger, _ *config.Config) error {
 					return migrator.InitSchema(db, logger)
 				})
 			},
@@ -39,8 +39,8 @@ func main() {
 			Use:   "seed",
 			Short: "填充种子数据",
 			RunE: func(cmd *cobra.Command, args []string) error {
-				return withDB(func(db *gorm.DB, logger *zap.Logger) error {
-					return seeder.SeedAll(db, logger)
+				return withDB(func(db *gorm.DB, logger *zap.Logger, cfg *config.Config) error {
+					return seeder.SeedAll(db, logger, cfg.Server.Mode)
 				})
 			},
 		},
@@ -48,11 +48,11 @@ func main() {
 			Use:   "init",
 			Short: "一键初始化：建表 + 填充种子数据",
 			RunE: func(cmd *cobra.Command, args []string) error {
-				return withDB(func(db *gorm.DB, logger *zap.Logger) error {
+				return withDB(func(db *gorm.DB, logger *zap.Logger, cfg *config.Config) error {
 					if err := migrator.InitSchema(db, logger); err != nil {
 						return err
 					}
-					return seeder.SeedAll(db, logger)
+					return seeder.SeedAll(db, logger, cfg.Server.Mode)
 				})
 			},
 		},
@@ -64,7 +64,7 @@ func main() {
 	}
 }
 
-func withDB(fn func(db *gorm.DB, logger *zap.Logger) error) error {
+func withDB(fn func(db *gorm.DB, logger *zap.Logger, cfg *config.Config) error) error {
 	cfg, err := config.Load(configPath)
 	if err != nil {
 		return fmt.Errorf("加载配置失败: %w", err)
@@ -81,5 +81,5 @@ func withDB(fn func(db *gorm.DB, logger *zap.Logger) error) error {
 		return fmt.Errorf("初始化数据库失败: %w", err)
 	}
 
-	return fn(db, logger)
+	return fn(db, logger, cfg)
 }

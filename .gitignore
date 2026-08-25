@@ -3,6 +3,7 @@ frontend/node_modules
 frontend/dist
 frontend/dist.rar
 frontend/dist.zip
+frontend/public/pdfjs/
 frontend/.DS_Store
 frontend/*.local
 frontend/.env

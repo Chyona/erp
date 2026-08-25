@@ -1,9 +1,4 @@
-import * as pdfjs from 'pdfjs-dist';
-
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url
-).toString();
+import { getPdfDocumentInit, pdfjs } from './pdfWorker';
 
 function assertPdfBuffer(buffer: ArrayBuffer) {
   const head = new TextDecoder().decode(buffer.slice(0, 5));
@@ -27,10 +22,7 @@ export async function renderPdfPageImages(
   source: string | ArrayBuffer,
   maxWidth = 960
 ): Promise<{ page: number; src: string }[]> {
-  const loadingTask =
-    typeof source === 'string'
-      ? pdfjs.getDocument({ url: source, withCredentials: false })
-      : pdfjs.getDocument({ data: source });
+  const loadingTask = pdfjs.getDocument(getPdfDocumentInit(source));
   const pdf = await loadingTask.promise;
   const pages: { page: number; src: string }[] = [];
 

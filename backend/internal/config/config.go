@@ -26,9 +26,10 @@ type Config struct {
 
 // ServerConfig HTTP 服务相关配置。
 type ServerConfig struct {
-	Host string `mapstructure:"host"`
-	Port int    `mapstructure:"port"`
-	Mode string `mapstructure:"mode"`
+	Host        string   `mapstructure:"host"`
+	Port        int      `mapstructure:"port"`
+	Mode        string   `mapstructure:"mode"`
+	CORSOrigins []string `mapstructure:"cors_origins"`
 }
 
 // AuthConfig 登录 JWT 配置。
@@ -148,6 +149,32 @@ func Load(configPath string) (*Config, error) {
 	return &cfg, nil
 }
 
+const defaultJWTSecret = "erp-dev-jwt-secret-change-me"
+
+// Validate 校验生产环境必填项。
+func (c *Config) Validate() error {
+	mode := strings.TrimSpace(c.Server.Mode)
+	secret := strings.TrimSpace(c.Auth.JWTSecret)
+	if mode == "release" {
+		if secret == "" || secret == defaultJWTSecret || len(secret) < 32 {
+			return fmt.Errorf("生产环境须设置至少 32 位的 APP_AUTH_JWT_SECRET")
+		}
+	}
+	return nil
+}
+
+// CORSAllowList 返回允许的跨域 Origin 列表。
+func (c *Config) CORSAllowList() []string {
+	out := make([]string, 0, len(c.Server.CORSOrigins))
+	for _, origin := range c.Server.CORSOrigins {
+		origin = strings.TrimSpace(origin)
+		if origin != "" {
+			out = append(out, origin)
+		}
+	}
+	return out
+}
+
 // applyEnvOverrides 用已设置的环境变量覆盖配置（仅当环境变量存在时生效）。
 func applyEnvOverrides(cfg *Config) {
 	if val, ok := os.LookupEnv("SERVER_HOST"); ok {
@@ -160,6 +187,11 @@ func applyEnvOverrides(cfg *Config) {
 	}
 	if val, ok := os.LookupEnv("SERVER_MODE"); ok {
 		cfg.Server.Mode = val
+	}
+	if val, ok := os.LookupEnv("APP_CORS_ORIGINS"); ok {
+		cfg.Server.CORSOrigins = splitCSV(val)
+	} else if val, ok := os.LookupEnv("CORS_ORIGINS"); ok {
+		cfg.Server.CORSOrigins = splitCSV(val)
 	}
 
 	if val, ok := os.LookupEnv("DATABASE_HOST"); ok {
@@ -292,4 +324,16 @@ func applyEnvOverrides(cfg *Config) {
 			cfg.Auth.ExpireHours = n
 		}
 	}
+}
+
+func splitCSV(raw string) []string {
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }

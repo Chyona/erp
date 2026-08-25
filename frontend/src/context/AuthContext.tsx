@@ -4,6 +4,29 @@ import { can, canMutateVoucher, canPrintVoucher, canAccessOwnVoucher, normalizeR
 const TOKEN_KEY = 'erp_auth_token';
 const USER_KEY = 'erp_auth_user';
 
+function isTokenExpired(token: string | null): boolean {
+  if (!token) return true;
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return true;
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))) as { exp?: number };
+    if (typeof payload.exp !== 'number') return false;
+    return payload.exp * 1000 <= Date.now();
+  } catch {
+    return true;
+  }
+}
+
+function readStoredToken(): string | null {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (isTokenExpired(token)) {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    return null;
+  }
+  return token;
+}
+
 export type AuthUser = {
   accountId: number;
   username: string;
@@ -45,8 +68,8 @@ function readStoredUser(): AuthUser | null {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem(TOKEN_KEY));
-  const [user, setUser] = useState<AuthUser | null>(() => readStoredUser());
+  const [token, setToken] = useState<string | null>(() => readStoredToken());
+  const [user, setUser] = useState<AuthUser | null>(() => (readStoredToken() ? readStoredUser() : null));
 
   const login = useCallback((nextToken: string, nextUser: AuthUser) => {
     const normalized = {

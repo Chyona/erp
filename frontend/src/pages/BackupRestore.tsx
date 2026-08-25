@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ColumnsType } from 'antd/es/table';
-import { Alert, App, Button, Input, Modal, Space, Typography } from 'antd';
+import { Alert, App, Button, Form, Input, Modal, Space, Typography } from 'antd';
 import { ExclamationCircleOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { Backup, formatBackupSize, formatBackupSource } from '../services/backup';
@@ -94,24 +94,51 @@ export default function BackupRestore() {
     }
   };
 
-  const handleRestore = async (record: BackupRecord) => {
+  const handleRestore = (record: BackupRecord) => {
     if (!canRestore) {
       message.warning('当前账号无权恢复数据');
       return;
     }
-    const ok = await confirmWarning(modal, {
+    let passwordValue = '';
+    modal.confirm({
       title: '确定恢复数据？',
-      content: `恢复备份「${record.name}」将覆盖现有全部数据（凭证、科目、设置等），此操作不可撤销。`
+      content: (
+        <div>
+          <div style={{ marginBottom: 12 }}>
+            恢复备份「{record.name}」将覆盖现有全部数据（凭证、科目、设置等），此操作不可撤销。
+          </div>
+          <Form layout="vertical">
+            <Form.Item label="当前登录密码" required style={{ marginBottom: 0 }}>
+              <Input.Password
+                autoComplete="current-password"
+                placeholder="请输入当前登录密码"
+                onChange={(e) => {
+                  passwordValue = e.target.value;
+                }}
+              />
+            </Form.Item>
+          </Form>
+        </div>
+      ),
+      okText: '恢复',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: async () => {
+        const password = passwordValue.trim();
+        if (!password) {
+          return Promise.reject(new Error('请输入当前登录密码'));
+        }
+        try {
+          await Backup.restore(record.id, password);
+          message.success('数据恢复成功');
+          await reinitApp();
+          navigate('/');
+        } catch (err) {
+          message.error(toUserMessage(err, '恢复失败'));
+          return Promise.reject(err);
+        }
+      }
     });
-    if (!ok) return;
-    try {
-      await Backup.restore(record.id);
-      message.success('数据恢复成功');
-      await reinitApp();
-      navigate('/');
-    } catch (err) {
-      message.error(toUserMessage(err, '恢复失败'));
-    }
   };
 
   const openRename = (record: BackupRecord) => {

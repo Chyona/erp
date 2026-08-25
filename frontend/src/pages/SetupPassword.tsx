@@ -102,12 +102,12 @@ export default function SetupPassword() {
             label="新密码"
             rules={[
               { required: true, message: '请输入新密码' },
-              { min: 6, message: '密码至少 6 位' }
+              { min: 8, message: '密码至少 8 位' }
             ]}
           >
             <Input.Password
               prefix={<LockOutlined />}
-              placeholder="至少 6 位"
+              placeholder="至少 8 位"
               autoComplete="new-password"
             />
           </Form.Item>

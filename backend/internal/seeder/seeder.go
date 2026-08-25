@@ -7,12 +7,9 @@ import (
 )
 
 // SeedAll 执行全部种子数据填充。
-func SeedAll(db *gorm.DB, logger *zap.Logger) error {
+func SeedAll(db *gorm.DB, logger *zap.Logger, serverMode string) error {
 	logger.Info("开始填充种子数据...")
-	if err := SeedAccounts(db, logger); err != nil {
-		return err
-	}
-	if err := EnsureAccountRoles(db, logger); err != nil {
+	if err := SeedAccounts(db, logger, serverMode); err != nil {
 		return err
 	}
 	logger.Info("种子数据填充完成")

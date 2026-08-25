@@ -5,6 +5,36 @@ import { mergeBalanceSheetRows } from '../utils/balanceSheetRows';
 import { formatStoredTaxExemptionPeriod } from '../utils/reportPeriod';
 import { formatBalanceDirection } from '../utils/ledgerDisplay';
 
+function escapeHtml(text: unknown): string {
+  return String(text ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function isAllowedAttachmentFetchUrl(url: string): boolean {
+  if (!url || url.startsWith('data:')) return false;
+  try {
+    const parsed = new URL(url, window.location.origin);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+    if (parsed.origin === window.location.origin) return true;
+    const allowedHosts = String(import.meta.env.VITE_ATTACHMENT_FETCH_HOSTS || '')
+      .split(',')
+      .map((host) => host.trim())
+      .filter(Boolean);
+    if (!allowedHosts.length) {
+      return /\.(myqcloud|aliyuncs|volces)\.com$/i.test(parsed.hostname);
+    }
+    return allowedHosts.some(
+      (host) => parsed.hostname === host || parsed.hostname.endsWith(`.${host}`)
+    );
+  } catch {
+    return false;
+  }
+}
+
 function downloadBlob(content, filename, type = 'text/plain;charset=utf-8') {
   const blob = new Blob(['\ufeff' + content], { type });
   const url = URL.createObjectURL(blob);
@@ -818,8 +848,8 @@ function renderPrintVoucher(voucher, company, attachments) {
     .map(
       (e) => `
       <tr>
-        <td>${e.summary}</td>
-        <td>${e.accountCode} ${e.accountName}</td>
+        <td>${escapeHtml(e.summary)}</td>
+        <td>${escapeHtml(e.accountCode)} ${escapeHtml(e.accountName)}</td>
         <td class="amount">${e.debit ? parseFloat(e.debit).toFixed(2) : ''}</td>
         <td class="amount">${e.credit ? parseFloat(e.credit).toFixed(2) : ''}</td>
       </tr>
@@ -828,24 +858,24 @@ function renderPrintVoucher(voucher, company, attachments) {
     .join('');
 
   const attachHtml = attachments.length
-    ? `<div class="pv-attachments">附件：${attachments.map((a) => a.name).join('、')}</div>`
+    ? `<div class="pv-attachments">附件：${attachments.map((a) => escapeHtml(a.name)).join('、')}</div>`
     : '';
 
-  const preparedBy = (voucher.preparedBy || '').trim() || '______';
-  const reviewedBy = (voucher.reviewedBy || '').trim() || '______';
+  const preparedBy = escapeHtml((voucher.preparedBy || '').trim() || '______');
+  const reviewedBy = escapeHtml((voucher.reviewedBy || '').trim() || '______');
 
   return `
       <div class="print-voucher print-area">
         <div class="pv-header">
           <div class="pv-title">记 账 凭 证</div>
-          <div class="pv-company">${company.name || ''}</div>
-          ${company.taxId ? `<div style="font-size:12px;color:#666">统一社会信用代码：${company.taxId}</div>` : ''}
+          <div class="pv-company">${escapeHtml(company.name || '')}</div>
+          ${company.taxId ? `<div style="font-size:12px;color:#666">统一社会信用代码：${escapeHtml(company.taxId)}</div>` : ''}
         </div>
         <div class="pv-meta">
-          <span>凭证字号：${voucher.voucherNo}</span>
-          <span>日期：${voucher.date}</span>
-          <span>附单据数：${voucher.attachmentCount || 0}</span>
-          <span>校验码：${voucher.checksum || ''}</span>
+          <span>凭证字号：${escapeHtml(voucher.voucherNo)}</span>
+          <span>日期：${escapeHtml(voucher.date)}</span>
+          <span>附单据数：${Number(voucher.attachmentCount) || 0}</span>
+          <span>校验码：${escapeHtml(voucher.checksum || '')}</span>
         </div>
         <table>
           <thead>
@@ -865,9 +895,9 @@ function renderPrintVoucher(voucher, company, attachments) {
             </tr>
           </tfoot>
         </table>
-        ${voucher.invoiceNumbers ? `<div style="margin-top:8px;font-size:12px">发票号码：${voucher.invoiceNumbers}</div>` : ''}
+        ${voucher.invoiceNumbers ? `<div style="margin-top:8px;font-size:12px">发票号码：${escapeHtml(voucher.invoiceNumbers)}</div>` : ''}
         ${invoiceMeta}
-        ${voucher.remark ? `<div style="margin-top:4px;font-size:12px">备注：${voucher.remark}</div>` : ''}
+        ${voucher.remark ? `<div style="margin-top:4px;font-size:12px">备注：${escapeHtml(voucher.remark)}</div>` : ''}
         ${attachHtml}
         <div class="pv-signatures">
           <span>制单人：${preparedBy}</span>
@@ -981,7 +1011,7 @@ async function appendPeriodAttachmentsToZip(
     const { voucher, id, index } = tasks[i];
     try {
       const att = await Voucher.getAttachment(id);
-      if (!att?.url || String(att.url).startsWith('data:')) {
+      if (!att?.url || String(att.url).startsWith('data:') || !isAllowedAttachmentFetchUrl(String(att.url))) {
         failed += 1;
         onProgress?.(i + 1, total);
         continue;

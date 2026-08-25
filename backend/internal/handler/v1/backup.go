@@ -13,12 +13,13 @@ import (
 
 // BackupHandler 备份与恢复 HTTP 处理器。
 type BackupHandler struct {
-	backupService service.BackupService
-	erpService    service.ErpService
+	backupService  service.BackupService
+	erpService     service.ErpService
+	accountService service.AccountService
 }
 
-func NewBackupHandler(backupService service.BackupService, erpService service.ErpService) *BackupHandler {
-	return &BackupHandler{backupService: backupService, erpService: erpService}
+func NewBackupHandler(backupService service.BackupService, erpService service.ErpService, accountService service.AccountService) *BackupHandler {
+	return &BackupHandler{backupService: backupService, erpService: erpService, accountService: accountService}
 }
 
 func (h *BackupHandler) writeAudit(c *gin.Context, action, target, details string) {
@@ -28,7 +29,8 @@ func (h *BackupHandler) writeAudit(c *gin.Context, action, target, details strin
 func requireBackupExport(c *gin.Context) bool {
 	actor := middleware.GetActor(c)
 	if actor == nil {
-		return true
+		response.Unauthorized(c, "请先登录")
+		return false
 	}
 	if !actor.CanExport() {
 		response.Forbidden(c, "当前账号无权备份")
@@ -40,7 +42,8 @@ func requireBackupExport(c *gin.Context) bool {
 func requireBackupRestore(c *gin.Context) bool {
 	actor := middleware.GetActor(c)
 	if actor == nil {
-		return true
+		response.Unauthorized(c, "请先登录")
+		return false
 	}
 	if !actor.IsAdmin() {
 		response.Forbidden(c, "需要管理员权限")
@@ -95,6 +98,10 @@ func (h *BackupHandler) UploadBackup(c *gin.Context) {
 	file, err := c.FormFile("file")
 	if err != nil {
 		response.BadRequest(c, "请上传备份文件")
+		return
+	}
+	if file.Size > maxUploadBytes {
+		response.BadRequest(c, "备份文件不能超过 20MB")
 		return
 	}
 	f, err := file.Open()
@@ -195,6 +202,27 @@ func (h *BackupHandler) BatchDeleteBackups(c *gin.Context) {
 // RestoreBackup POST /backups/:id/restore
 func (h *BackupHandler) RestoreBackup(c *gin.Context) {
 	if !requireBackupRestore(c) {
+		return
+	}
+	var body struct {
+		Password string `json:"password"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	password := strings.TrimSpace(body.Password)
+	if password == "" {
+		response.BadRequest(c, "恢复全库数据需输入当前登录密码")
+		return
+	}
+	claims := middleware.GetAuthClaims(c)
+	if claims == nil {
+		response.Unauthorized(c, "请先登录")
+		return
+	}
+	if err := h.accountService.VerifyPassword(c.Request.Context(), claims.AccountID, password); err != nil {
+		response.Forbidden(c, "密码不正确")
 		return
 	}
 	data, err := h.backupService.Read(c.Request.Context(), c.Param("id"))

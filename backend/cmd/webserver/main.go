@@ -41,6 +41,10 @@ func main() {
 		fmt.Fprintf(os.Stderr, "加载配置失败: %v\n", err)
 		os.Exit(1)
 	}
+	if err := cfg.Validate(); err != nil {
+		fmt.Fprintf(os.Stderr, "配置校验失败: %v\n", err)
+		os.Exit(1)
+	}
 
 	logger, err := bootstrap.InitLogger(cfg.Logger)
 	if err != nil {
@@ -72,7 +76,7 @@ func main() {
 	erpService := service.NewErpService(erpRepo, accountRepo, storeClient)
 	erpHandler := v1handler.NewErpHandler(erpService, accountService)
 	backupService := service.NewBackupService("./data/erp-backups")
-	backupHandler := v1handler.NewBackupHandler(backupService, erpService)
+	backupHandler := v1handler.NewBackupHandler(backupService, erpService, accountService)
 	appService := service.NewAppService(erpRepo)
 	appHandler := v1handler.NewAppHandler(appService)
 	llmClient := llm.NewClient(cfg.LLM)
@@ -94,8 +98,8 @@ func main() {
 	); err != nil {
 		logger.Fatal("自动迁移数据库表失败", zap.Error(err))
 	}
-	if err := seeder.EnsureBuiltinAdmin(db, logger); err != nil {
-		logger.Warn("确保内置管理员失败", zap.Error(err))
+	if err := seeder.EnsureBuiltinAdmin(db, logger, cfg.Server.Mode); err != nil {
+		logger.Fatal("确保内置管理员失败", zap.Error(err))
 	}
 	if err := seeder.EnsureAccountRoles(db, logger); err != nil {
 		logger.Warn("补齐账号角色失败", zap.Error(err))
@@ -103,21 +107,23 @@ func main() {
 
 	gin.SetMode(cfg.Server.Mode)
 	r := gin.New()
-	r.Use(gin.Recovery(), middleware.CORS(), middleware.RequestLogger(logger))
+	r.Use(gin.Recovery(), middleware.SecurityHeaders(), middleware.CORS(cfg.CORSAllowList()), middleware.RequestLogger(logger))
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
 
 	erpAPI := r.Group("/openapi/erp/v1")
-	routesv1.RegisterRoutes(erpAPI, v1AccountHandler, v1AuthHandler, v2AccountHandler, jwtManager)
+	routesv1.RegisterRoutes(erpAPI, v1AccountHandler, v1AuthHandler, v2AccountHandler, jwtManager, accountRepo)
 
 	erpData := erpAPI.Group("")
-	erpData.Use(middleware.Auth(jwtManager), middleware.RequirePasswordSetupDone(), middleware.DenyReadonlyOnMutate())
+	erpData.Use(middleware.Auth(jwtManager, accountRepo), middleware.RequirePasswordSetupDone(), middleware.DenyReadonlyOnMutate())
 	routesv1.RegisterErpRoutes(erpData, erpHandler, appHandler, importHandler, backupHandler)
 
-	docs.SwaggerInfo.Host = cfg.Server.Addr()
-	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	if cfg.Server.Mode != "release" {
+		docs.SwaggerInfo.Host = cfg.Server.Addr()
+		r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	}
 
 	addr := cfg.Server.Addr()
 	logger.Info("HTTP 服务启动", zap.String("addr", addr))

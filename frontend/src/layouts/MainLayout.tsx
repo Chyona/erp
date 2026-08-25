@@ -187,7 +187,7 @@ export default function MainLayout() {
           <Form.Item
             name="newPassword"
             label="新密码"
-            rules={[{ required: true, min: 6, message: '新密码至少 6 位' }]}
+            rules={[{ required: true, min: 8, message: '新密码至少 8 位' }]}
           >
             <Input.Password autoComplete="new-password" />
           </Form.Item>

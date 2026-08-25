@@ -42,7 +42,7 @@ export function sanitizeUserMessage(raw: string, fallback = '操作失败，请�
     return '请填写用户名';
   }
   if (/field validation for 'password'/i.test(msg)) {
-    return /min/i.test(msg) ? '密码至少 6 位' : '请填写密码';
+    return /min/i.test(msg) ? '密码至少 8 位' : '请填写密码';
   }
 
   // 明显技术英文、几乎无中文

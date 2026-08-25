@@ -233,27 +233,6 @@ function PdfGalleryLightbox({
         </header>
 
         <div className="attachment-lightbox__body attachment-lightbox__body--document">
-          {showSwitch && canPrev ? (
-            <button
-              type="button"
-              className="attachment-lightbox__switch attachment-lightbox__switch--prev"
-              onClick={() => onIndexChange(safeIndex - 1)}
-              aria-label="上一个附件"
-            >
-              <LeftOutlined />
-            </button>
-          ) : null}
-          {showSwitch && canNext ? (
-            <button
-              type="button"
-              className="attachment-lightbox__switch attachment-lightbox__switch--next"
-              onClick={() => onIndexChange(safeIndex + 1)}
-              aria-label="下一个附件"
-            >
-              <RightOutlined />
-            </button>
-          ) : null}
-
           <div className="attachment-lightbox__content attachment-lightbox__content--document" key={current.url || safeIndex}>
             {!current.url ? (
               <div className="attachment-lightbox__status">

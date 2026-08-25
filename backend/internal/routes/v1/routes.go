@@ -7,6 +7,7 @@ import (
 	"erp/internal/middleware"
 	"erp/internal/pkg/authjwt"
 	"erp/internal/pkg/rbac"
+	"erp/internal/repository"
 	"github.com/gin-gonic/gin"
 )
 
@@ -17,17 +18,18 @@ func RegisterRoutes(
 	authHandler *v1handler.AuthHandler,
 	profileHandler *v2handler.AccountHandler,
 	jwtManager *authjwt.Manager,
+	accountRepo repository.AccountRepository,
 ) {
 	auth := rg.Group("/auth")
 	{
-		auth.POST("/login", authHandler.Login)
-		auth.POST("/confirm-password", middleware.Auth(jwtManager), authHandler.ConfirmPassword)
-		auth.POST("/setup-password", middleware.Auth(jwtManager), authHandler.SetupPassword)
-		auth.POST("/skip-password-setup", middleware.Auth(jwtManager), authHandler.SkipPasswordSetup)
-		auth.POST("/change-password", middleware.Auth(jwtManager), middleware.RequirePasswordSetupDone(), authHandler.ChangePassword)
+		auth.POST("/login", middleware.DefaultLoginRateLimit(), authHandler.Login)
+		auth.POST("/confirm-password", middleware.Auth(jwtManager, accountRepo), authHandler.ConfirmPassword)
+		auth.POST("/setup-password", middleware.Auth(jwtManager, accountRepo), authHandler.SetupPassword)
+		auth.POST("/skip-password-setup", middleware.Auth(jwtManager, accountRepo), authHandler.SkipPasswordSetup)
+		auth.POST("/change-password", middleware.Auth(jwtManager, accountRepo), middleware.RequirePasswordSetupDone(), authHandler.ChangePassword)
 	}
 
-	users := rg.Group("/users", middleware.Auth(jwtManager), middleware.RequirePasswordSetupDone(), middleware.RequireRoles(rbac.RoleAdmin))
+	users := rg.Group("/users", middleware.Auth(jwtManager, accountRepo), middleware.RequirePasswordSetupDone(), middleware.RequireRoles(rbac.RoleAdmin))
 	{
 		users.POST("", accountHandler.CreateAccount)
 		users.GET("", accountHandler.ListAccounts)

@@ -64,8 +64,8 @@ export const Backup = {
     return apiRequest<void>('POST', '/backups/batch-delete', { ids });
   },
 
-  restore(id: string): Promise<void> {
-    return apiRequest<void>('POST', `/backups/${encodeURIComponent(id)}/restore`);
+  restore(id: string, password: string): Promise<void> {
+    return apiRequest<void>('POST', `/backups/${encodeURIComponent(id)}/restore`, { password });
   },
 
   async download(record: BackupRecord) {

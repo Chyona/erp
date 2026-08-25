@@ -1,15 +1,10 @@
-import * as pdfjs from 'pdfjs-dist';
+import { getPdfDocumentInit, pdfjs } from './pdfWorker';
 
 export { fetchPdfBuffer, renderPdfPageImages } from './pdfPreview';
 
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url
-).toString();
-
 export async function pdfFirstPageToPngFile(file: File): Promise<File> {
   const data = await file.arrayBuffer();
-  const pdf = await pdfjs.getDocument({ data }).promise;
+  const pdf = await pdfjs.getDocument(getPdfDocumentInit(data)).promise;
   const page = await pdf.getPage(1);
   const viewport = page.getViewport({ scale: 2 });
   const canvas = document.createElement('canvas');

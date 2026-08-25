@@ -2,6 +2,9 @@ package seeder
 
 import (
 	"errors"
+	"fmt"
+	"os"
+	"strings"
 
 	"erp/internal/model"
 	"erp/internal/pkg/rbac"
@@ -13,22 +16,35 @@ import (
 
 const (
 	builtinAdminUsername = "admin"
-	builtinAdminPassword = "admin"
 	builtinAdminEmail    = "admin@example.com"
 	builtinAdminNickname = "管理员"
+	devAdminPassword     = "ChangeMe1!"
 )
 
+func resolveInitialAdminPassword(serverMode string) (string, error) {
+	if fromEnv := strings.TrimSpace(os.Getenv("APP_ADMIN_INITIAL_PASSWORD")); fromEnv != "" {
+		if len(fromEnv) < utils.MinPasswordLen {
+			return "", fmt.Errorf("APP_ADMIN_INITIAL_PASSWORD 至少 %d 位", utils.MinPasswordLen)
+		}
+		return fromEnv, nil
+	}
+	if serverMode == "release" {
+		return "", errors.New("生产环境须设置 APP_ADMIN_INITIAL_PASSWORD（至少 8 位）")
+	}
+	return devAdminPassword, nil
+}
+
 // SeedAccounts 填充默认账号种子数据（保证内置 admin 存在）。
-func SeedAccounts(db *gorm.DB, logger *zap.Logger) error {
-	if err := EnsureBuiltinAdmin(db, logger); err != nil {
+func SeedAccounts(db *gorm.DB, logger *zap.Logger, serverMode string) error {
+	if err := EnsureBuiltinAdmin(db, logger, serverMode); err != nil {
 		return err
 	}
 	return EnsureAccountRoles(db, logger)
 }
 
 // EnsureBuiltinAdmin 确保系统内置管理员账号存在。
-// 若不存在则创建 username=admin / password=admin；已存在则仅补齐角色与启用状态，不覆盖已改密码。
-func EnsureBuiltinAdmin(db *gorm.DB, logger *zap.Logger) error {
+// 新建时使用 APP_ADMIN_INITIAL_PASSWORD（生产必填）；已存在则不覆盖密码。
+func EnsureBuiltinAdmin(db *gorm.DB, logger *zap.Logger, serverMode string) error {
 	var account model.Account
 	err := db.Unscoped().Where("username = ?", builtinAdminUsername).First(&account).Error
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -36,7 +52,11 @@ func EnsureBuiltinAdmin(db *gorm.DB, logger *zap.Logger) error {
 	}
 
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		hashed, hashErr := utils.HashPassword(builtinAdminPassword)
+		initialPassword, pwdErr := resolveInitialAdminPassword(serverMode)
+		if pwdErr != nil {
+			return pwdErr
+		}
+		hashed, hashErr := utils.HashPassword(initialPassword)
 		if hashErr != nil {
 			return hashErr
 		}
@@ -46,7 +66,7 @@ func EnsureBuiltinAdmin(db *gorm.DB, logger *zap.Logger) error {
 			Password:           hashed,
 			Nickname:           builtinAdminNickname,
 			Role:               rbac.RoleAdmin,
-			MustChangePassword: false,
+			MustChangePassword: true,
 			Status:             1,
 		}
 		if createErr := db.Create(&account).Error; createErr != nil {
@@ -54,8 +74,11 @@ func EnsureBuiltinAdmin(db *gorm.DB, logger *zap.Logger) error {
 		}
 		logger.Info("已创建内置管理员账号",
 			zap.String("username", builtinAdminUsername),
-			zap.String("password", builtinAdminPassword),
+			zap.Bool("must_change_password", true),
 		)
+		if serverMode != "release" {
+			logger.Warn("开发环境默认管理员初始密码见 APP_ADMIN_INITIAL_PASSWORD 或内置 dev 默认值，首次登录须修改")
+		}
 		return nil
 	}
 
@@ -70,10 +93,6 @@ func EnsureBuiltinAdmin(db *gorm.DB, logger *zap.Logger) error {
 	}
 	if account.Status != 1 {
 		account.Status = 1
-		changed = true
-	}
-	if account.MustChangePassword {
-		account.MustChangePassword = false
 		changed = true
 	}
 	if account.Nickname == "" {
@@ -114,9 +133,8 @@ func EnsureAccountRoles(db *gorm.DB, logger *zap.Logger) error {
 	res = db.Model(&model.Account{}).
 		Where("username = ?", builtinAdminUsername).
 		Updates(map[string]interface{}{
-			"must_change_password": false,
-			"status":               1,
-			"role":                 rbac.RoleAdmin,
+			"status": 1,
+			"role":   rbac.RoleAdmin,
 		})
 	if res.Error != nil {
 		return res.Error

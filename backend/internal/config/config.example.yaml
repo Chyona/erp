@@ -4,6 +4,7 @@ server:
   host: "0.0.0.0"
   port: 30000
   mode: "debug" # debug | release | test
+  cors_origins: [] # 生产环境通过 APP_CORS_ORIGINS 注入，如 https://erp.example.com
 
 database:
   host: "127.0.0.1"

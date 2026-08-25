@@ -9,9 +9,13 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"erp/internal/middleware"
 	"erp/internal/model"
+	"erp/internal/pkg/authjwt"
+	"erp/internal/pkg/rbac"
 	"erp/internal/service"
 	"github.com/gin-gonic/gin"
 	"gorm.io/datatypes"
@@ -20,6 +24,62 @@ import (
 func init() {
 	gin.SetMode(gin.TestMode)
 }
+
+func testAdminMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		middleware.SetTestClaims(c, &authjwt.Claims{
+			AccountID: 1,
+			Username:  "admin",
+			Nickname:  "管理员",
+			Role:      rbac.RoleAdmin,
+		})
+		c.Next()
+	}
+}
+
+func newTestRouter(h *ErpHandler) *gin.Engine {
+	r := gin.New()
+	r.Use(testAdminMiddleware())
+	return r
+}
+
+type stubAccountService struct{}
+
+func (stubAccountService) CreateAccount(context.Context, string, string, string, string, string) (*model.Account, error) {
+	return nil, nil
+}
+func (stubAccountService) GetAccount(context.Context, uint) (*model.Account, error) {
+	return nil, nil
+}
+func (stubAccountService) ListAccounts(context.Context, int, int) ([]model.Account, int64, error) {
+	return nil, 0, nil
+}
+func (stubAccountService) UpdateAccount(context.Context, uint, service.UpdateAccountPatch) (*model.Account, error) {
+	return nil, nil
+}
+func (stubAccountService) ResetPassword(context.Context, uint, string, bool) (*model.Account, error) {
+	return nil, nil
+}
+func (stubAccountService) SetupPassword(context.Context, uint, string) (*model.Account, error) {
+	return nil, nil
+}
+func (stubAccountService) SkipPasswordSetup(context.Context, uint) (*model.Account, error) {
+	return nil, nil
+}
+func (stubAccountService) ChangePassword(context.Context, uint, string, string) (*model.Account, error) {
+	return nil, nil
+}
+func (stubAccountService) DeleteAccount(context.Context, uint) error { return nil }
+func (stubAccountService) Authenticate(context.Context, string, string) (*model.Account, error) {
+	return nil, nil
+}
+func (stubAccountService) VerifyPassword(_ context.Context, _ uint, password string) error {
+	if strings.TrimSpace(password) == "" {
+		return errors.New("密码不正确")
+	}
+	return nil
+}
+func (stubAccountService) CountByRole(context.Context, string) (int64, error) { return 0, nil }
 
 // stubErpService 可配置行为的 ErpService 桩，用于 Handler 单元测试。
 type stubErpService struct {
@@ -245,8 +305,8 @@ func TestErpHandler_ChartAccounts(t *testing.T) {
 		accounts: []model.ChartAccount{{ID: "a1", Code: "1002", Name: "银行存款"}},
 		account:  &model.ChartAccount{ID: "a1", Code: "1002", Name: "银行存款"},
 	}
-	h := NewErpHandler(stub, nil)
-	r := gin.New()
+	h := NewErpHandler(stub, stubAccountService{})
+	r := newTestRouter(h)
 	r.GET("/accounts", h.ListChartAccounts)
 	r.GET("/accounts/:id", h.GetChartAccount)
 	r.PUT("/accounts/:id", h.SaveChartAccount)
@@ -307,8 +367,8 @@ func TestErpHandler_ListVouchersPaginated(t *testing.T) {
 		})
 	}
 	stub := &stubErpService{vouchers: vouchers}
-	h := NewErpHandler(stub, nil)
-	r := gin.New()
+	h := NewErpHandler(stub, stubAccountService{})
+	r := newTestRouter(h)
 	r.GET("/vouchers", h.ListVouchers)
 
 	w := httptest.NewRecorder()
@@ -344,8 +404,8 @@ func TestErpHandler_Vouchers(t *testing.T) {
 		vouchers: []model.Voucher{{ID: "v1", VoucherNo: "记-1"}},
 		voucher:  &model.Voucher{ID: "v1", VoucherNo: "记-1"},
 	}
-	h := NewErpHandler(stub, nil)
-	r := gin.New()
+	h := NewErpHandler(stub, stubAccountService{})
+	r := newTestRouter(h)
 	r.GET("/vouchers", h.ListVouchers)
 	r.GET("/vouchers/:id", h.GetVoucher)
 	r.PUT("/vouchers/:id", h.SaveVoucher)
@@ -374,7 +434,10 @@ func TestErpHandler_Vouchers(t *testing.T) {
 	}
 
 	w = httptest.NewRecorder()
-	r.ServeHTTP(w, httptest.NewRequest(http.MethodDelete, "/vouchers/v1", nil))
+	delPayload, _ := json.Marshal(map[string]string{"confirmPassword": "Confirm1!"})
+	delReq := httptest.NewRequest(http.MethodDelete, "/vouchers/v1", bytes.NewReader(delPayload))
+	delReq.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, delReq)
 	if w.Code != 200 {
 		t.Fatalf("DeleteVoucher status = %d", w.Code)
 	}
@@ -390,8 +453,8 @@ func TestErpHandler_Attachments(t *testing.T) {
 		attachments: []model.Attachment{{ID: "att1", Name: "a.pdf"}},
 		attachment:  &model.Attachment{ID: "att1", Name: "a.pdf"},
 	}
-	h := NewErpHandler(stub, nil)
-	r := gin.New()
+	h := NewErpHandler(stub, stubAccountService{})
+	r := newTestRouter(h)
 	r.GET("/attachments", h.ListAttachments)
 	r.GET("/attachments/:id", h.GetAttachment)
 	r.PUT("/attachments/:id", h.SaveAttachment)
@@ -425,8 +488,8 @@ func TestErpHandler_AuditLogs(t *testing.T) {
 		auditLogs: []model.AuditLog{{ID: "l1", Action: "create"}},
 		auditLog:  &model.AuditLog{ID: "l1", Action: "create"},
 	}
-	h := NewErpHandler(stub, nil)
-	r := gin.New()
+	h := NewErpHandler(stub, stubAccountService{})
+	r := newTestRouter(h)
 	r.GET("/audit-logs", h.ListAuditLogs)
 	r.GET("/audit-logs/:id", h.GetAuditLog)
 	r.POST("/audit-logs", h.AddAuditLog)
@@ -466,8 +529,8 @@ func TestErpHandler_Settings(t *testing.T) {
 		settings:   []model.Setting{{Key: "companyName", Value: datatypes.JSON(`"ACME"`)}},
 		settingVal: json.RawMessage(`"ACME"`),
 	}
-	h := NewErpHandler(stub, nil)
-	r := gin.New()
+	h := NewErpHandler(stub, stubAccountService{})
+	r := newTestRouter(h)
 	r.GET("/settings", h.ListSettings)
 	r.GET("/settings/:key", h.GetSetting)
 	r.PUT("/settings/:key", h.SetSetting)
@@ -521,8 +584,8 @@ func TestErpHandler_ExportImport(t *testing.T) {
 	stub := &stubErpService{
 		exportData: &model.ExportData{Version: 1, ExportedAt: "2026-01-01T00:00:00Z"},
 	}
-	h := NewErpHandler(stub, nil)
-	r := gin.New()
+	h := NewErpHandler(stub, stubAccountService{})
+	r := newTestRouter(h)
 	r.GET("/data/export", h.ExportAll)
 	r.POST("/data/import", h.ImportAll)
 

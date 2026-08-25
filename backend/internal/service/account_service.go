@@ -78,8 +78,8 @@ func (s *accountService) CreateAccount(ctx context.Context, username, email, pas
 	if !rbac.IsValidRole(role) {
 		return nil, errors.New("请选择有效的角色")
 	}
-	if len(password) < 6 {
-		return nil, errors.New("密码至少 6 位")
+	if len(password) < utils.MinPasswordLen {
+		return nil, utils.ErrWeakPassword
 	}
 
 	hashed, err := utils.HashPassword(password)
@@ -208,8 +208,8 @@ func (s *accountService) UpdateAccount(ctx context.Context, id uint, patch Updat
 // ResetPassword 管理员重置密码。
 // requireReSetup=true 时，目标用户下次登录需重新设置密码；改自己的密码时一般为 false。
 func (s *accountService) ResetPassword(ctx context.Context, id uint, newPassword string, requireReSetup bool) (*model.Account, error) {
-	if len(newPassword) < 6 {
-		return nil, errors.New("密码至少 6 位")
+	if len(newPassword) < utils.MinPasswordLen {
+		return nil, utils.ErrWeakPassword
 	}
 	account, err := s.accountRepo.GetByID(ctx, id)
 	if err != nil {
@@ -233,8 +233,8 @@ func (s *accountService) ResetPassword(ctx context.Context, id uint, newPassword
 
 // ChangePassword 当前用户修改自己的密码（需验证旧密码）。
 func (s *accountService) ChangePassword(ctx context.Context, accountID uint, oldPassword, newPassword string) (*model.Account, error) {
-	if len(newPassword) < 6 {
-		return nil, errors.New("新密码至少 6 位")
+	if len(newPassword) < utils.MinPasswordLen {
+		return nil, utils.ErrWeakPassword
 	}
 	account, err := s.accountRepo.GetByID(ctx, accountID)
 	if err != nil {
@@ -243,7 +243,8 @@ func (s *accountService) ChangePassword(ctx context.Context, accountID uint, old
 		}
 		return nil, err
 	}
-	if !utils.CheckPassword(oldPassword, account.Password) {
+	ok, _ := utils.CheckPassword(oldPassword, account.Password)
+	if !ok {
 		return nil, errors.New("当前密码不正确")
 	}
 	hashed, err := utils.HashPassword(newPassword)
@@ -261,8 +262,8 @@ func (s *accountService) ChangePassword(ctx context.Context, accountID uint, old
 
 // SetupPassword 首次登录设置密码（仅 MustChangePassword=true 时可用）。
 func (s *accountService) SetupPassword(ctx context.Context, accountID uint, newPassword string) (*model.Account, error) {
-	if len(newPassword) < 6 {
-		return nil, errors.New("密码至少 6 位")
+	if len(newPassword) < utils.MinPasswordLen {
+		return nil, utils.ErrWeakPassword
 	}
 	account, err := s.accountRepo.GetByID(ctx, accountID)
 	if err != nil {
@@ -342,8 +343,15 @@ func (s *accountService) Authenticate(ctx context.Context, username, password st
 	if account.Status != 1 {
 		return nil, errors.New("账号已禁用")
 	}
-	if !utils.CheckPassword(password, account.Password) {
+	ok, needUpgrade := utils.CheckPassword(password, account.Password)
+	if !ok {
 		return nil, errors.New("用户名或密码错误")
+	}
+	if needUpgrade {
+		if hashed, hashErr := utils.RehashPassword(password); hashErr == nil {
+			account.Password = hashed
+			_ = s.accountRepo.Update(ctx, account)
+		}
 	}
 	account.Role = resolveAccountRole(account)
 	return account, nil
@@ -357,7 +365,8 @@ func (s *accountService) VerifyPassword(ctx context.Context, accountID uint, pas
 		}
 		return err
 	}
-	if !utils.CheckPassword(password, account.Password) {
+	ok, _ := utils.CheckPassword(password, account.Password)
+	if !ok {
 		return errors.New("密码不正确")
 	}
 	return nil

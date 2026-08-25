@@ -5,10 +5,12 @@
   "type": "module",
   "packageManager": "pnpm@11.10.0",
   "scripts": {
-    "dev": "vite",
-    "dev:mock": "VITE_USE_MOCK=true vite",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview",
+    "copy-pdf-assets": "node scripts/copy-pdf-assets.mjs",
+    "copy-pdf-worker": "pnpm copy-pdf-assets",
+    "dev": "pnpm copy-pdf-assets && vite",
+    "dev:mock": "pnpm copy-pdf-assets && VITE_USE_MOCK=true vite",
+    "build": "pnpm copy-pdf-assets && tsc --noEmit && vite build",
+    "preview": "pnpm copy-pdf-assets && vite preview",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

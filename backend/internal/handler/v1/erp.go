@@ -14,6 +14,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const maxUploadBytes = 20 << 20 // 20MB
+
 // ErpHandler ERP HTTP 处理器，对应前端 ErpApi（services/erpApi.ts）。
 type ErpHandler struct {
 	erpService     service.ErpService
@@ -27,7 +29,8 @@ func NewErpHandler(erpService service.ErpService, accountService service.Account
 func requireAdmin(c *gin.Context) bool {
 	actor := middleware.GetActor(c)
 	if actor == nil {
-		return true
+		response.Unauthorized(c, "请先登录")
+		return false
 	}
 	if !actor.IsAdmin() {
 		response.Forbidden(c, "需要管理员权限")
@@ -39,7 +42,8 @@ func requireAdmin(c *gin.Context) bool {
 func requireExport(c *gin.Context) bool {
 	actor := middleware.GetActor(c)
 	if actor == nil {
-		return true
+		response.Unauthorized(c, "请先登录")
+		return false
 	}
 	if !actor.CanExport() {
 		response.Forbidden(c, "当前账号无权导出或备份")
@@ -48,8 +52,25 @@ func requireExport(c *gin.Context) bool {
 	return true
 }
 
-// requireAdminDeletePassword 保留兼容 confirmPassword 字段；已登录管理员凭 JWT 即可删除，不再二次验密。
-func (h *ErpHandler) requireAdminDeletePassword(c *gin.Context, _ string) bool {
+// requireAdminDeletePassword 危险删除操作需管理员身份并二次验密。
+func (h *ErpHandler) requireAdminDeletePassword(c *gin.Context, confirmPassword string) bool {
+	if !requireAdmin(c) {
+		return false
+	}
+	confirmPassword = strings.TrimSpace(confirmPassword)
+	if confirmPassword == "" {
+		response.BadRequest(c, "请输入当前登录密码以确认删除")
+		return false
+	}
+	claims := middleware.GetAuthClaims(c)
+	if claims == nil {
+		response.Unauthorized(c, "请先登录")
+		return false
+	}
+	if err := h.accountService.VerifyPassword(c.Request.Context(), claims.AccountID, confirmPassword); err != nil {
+		response.Forbidden(c, "密码不正确")
+		return false
+	}
 	return true
 }
 
@@ -617,6 +638,10 @@ func (h *ErpHandler) UploadAttachment(c *gin.Context) {
 		response.BadRequest(c, "请上传 file 字段")
 		return
 	}
+	if fileHeader.Size > maxUploadBytes {
+		response.BadRequest(c, "单个附件不能超过 20MB")
+		return
+	}
 	f, err := fileHeader.Open()
 	if err != nil {
 		response.BadRequest(c, err.Error())
@@ -681,6 +706,9 @@ func (h *ErpHandler) DeleteAttachment(c *gin.Context) {
 
 // ClearAttachments DELETE /attachments — 清空全部附件。
 func (h *ErpHandler) ClearAttachments(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	if err := h.erpService.ClearAttachments(c.Request.Context()); err != nil {
 		response.InternalError(c, err.Error())
 		return
@@ -716,6 +744,17 @@ func (h *ErpHandler) AddAuditLog(c *gin.Context) {
 		response.BadRequest(c, err.Error())
 		return
 	}
+	req.Action = strings.TrimSpace(req.Action)
+	req.Target = strings.TrimSpace(req.Target)
+	req.Details = strings.TrimSpace(req.Details)
+	if req.Action == "" {
+		response.BadRequest(c, "action 不能为空")
+		return
+	}
+	if len(req.Action) > 64 || len(req.Target) > 256 || len(req.Details) > 4000 {
+		response.BadRequest(c, "审计日志字段过长")
+		return
+	}
 	userAgent := c.GetHeader("User-Agent")
 	log, err := h.erpService.AddAuditLog(c.Request.Context(), req.Action, req.Target, req.Details, userAgent)
 	if err != nil {
@@ -727,6 +766,9 @@ func (h *ErpHandler) AddAuditLog(c *gin.Context) {
 
 // ClearAuditLogs DELETE /audit-logs — 清空审计日志。
 func (h *ErpHandler) ClearAuditLogs(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	if err := h.erpService.ClearAuditLogs(c.Request.Context()); err != nil {
 		response.InternalError(c, err.Error())
 		return
