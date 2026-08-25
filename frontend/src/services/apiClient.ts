@@ -11,11 +11,13 @@ type ApiBody<T> = {
 
 export class ApiError extends Error {
   code: number;
+  httpStatus: number;
 
-  constructor(message: string, code = 500) {
+  constructor(message: string, code = 500, httpStatus = code) {
     super(sanitizeUserMessage(message));
     this.name = 'ApiError';
     this.code = code;
+    this.httpStatus = httpStatus;
   }
 }
 
@@ -61,7 +63,7 @@ export async function apiRequest<T>(
       body: body !== undefined ? JSON.stringify(body) : undefined
     });
   } catch (err) {
-    throw new ApiError(toUserMessage(err, '无法连接服务器，请确认网络或后端服务是否正常'));
+    throw new ApiError(toUserMessage(err, '无法连接服务器，请确认网络或后端服务是否正常'), 0, 0);
   }
 
   let json: ApiBody<T>;
@@ -69,12 +71,20 @@ export async function apiRequest<T>(
     json = (await res.json()) as ApiBody<T>;
   } catch {
     handleUnauthorized(res.status, res.status);
-    throw new ApiError(res.ok ? '服务器返回了无法识别的内容' : `请求失败（${res.status}）`);
+    throw new ApiError(
+      res.ok ? '服务器返回了无法识别的内容' : `请求失败（${res.status}）`,
+      res.status,
+      res.status
+    );
   }
 
   if (!res.ok || json.code !== 0) {
     handleUnauthorized(res.status, json.code ?? res.status);
-    throw new ApiError(json.message || `请求失败（${res.status}）`, json.code ?? res.status);
+    throw new ApiError(
+      json.message || `请求失败（${res.status}）`,
+      json.code ?? res.status,
+      res.status
+    );
   }
 
   return json.data;
@@ -87,7 +97,7 @@ export async function apiUploadForm<T>(path: string, form: FormData): Promise<T>
   try {
     res = await fetch(url, { method: 'POST', headers: authHeaders(), body: form });
   } catch (err) {
-    throw new ApiError(toUserMessage(err, '无法连接服务器，请确认网络或后端服务是否正常'));
+    throw new ApiError(toUserMessage(err, '无法连接服务器，请确认网络或后端服务是否正常'), 0, 0);
   }
 
   let json: ApiBody<T>;
@@ -95,12 +105,20 @@ export async function apiUploadForm<T>(path: string, form: FormData): Promise<T>
     json = (await res.json()) as ApiBody<T>;
   } catch {
     handleUnauthorized(res.status, res.status);
-    throw new ApiError(res.ok ? '服务器返回了无法识别的内容' : `请求失败（${res.status}）`);
+    throw new ApiError(
+      res.ok ? '服务器返回了无法识别的内容' : `请求失败（${res.status}）`,
+      res.status,
+      res.status
+    );
   }
 
   if (!res.ok || json.code !== 0) {
     handleUnauthorized(res.status, json.code ?? res.status);
-    throw new ApiError(json.message || `请求失败（${res.status}）`, json.code ?? res.status);
+    throw new ApiError(
+      json.message || `请求失败（${res.status}）`,
+      json.code ?? res.status,
+      res.status
+    );
   }
 
   return json.data;

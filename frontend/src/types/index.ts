@@ -207,6 +207,8 @@ export interface AppInitResult {
   repaired: number;
   syncedLocks: number;
   localRepaired: number;
+  degraded?: boolean;
+  initWarning?: string;
 }
 
 export interface AppContextValue {
@@ -216,6 +218,8 @@ export interface AppContextValue {
   setAccounts: (accounts: Account[]) => void;
   refreshKey: number;
   refresh: () => void;
+  initWarning: string | null;
+  clearInitWarning: () => void;
   /** 登录后或全库恢复后执行：POST /app/init，更新公司名与科目表 */
   reinitApp: () => Promise<AppInitResult>;
 }

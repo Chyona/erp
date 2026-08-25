@@ -1938,7 +1938,6 @@ body,
   border-color: #91caff !important;
   background: #e6f4ff !important;
   box-shadow: none;
-  margin-right: 8px;
 }
 
 .voucher-template-btn:hover,
@@ -2903,6 +2902,272 @@ body,
 .business-type-hint__flow--tax .business-type-hint__flow-advanced {
   border-top-color: #bfdbfe;
   color: #1e40af;
+}
+
+.voucher-sheet__th-label,
+.voucher-form__field-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.voucher-phrase-hint__examples {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.voucher-phrase-hint__example-btn {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 6px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #fafafa;
+  color: #374151;
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: left;
+  cursor: pointer;
+}
+
+.voucher-phrase-hint__example-btn:hover:not(:disabled) {
+  border-color: #91caff;
+  background: #f0f7ff;
+}
+
+.voucher-phrase-hint__example-btn:disabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.voucher-phrase-hint__preset-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.voucher-phrase-hint__preset-row .voucher-phrase-hint__example-btn {
+  flex: 1;
+}
+
+.voucher-phrase-hint__preset-actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: flex-start;
+}
+
+.voucher-phrase-hint__inline-editor {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.voucher-phrase-hint__builtin {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.voucher-phrase-hint__builtin-tip {
+  display: block;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.voucher-phrase-hint__example-btn--builtin {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  text-align: left;
+}
+
+.voucher-phrase-hint__builtin-tag {
+  flex-shrink: 0;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: #f0f0f0;
+  color: #595959;
+  font-size: 11px;
+  line-height: 20px;
+}
+
+.voucher-phrase-hint__editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.voucher-phrase-hint__editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.voucher-phrase-input {
+  position: relative;
+  width: 100%;
+}
+
+.voucher-phrase-input__ac,
+.voucher-phrase-input__ac.ant-select-auto-complete {
+  width: 100%;
+}
+
+.voucher-phrase-input--multiline .voucher-phrase-input__library-trigger {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+}
+
+.voucher-phrase-input--multiline textarea {
+  padding-right: 32px;
+}
+
+.voucher-phrase-input__library-trigger {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #d9d9d9;
+  border-radius: 50%;
+  background: #fff;
+  color: #595959;
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: -1px;
+  cursor: pointer;
+}
+
+.voucher-phrase-input__library-trigger:hover {
+  border-color: #1677ff;
+  color: #1677ff;
+}
+
+.voucher-sheet__td-summary .voucher-phrase-input .ant-input-affix-wrapper {
+  padding-inline-end: 4px !important;
+}
+
+.voucher-sheet__td-summary .voucher-phrase-input .ant-input-affix-wrapper input {
+  padding-right: 4px !important;
+}
+
+.voucher-sheet__td-summary--library-open .voucher-sheet__cell-editor {
+  display: block;
+}
+
+.voucher-sheet__td-summary--library-open .voucher-sheet__cell-preview {
+  display: none;
+}
+
+.voucher-sheet__td-summary--dropdown-open {
+  position: relative;
+  z-index: 12;
+}
+
+.voucher-sheet__td-summary--dropdown-open .voucher-sheet__cell-editor {
+  display: block;
+}
+
+.voucher-sheet__td-summary--dropdown-open .voucher-sheet__cell-preview {
+  display: none;
+}
+
+.voucher-sheet__td-summary .voucher-phrase-input__ac.ant-select-auto-complete {
+  height: var(--voucher-row-height);
+}
+
+.voucher-sheet__td-summary .voucher-phrase-input__ac.ant-select-auto-complete .ant-select-selector {
+  height: var(--voucher-row-height) !important;
+  min-height: var(--voucher-row-height) !important;
+  padding: 0 !important;
+  align-items: center !important;
+}
+
+.voucher-sheet__td-summary .voucher-phrase-input__ac.ant-select-auto-complete .ant-select-selection-search {
+  inset-inline-start: 0 !important;
+  inset-inline-end: 0 !important;
+}
+
+.voucher-sheet__td-summary .voucher-phrase-input__ac.ant-select-auto-complete .ant-select-selection-search-input {
+  height: var(--voucher-row-height) !important;
+}
+
+.voucher-phrase-input__dropdown.ant-select-dropdown {
+  margin-top: 0;
+}
+
+.voucher-phrase-library__search {
+  margin-bottom: 12px;
+}
+
+.voucher-phrase-library__table .ant-table-row {
+  cursor: pointer;
+}
+
+.voucher-phrase-library__text-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.voucher-phrase-library__text-cell .voucher-phrase-library__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.voucher-phrase-library__tag {
+  flex-shrink: 0;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: #f0f0f0;
+  color: #595959;
+  font-size: 11px;
+  line-height: 20px;
+}
+
+.voucher-phrase-library__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.voucher-phrase-library-modal .ant-modal-body {
+  padding-top: 16px;
+}
+
+.voucher-phrase-library__table .ant-table-thead>tr>th {
+  background: #fafafa;
+  font-weight: 500;
+}
+
+.voucher-phrase-library__table .voucher-phrase-library__row--selected>td {
+  background: #e6f4ff !important;
+}
+
+.voucher-sheet__td-summary .voucher-phrase-input__ac input {
+  padding-inline: 4px 28px;
+}
+
+.voucher-form__extra .ant-select-auto-complete {
+  width: 100%;
+}
+
+.voucher-phrase-popover .ant-popover-inner {
+  max-width: min(420px, 92vw);
 }
 
 .main-content h2.ant-typography,
@@ -4542,6 +4807,24 @@ body,
   display: flex;
   align-items: center;
   gap: 4px;
+  flex-shrink: 0;
+}
+
+.voucher-sheet__phrase-auto-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 0 4px;
+  padding: 0 4px;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.voucher-sheet__phrase-auto-switch .ant-switch {
   flex-shrink: 0;
 }
 

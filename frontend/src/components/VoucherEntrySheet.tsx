@@ -10,6 +10,7 @@ import AmountGrid, { AmountGridHeader } from './AmountGrid';
 import EllipsisText from './EllipsisText';
 import VoucherAttachmentColumn from './VoucherAttachmentColumn';
 import VoucherAttachmentControls from './VoucherAttachmentControls';
+import VoucherPhraseAutoComplete from './VoucherPhraseAutoComplete';
 import { amountToChineseUppercase, formatAccountingPeriod } from '../utils/amountGrid';
 import { Accounts } from '../services/accounts';
 
@@ -64,6 +65,8 @@ function VoucherEntrySheet({
   const period = accountingPeriodLabel || formatAccountingPeriod(voucherDate);
   const [debitHighlight, setDebitHighlight] = useState<number[]>([]);
   const [creditHighlight, setCreditHighlight] = useState<number[]>([]);
+  const [summaryLibraryRow, setSummaryLibraryRow] = useState<number | null>(null);
+  const [summaryDropdownRow, setSummaryDropdownRow] = useState<number | null>(null);
   const showTotalCn = totals.balanced;
   const totalAmount = showTotalCn ? Math.max(totals.debit, totals.credit) : 0;
   const totalDebitDisplay = totals.debit > 0 ? totals.debit : '';
@@ -207,7 +210,13 @@ function VoucherEntrySheet({
                             </div>
                           )}
                         </td>
-                        <td className="voucher-sheet__td-summary">
+                        <td
+                          className={`voucher-sheet__td-summary${
+                            summaryLibraryRow === index ? ' voucher-sheet__td-summary--library-open' : ''
+                          }${
+                            summaryDropdownRow === index ? ' voucher-sheet__td-summary--dropdown-open' : ''
+                          }`}
+                        >
                           {readOnly ? (
                             <span className="voucher-sheet__readonly-text">{entry?.summary || ''}</span>
                           ) : (
@@ -219,14 +228,22 @@ function VoucherEntrySheet({
                                 {entry?.summary || ''}
                               </EllipsisText>
                               <div className="voucher-sheet__cell-editor">
-                                <Input
+                                <VoucherPhraseAutoComplete
+                                  kind="summary"
                                   variant="borderless"
-                                  value={entry?.summary ?? ''}
+                                  className="voucher-sheet__phrase-input"
                                   placeholder="摘要"
+                                  value={entry?.summary ?? ''}
                                   onFocus={activateRow}
-                                  onChange={(e) => {
+                                  onLibraryOpenChange={(open) =>
+                                    setSummaryLibraryRow(open ? index : null)
+                                  }
+                                  onDropdownOpenChange={(open) =>
+                                    setSummaryDropdownRow(open ? index : null)
+                                  }
+                                  onChange={(text) => {
                                     activateRow();
-                                    onUpdateEntry(index, 'summary', e.target.value);
+                                    onUpdateEntry(index, 'summary', text);
                                   }}
                                 />
                               </div>

@@ -16,6 +16,7 @@ import {
   getTabKey,
   isHomeTabKey,
   PAGE_TABS_MAX,
+  parseTabPath,
   resolvePageTabTitle
 } from '../utils/pageTabs';
 
@@ -32,7 +33,8 @@ type PageTabsContextValue = {
   cacheRef: React.MutableRefObject<Map<string, ReactElement>>;
   tabDataRefreshKeys: Record<string, number>;
   switchTab: (key: string) => void;
-  closeTab: (key: string) => void;
+  closeTab: (key: string, options?: { fallbackPath?: string }) => void;
+  closeTabAndOpen: (closingKey: string, targetPath: string) => void;
   refreshTab: (key: string) => void;
   closeOtherTabs: (key: string) => void;
   closeAllTabs: () => void;
@@ -121,7 +123,7 @@ export function PageTabsProvider({ children }: { children: ReactNode }) {
   );
 
   const closeTab = useCallback(
-    (key: string) => {
+    (key: string, options?: { fallbackPath?: string }) => {
       if (isHomeTabKey(key)) return;
 
       let nextPath: string | null = null;
@@ -133,8 +135,10 @@ export function PageTabsProvider({ children }: { children: ReactNode }) {
         const next = prev.filter((tab) => tab.key !== key);
 
         if (key === activeKey) {
-          const fallback = next[Math.min(index, next.length - 1)] ?? next[next.length - 1];
-          nextPath = fallback?.path ?? '/';
+          nextPath =
+            options?.fallbackPath ??
+            (next[Math.min(index, next.length - 1)] ?? next[next.length - 1])?.path ??
+            '/';
         }
 
         return next;
@@ -143,6 +147,41 @@ export function PageTabsProvider({ children }: { children: ReactNode }) {
       if (nextPath) navigate(nextPath);
     },
     [activeKey, navigate]
+  );
+
+  const closeTabAndOpen = useCallback(
+    (closingKey: string, targetPath: string) => {
+      const target = parseTabPath(targetPath);
+      const keysToClose = new Set<string>();
+      if (!isHomeTabKey(closingKey)) keysToClose.add(closingKey);
+      if (!isHomeTabKey(activeKey)) keysToClose.add(activeKey);
+
+      setTabs((prev) => {
+        let next = prev.filter((tab) => {
+          if (!keysToClose.has(tab.key) || !tab.closable) return true;
+          cacheRef.current.delete(tab.key);
+          return false;
+        });
+
+        if (!next.some((tab) => tab.key === target.key)) {
+          next = [
+            ...next,
+            {
+              key: target.key,
+              path: target.fullPath,
+              title: resolvePageTabTitle(target.pathname),
+              closable: true
+            }
+          ];
+        }
+
+        return ensureHomeTabFirst(next, homeTab);
+      });
+
+      setTabDataRefreshKeys((prev) => ({ ...prev, [target.key]: (prev[target.key] || 0) + 1 }));
+      navigate(target.fullPath);
+    },
+    [activeKey, homeTab, navigate]
   );
 
   const refreshTab = useCallback((key: string) => {
@@ -192,12 +231,13 @@ export function PageTabsProvider({ children }: { children: ReactNode }) {
       tabDataRefreshKeys,
       switchTab,
       closeTab,
+      closeTabAndOpen,
       refreshTab,
       closeOtherTabs,
       closeAllTabs,
       updateTabTitle
     }),
-    [tabs, activeKey, tabDataRefreshKeys, switchTab, closeTab, refreshTab, closeOtherTabs, closeAllTabs, updateTabTitle]
+    [tabs, activeKey, tabDataRefreshKeys, switchTab, closeTab, closeTabAndOpen, refreshTab, closeOtherTabs, closeAllTabs, updateTabTitle]
   );
 
   return <PageTabsContext.Provider value={value}>{children}</PageTabsContext.Provider>;

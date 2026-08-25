@@ -31,6 +31,18 @@ export function getTabKey(pathname: string, search = '') {
   return `${pathname}${search}`;
 }
 
+export function parseTabPath(path: string) {
+  const qIndex = path.indexOf('?');
+  const pathname = qIndex >= 0 ? path.slice(0, qIndex) : path;
+  const search = qIndex >= 0 ? path.slice(qIndex) : '';
+  return {
+    pathname,
+    search,
+    key: getTabKey(pathname, search),
+    fullPath: `${pathname}${search}`
+  };
+}
+
 export function resolvePageTabTitle(pathname: string) {
   if (ROUTE_TITLES[pathname]) return ROUTE_TITLES[pathname];
   if (/^\/vouchers\/\d+\/edit$/.test(pathname)) return '编辑凭证';

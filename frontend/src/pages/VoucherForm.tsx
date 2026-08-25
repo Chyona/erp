@@ -10,6 +10,7 @@ import {
   Space,
   Alert,
   App,
+  Switch,
   Tooltip
 } from 'antd';
 import { useAsyncLoading } from '../hooks/useAsyncLoading';
@@ -31,6 +32,8 @@ import {
 } from '../utils/operatorDisplayName';
 import { confirmDanger, confirmWarning } from '../utils/confirmAction';
 import BusinessTypeHint from '../components/BusinessTypeHint';
+import VoucherPhraseAutoComplete from '../components/VoucherPhraseAutoComplete';
+import { rememberVoucherPhrasesFromVoucher } from '../services/voucherPhraseCatalog';
 import VoucherEntrySheet from '../components/VoucherEntrySheet';
 import VoucherSheetTools from '../components/VoucherSheetTools';
 import VoucherFormActions from '../components/VoucherFormActions';
@@ -55,11 +58,11 @@ import {
   formatStoredTaxExemptionPeriod
 } from '../utils/reportPeriod';
 
-const { TextArea } = Input;
-
 const VOUCHER_TYPE = '记';
 const EYE_CARE_KEY = 'voucherEyeCare';
 const FULLSCREEN_KEY = 'voucherFullscreen';
+const PHRASE_AUTO_REMEMBER_KEY = 'voucherPhraseAutoRemember';
+const VOUCHER_LIST_PATH = '/vouchers';
 const SAVE_MSG_KEY = 'voucher-save';
 
 type VoucherNavState = {
@@ -126,7 +129,7 @@ export default function VoucherForm() {
   }, []);
   const navigate = useNavigate();
   const [tabKey] = useState(() => getTabKey(location.pathname, location.search));
-  const { updateTabTitle } = usePageTabs();
+  const { updateTabTitle, closeTabAndOpen } = usePageTabs();
   const { message, modal } = App.useApp();
   const { accounts, refresh } = useApp();
   const { user, canAccessOwnVoucher, canMutateVoucher } = useAuth();
@@ -155,6 +158,9 @@ export default function VoucherForm() {
   }>({ older: null, newer: null });
   const [eyeCare, setEyeCare] = useState(() => localStorage.getItem(EYE_CARE_KEY) === '1');
   const [fullscreen, setFullscreen] = useState(() => localStorage.getItem(FULLSCREEN_KEY) === '1');
+  const [phraseAutoRemember, setPhraseAutoRemember] = useState(
+    () => localStorage.getItem(PHRASE_AUTO_REMEMBER_KEY) === '1'
+  );
   const [carryForwardPeriodLabel, setCarryForwardPeriodLabel] = useState('');
   const [carryForwardReadOnly, setCarryForwardReadOnly] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -172,7 +178,6 @@ export default function VoucherForm() {
   const businessType = Form.useWatch('businessType', form);
   const invoiceType = Form.useWatch('invoiceType', form);
   const signatory = Form.useWatch('signatory', form);
-
   const totals = useMemo(() => Voucher.calcTotals(entries), [entries]);
   const operatorAccountId = ownerAccountId ?? user?.accountId;
   const displaySignatory = useMemo(
@@ -478,6 +483,16 @@ export default function VoucherForm() {
       return next;
     });
   };
+
+  const handlePhraseAutoRememberChange = (checked: boolean) => {
+    setPhraseAutoRemember(checked);
+    localStorage.setItem(PHRASE_AUTO_REMEMBER_KEY, checked ? '1' : '0');
+  };
+
+  const closeFormTabAndOpenVoucherList = useCallback(() => {
+    const closingKey = getTabKey(location.pathname, location.search);
+    closeTabAndOpen(closingKey, VOUCHER_LIST_PATH);
+  }, [location.pathname, location.search, closeTabAndOpen]);
 
   const confirmDiscardIfDirty = useCallback(async () => {
     if (!hasUnsavedChanges()) return true;
@@ -1087,6 +1102,9 @@ export default function VoucherForm() {
       };
 
       const saved = await Voucher.save(voucherData, false);
+      if (phraseAutoRemember) {
+        void rememberVoucherPhrasesFromVoucher(entries, values.remark);
+      }
       message.success({ content: `${saved.voucherNo} 保存成功`, key: SAVE_MSG_KEY });
 
       if (continueNew) {
@@ -1104,7 +1122,7 @@ export default function VoucherForm() {
         return;
       }
 
-      navigate('/vouchers', { replace: true });
+      closeFormTabAndOpenVoucherList();
       refresh();
     } catch (err) {
       if ((err as { errorFields?: unknown[] })?.errorFields) {
@@ -1248,6 +1266,16 @@ export default function VoucherForm() {
                       getSnapshot={getTemplateSnapshot}
                     />
                   </Tooltip>
+                  <Tooltip title="开启后，保存凭证时自动将摘要和备注加入短语库">
+                    <label className="voucher-sheet__phrase-auto-switch">
+                      <Switch
+                        size="small"
+                        checked={phraseAutoRemember}
+                        onChange={handlePhraseAutoRememberChange}
+                      />
+                      <span>保存收录短语</span>
+                    </label>
+                  </Tooltip>
                   <span className="voucher-form__toolbar-divider" aria-hidden="true" />
                 </>
               ) : null}
@@ -1322,10 +1350,12 @@ export default function VoucherForm() {
                   />
                 </Form.Item>
                 <Form.Item name="remark" label="备注">
-                  <TextArea
+                  <VoucherPhraseAutoComplete
+                    kind="remark"
+                    multiline
                     rows={3}
-                    placeholder="补充说明业务背景，便于税务核查"
-                    readOnly={readOnly}
+                    disabled={readOnly}
+                    placeholder="补充说明；可输入关键词搜索，或点右侧 … 打开备注库"
                   />
                 </Form.Item>
               </div>

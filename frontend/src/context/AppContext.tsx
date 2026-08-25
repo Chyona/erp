@@ -8,13 +8,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [companyName, setCompanyName] = useState('');
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [initWarning, setInitWarning] = useState<string | null>(null);
 
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
+  const clearInitWarning = useCallback(() => setInitWarning(null), []);
 
   const reinitApp = useCallback(async () => {
     const result = await runAppInit();
     setCompanyName(result.companyName);
     setAccounts(result.accounts);
+    setInitWarning(result.degraded ? result.initWarning || '后台同步未完成' : null);
     const synced = result.repaired + result.syncedLocks + result.localRepaired;
     if (synced > 0) {
       setRefreshKey((k) => k + 1);
@@ -24,7 +27,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppContext.Provider
-      value={{ companyName, setCompanyName, accounts, setAccounts, refreshKey, refresh, reinitApp }}
+      value={{
+        companyName,
+        setCompanyName,
+        accounts,
+        setAccounts,
+        refreshKey,
+        refresh,
+        initWarning,
+        clearInitWarning,
+        reinitApp
+      }}
     >
       {children}
     </AppContext.Provider>
