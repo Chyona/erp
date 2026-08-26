@@ -9,7 +9,7 @@ import {
   App
 } from 'antd';
 import AppTable from './AppTable';
-import { useNavigate } from 'react-router-dom';
+import { useVoucherPageNavigation } from '../hooks/useVoucherPageNavigation';
 import { TaxExemption } from '../services/taxExemption';
 import { ProfitLossClosing } from '../services/profitLossClosing';
 import { INVOICE_TYPE_LABEL } from '../constants/invoice';
@@ -99,7 +99,7 @@ export default function TaxExemptionPanel({
   const { message, modal } = App.useApp();
   const { refreshKey, refresh } = useApp();
   const tabDataRefresh = useTabDataRefresh();
-  const navigate = useNavigate();
+  const { openVoucherEdit } = useVoucherPageNavigation();
   const [period, setPeriod] = useState(defaultTaxExemptionPeriod);
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -284,7 +284,7 @@ export default function TaxExemptionPanel({
         </Button>
         {relatedCarryForwardVouchers.map((cf) => (
           <Space key={cf.id} size={8}>
-            <Button onClick={() => navigate(`/vouchers/${cf.id}/edit`)}>
+            <Button onClick={() => openVoucherEdit(cf.id)}>
               查看结转凭证 {cf.voucherNo}
               {formatStoredTaxExemptionPeriod(cf)
                 ? `（${formatStoredTaxExemptionPeriod(cf)}）`

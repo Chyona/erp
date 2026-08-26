@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, Pagination, Table, Typography, App, Space, Tag } from 'antd';
 import { DownloadOutlined, ReloadOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { useVoucherPageNavigation } from '../hooks/useVoucherPageNavigation';
 import type { ColumnsType } from 'antd/es/table';
 import type { Account, LedgerResult, LedgerRow } from '../types';
 import { Voucher } from '../services/voucher';
@@ -32,7 +32,7 @@ export default function Ledger() {
   const { refreshKey } = useApp();
   const tabDataRefresh = useTabDataRefresh();
   const { can } = useAuth();
-  const navigate = useNavigate();
+  const { openVoucherEdit } = useVoucherPageNavigation();
   const [accountList, setAccountList] = useState<Account[]>([]);
   const [accountId, setAccountId] = useState('');
   const [timeFilter, setTimeFilter] = useState<VoucherTimeFilterState>(() => loadStoredTimeFilter());
@@ -129,9 +129,9 @@ export default function Ledger() {
   const openVoucher = useCallback(
     (row: LedgerRow) => {
       if (!row.voucherId) return;
-      navigate(`/vouchers/${row.voucherId}/edit`);
+      openVoucherEdit(row.voucherId);
     },
-    [navigate]
+    [openVoucherEdit]
   );
 
   const renderVoucherNo = (value: string, row: LedgerRow) => {

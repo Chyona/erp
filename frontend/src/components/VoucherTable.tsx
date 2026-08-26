@@ -6,7 +6,7 @@ import AppTable from './AppTable';
 import EllipsisText from './EllipsisText';
 import SensitiveColumnHeader from './SensitiveColumnHeader';
 import { DeleteOutlined, EyeOutlined, PaperClipOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { useVoucherPageNavigation } from '../hooks/useVoucherPageNavigation';
 import { enrichAttachmentDisplayNames, attachmentNameContextFromVoucher } from '../utils/attachmentName';
 import { Voucher } from '../services/voucher';
 import type { Attachment, Voucher as VoucherRecord } from '../types';
@@ -225,7 +225,7 @@ export default function VoucherTable({
   pagination?: { current: number; pageSize: number; total: number };
   onPaginationChange?: (page: number, pageSize: number) => void;
 }) {
-  const navigate = useNavigate();
+  const { openVoucherEdit } = useVoucherPageNavigation();
   const { message, modal } = App.useApp();
   const { refresh } = useApp();
   const { canMutateVoucher, canAccessOwnVoucher, role } = useAuth();
@@ -375,7 +375,7 @@ export default function VoucherTable({
       onView?.(voucher.id);
       return;
     }
-    navigate(`/vouchers/${voucher.id}/edit`);
+    openVoucherEdit(voucher.id);
   };
 
   const canOpenVoucherLink = (voucher) => canAccessOwnVoucher(voucher);

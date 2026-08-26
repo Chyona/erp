@@ -17,8 +17,43 @@ import {
   isHomeTabKey,
   PAGE_TABS_MAX,
   parseTabPath,
-  resolvePageTabTitle
+  resolvePageTabTitleFromKey,
+  isVoucherEditPath,
+  isVoucherNewPath,
+  resolveTabIdentity,
+  VOUCHER_NEW_TAB_KEY
 } from '../utils/pageTabs';
+
+function removeDuplicateVoucherTabs<T extends { key: string; path: string }>(
+  tabs: T[],
+  key: string,
+  pathname: string,
+  cacheRef: React.MutableRefObject<Map<string, ReactElement>>
+) {
+  let next = tabs;
+  if (isVoucherNewPath(pathname)) {
+    next = next.filter((tab) => {
+      const tabPathname = parseTabPath(tab.path).pathname;
+      if (isVoucherNewPath(tabPathname) && tab.key !== key) {
+        cacheRef.current.delete(tab.key);
+        return false;
+      }
+      return true;
+    });
+  }
+  if (isVoucherEditPath(pathname)) {
+    next = next.filter((tab) => {
+      const tabPathname = parseTabPath(tab.path).pathname;
+      const isEditTab = tab.key === key || isVoucherEditPath(tab.key) || isVoucherEditPath(tabPathname);
+      if (isEditTab && tab.key !== key) {
+        cacheRef.current.delete(tab.key);
+        return false;
+      }
+      return true;
+    });
+  }
+  return next;
+}
 
 export type PageTab = {
   key: string;
@@ -38,7 +73,7 @@ type PageTabsContextValue = {
   refreshTab: (key: string) => void;
   closeOtherTabs: (key: string) => void;
   closeAllTabs: () => void;
-  updateTabTitle: (key: string, title: string) => void;
+  openPageTab: (targetPath: string, options?: { refresh?: boolean }) => void;
 };
 
 const PageTabsContext = createContext<PageTabsContextValue | null>(null);
@@ -46,6 +81,10 @@ const TabPaneContext = createContext<string | null>(null);
 
 export function TabPaneProvider({ tabKey, children }: { tabKey: string; children: ReactNode }) {
   return <TabPaneContext.Provider value={tabKey}>{children}</TabPaneContext.Provider>;
+}
+
+export function useTabPaneKey() {
+  return useContext(TabPaneContext);
 }
 
 export function useTabDataRefresh() {
@@ -62,7 +101,7 @@ export function PageTabsProvider({ children }: { children: ReactNode }) {
   const homeTab = useMemo(() => createHomeTab(), []);
   const [tabDataRefreshKeys, setTabDataRefreshKeys] = useState<Record<string, number>>({});
   const [tabs, setTabs] = useState<PageTab[]>(() => {
-    const key = getTabKey(location.pathname, location.search);
+    const { key, path, pathname } = resolveTabIdentity(location.pathname, location.search);
     if (isHomeTabKey(key)) {
       return [homeTab];
     }
@@ -70,8 +109,8 @@ export function PageTabsProvider({ children }: { children: ReactNode }) {
       [
         {
           key,
-          path: `${location.pathname}${location.search}`,
-          title: resolvePageTabTitle(location.pathname),
+          path,
+          title: resolvePageTabTitleFromKey(key),
           closable: true
         }
       ],
@@ -79,14 +118,15 @@ export function PageTabsProvider({ children }: { children: ReactNode }) {
     );
   });
 
-  const activeKey = getTabKey(location.pathname, location.search);
+  const activeKey = resolveTabIdentity(location.pathname, location.search).key;
 
   useEffect(() => {
-    const key = getTabKey(location.pathname, location.search);
-    const path = `${location.pathname}${location.search}`;
+    const { key, path, pathname } = resolveTabIdentity(location.pathname, location.search);
 
     setTabs((prev) => {
-      const withHome = prev.some((tab) => isHomeTabKey(tab.key)) ? prev : ensureHomeTabFirst(prev, homeTab);
+      let withHome = prev.some((tab) => isHomeTabKey(tab.key)) ? prev : ensureHomeTabFirst(prev, homeTab);
+      withHome = removeDuplicateVoucherTabs(withHome, key, pathname, cacheRef);
+
       const existing = withHome.find((tab) => tab.key === key);
       if (existing) {
         if (existing.path === path) return ensureHomeTabFirst(withHome, homeTab);
@@ -99,7 +139,7 @@ export function PageTabsProvider({ children }: { children: ReactNode }) {
       const nextTab: PageTab = {
         key,
         path,
-        title: resolvePageTabTitle(location.pathname),
+        title: resolvePageTabTitleFromKey(key),
         closable: true
       };
 
@@ -151,7 +191,8 @@ export function PageTabsProvider({ children }: { children: ReactNode }) {
 
   const closeTabAndOpen = useCallback(
     (closingKey: string, targetPath: string) => {
-      const target = parseTabPath(targetPath);
+      const { pathname, search } = parseTabPath(targetPath);
+      const target = resolveTabIdentity(pathname, search);
       const keysToClose = new Set<string>();
       if (!isHomeTabKey(closingKey)) keysToClose.add(closingKey);
       if (!isHomeTabKey(activeKey)) keysToClose.add(activeKey);
@@ -168,8 +209,8 @@ export function PageTabsProvider({ children }: { children: ReactNode }) {
             ...next,
             {
               key: target.key,
-              path: target.fullPath,
-              title: resolvePageTabTitle(target.pathname),
+              path: target.path,
+              title: resolvePageTabTitleFromKey(target.key),
               closable: true
             }
           ];
@@ -179,7 +220,7 @@ export function PageTabsProvider({ children }: { children: ReactNode }) {
       });
 
       setTabDataRefreshKeys((prev) => ({ ...prev, [target.key]: (prev[target.key] || 0) + 1 }));
-      navigate(target.fullPath);
+      navigate(target.path);
     },
     [activeKey, homeTab, navigate]
   );
@@ -187,6 +228,63 @@ export function PageTabsProvider({ children }: { children: ReactNode }) {
   const refreshTab = useCallback((key: string) => {
     setTabDataRefreshKeys((prev) => ({ ...prev, [key]: (prev[key] || 0) + 1 }));
   }, []);
+
+  const openPageTab = useCallback(
+    (targetPath: string, options?: { refresh?: boolean }) => {
+      const { pathname, search } = parseTabPath(targetPath);
+      const identity = resolveTabIdentity(pathname, search);
+      const shouldRefresh = options?.refresh !== false;
+      let tabExisted = false;
+
+      setTabs((prev) => {
+        let withHome = prev.some((tab) => isHomeTabKey(tab.key)) ? prev : ensureHomeTabFirst(prev, homeTab);
+        withHome = removeDuplicateVoucherTabs(withHome, identity.key, pathname, cacheRef);
+
+        tabExisted = withHome.some((tab) => tab.key === identity.key);
+
+        const existing = withHome.find((tab) => tab.key === identity.key);
+        if (existing) {
+          return ensureHomeTabFirst(
+            withHome.map((tab) =>
+              tab.key === identity.key ? { ...tab, path: identity.path } : tab
+            ),
+            homeTab
+          );
+        }
+
+        const nextTab: PageTab = {
+          key: identity.key,
+          path: identity.path,
+          title: resolvePageTabTitleFromKey(identity.key),
+          closable: true
+        };
+
+        let next = ensureHomeTabFirst([...withHome, nextTab], homeTab);
+        while (next.length > PAGE_TABS_MAX) {
+          const removeIndex = next.findIndex((tab) => tab.closable);
+          if (removeIndex < 0) break;
+          cacheRef.current.delete(next[removeIndex].key);
+          next = next.filter((_, index) => index !== removeIndex);
+        }
+        return ensureHomeTabFirst(next, homeTab);
+      });
+
+      if (tabExisted && shouldRefresh) {
+        const currentPath = `${location.pathname}${location.search}`;
+        if (currentPath !== identity.path) {
+          navigate(identity.path);
+          if (identity.key === VOUCHER_NEW_TAB_KEY) {
+            queueMicrotask(() => refreshTab(identity.key));
+          }
+          return;
+        }
+        refreshTab(identity.key);
+        return;
+      }
+      navigate(identity.path);
+    },
+    [homeTab, location.pathname, location.search, navigate, refreshTab]
+  );
 
   const closeOtherTabs = useCallback(
     (key: string) => {
@@ -219,10 +317,6 @@ export function PageTabsProvider({ children }: { children: ReactNode }) {
     navigate('/');
   }, [homeTab, navigate]);
 
-  const updateTabTitle = useCallback((key: string, title: string) => {
-    setTabs((prev) => prev.map((tab) => (tab.key === key ? { ...tab, title } : tab)));
-  }, []);
-
   const value = useMemo(
     () => ({
       tabs,
@@ -235,9 +329,9 @@ export function PageTabsProvider({ children }: { children: ReactNode }) {
       refreshTab,
       closeOtherTabs,
       closeAllTabs,
-      updateTabTitle
+      openPageTab
     }),
-    [tabs, activeKey, tabDataRefreshKeys, switchTab, closeTab, closeTabAndOpen, refreshTab, closeOtherTabs, closeAllTabs, updateTabTitle]
+    [tabs, activeKey, tabDataRefreshKeys, switchTab, closeTab, closeTabAndOpen, refreshTab, closeOtherTabs, closeAllTabs, openPageTab]
   );
 
   return <PageTabsContext.Provider value={value}>{children}</PageTabsContext.Provider>;

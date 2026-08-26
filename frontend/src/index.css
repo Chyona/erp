@@ -3056,11 +3056,11 @@ body,
 }
 
 .voucher-sheet__td-summary .voucher-phrase-input .ant-input-affix-wrapper {
-  padding-inline-end: 4px !important;
+  padding-inline: 0 !important;
 }
 
 .voucher-sheet__td-summary .voucher-phrase-input .ant-input-affix-wrapper input {
-  padding-right: 4px !important;
+  padding-inline: 0 !important;
 }
 
 .voucher-sheet__td-summary--library-open .voucher-sheet__cell-editor {
@@ -3096,12 +3096,12 @@ body,
 }
 
 .voucher-sheet__td-summary .voucher-phrase-input__ac.ant-select-auto-complete .ant-select-selection-search {
-  inset-inline-start: 0 !important;
-  inset-inline-end: 0 !important;
+  inset-inline: 0 !important;
 }
 
 .voucher-sheet__td-summary .voucher-phrase-input__ac.ant-select-auto-complete .ant-select-selection-search-input {
   height: var(--voucher-row-height) !important;
+  padding: 0 !important;
 }
 
 .voucher-phrase-input__dropdown.ant-select-dropdown {
@@ -3159,7 +3159,7 @@ body,
 }
 
 .voucher-sheet__td-summary .voucher-phrase-input__ac input {
-  padding-inline: 4px 28px;
+  padding: 0 !important;
 }
 
 .voucher-form__extra .ant-select-auto-complete {
@@ -5444,6 +5444,11 @@ body,
   height: var(--voucher-row-height);
 }
 
+.voucher-sheet__td-summary .voucher-sheet__cell-editor {
+  padding: 0 4px 0 8px;
+  box-sizing: border-box;
+}
+
 .voucher-sheet__amount-cell {
   position: relative;
   height: var(--voucher-row-height);
@@ -5480,11 +5485,18 @@ body,
   font-size: 13px;
 }
 
-.voucher-sheet__td-summary .ant-input {
+.voucher-sheet__td-summary .voucher-phrase-input,
+.voucher-sheet__td-summary .voucher-phrase-input__ac,
+.voucher-sheet__td-summary .voucher-phrase-input__ac.ant-select-auto-complete,
+.voucher-sheet__td-summary .voucher-phrase-input .ant-input-affix-wrapper {
+  height: 100%;
+}
+
+.voucher-sheet__td-summary .ant-input:not(.voucher-phrase-input__ac input) {
   height: var(--voucher-row-height) !important;
   line-height: var(--voucher-row-height) !important;
-  padding-left: 8px !important;
-  padding-right: 8px !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
 }
 
 .voucher-sheet__td-account .ant-select {

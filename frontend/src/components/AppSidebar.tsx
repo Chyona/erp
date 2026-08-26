@@ -22,6 +22,7 @@ import {
   type NavMenuGroup
 } from '../constants/navMenu';
 import { useAuth } from '../context/AuthContext';
+import { useVoucherPageNavigation } from '../hooks/useVoucherPageNavigation';
 
 type NavIconSet = {
   outline: React.ReactNode;
@@ -62,6 +63,7 @@ export default function AppSidebar({ collapsed, theme }: AppSidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const { can } = useAuth();
+  const { openNewVoucher } = useVoucherPageNavigation();
   const [highlightKey, setHighlightKey] = useState<string | null>(null);
   const [flyoutTop, setFlyoutTop] = useState(0);
   const hideTimerRef = useRef<number | null>(null);
@@ -109,10 +111,13 @@ export default function AppSidebar({ collapsed, theme }: AppSidebarProps) {
   );
 
   const handleLeafClick = (path?: string) => {
-    if (path) {
+    if (!path) return;
+    if (path === '/vouchers/new') {
+      openNewVoucher(path);
+    } else {
       navigate(path);
-      setHighlightKey(null);
     }
+    setHighlightKey(null);
   };
 
   const renderNavButton = (entry: NavMenuEntry) => {

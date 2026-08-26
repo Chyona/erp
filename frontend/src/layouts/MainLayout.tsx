@@ -97,120 +97,120 @@ export default function MainLayout() {
   ];
 
   return (
-    <Layout className="app-layout">
-      <Sider
-        width={120}
-        collapsedWidth={64}
-        collapsible
-        collapsed={collapsed}
-        onCollapse={handleSiderCollapse}
-        trigger={null}
-        theme={siderTheme}
-        className={`app-sider app-sider--${siderTheme}`}
-      >
-        <div className="sidebar-logo">
-          <span className="logo-icon">📒</span>
-          <span className="sidebar-logo__title">{APP_CONFIG.shortName}</span>
-        </div>
-        <AppSidebar collapsed={collapsed} theme={siderTheme} />
-        <div className="sidebar-toolbar">
-          <button
-            type="button"
-            className="sidebar-toolbar__btn"
-            aria-label={siderTheme === 'dark' ? '切换为浅色导航' : '切换为深色导航'}
-            onClick={toggleSiderTheme}
-          >
-            {siderTheme === 'dark' ? <SunOutlined /> : <MoonOutlined />}
-          </button>
-          <span className="sidebar-toolbar__divider" aria-hidden="true" />
-          <button
-            type="button"
-            className="sidebar-toolbar__btn"
-            aria-label={collapsed ? '展开导航' : '折叠导航'}
-            onClick={() => handleSiderCollapse(!collapsed)}
-          >
-            {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-          </button>
-        </div>
-      </Sider>
-      <Layout className="app-main">
-        <Header className="topbar">
-          <Typography.Text strong>
-            {companyName || '请先在设置中填写企业信息'}
-          </Typography.Text>
-          <Space size={12} className="topbar__actions">
-            <Dropdown
-              menu={{ items: userMenuItems }}
-              trigger={['hover']}
-              placement="bottomRight"
-              overlayClassName="topbar-user-menu"
+    <PageTabsProvider>
+      <Layout className="app-layout">
+        <Sider
+          width={120}
+          collapsedWidth={64}
+          collapsible
+          collapsed={collapsed}
+          onCollapse={handleSiderCollapse}
+          trigger={null}
+          theme={siderTheme}
+          className={`app-sider app-sider--${siderTheme}`}
+        >
+          <div className="sidebar-logo">
+            <span className="logo-icon">📒</span>
+            <span className="sidebar-logo__title">{APP_CONFIG.shortName}</span>
+          </div>
+          <AppSidebar collapsed={collapsed} theme={siderTheme} />
+          <div className="sidebar-toolbar">
+            <button
+              type="button"
+              className="sidebar-toolbar__btn"
+              aria-label={siderTheme === 'dark' ? '切换为浅色导航' : '切换为深色导航'}
+              onClick={toggleSiderTheme}
             >
-              <button
-                type="button"
-                className="topbar-user"
-                aria-label={`${displayName}，打开账户菜单`}
-                aria-haspopup="menu"
+              {siderTheme === 'dark' ? <SunOutlined /> : <MoonOutlined />}
+            </button>
+            <span className="sidebar-toolbar__divider" aria-hidden="true" />
+            <button
+              type="button"
+              className="sidebar-toolbar__btn"
+              aria-label={collapsed ? '展开导航' : '折叠导航'}
+              onClick={() => handleSiderCollapse(!collapsed)}
+            >
+              {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+            </button>
+          </div>
+        </Sider>
+        <Layout className="app-main">
+          <Header className="topbar">
+            <Typography.Text strong>
+              {companyName || '请先在设置中填写企业信息'}
+            </Typography.Text>
+            <Space size={12} className="topbar__actions">
+              <Dropdown
+                menu={{ items: userMenuItems }}
+                trigger={['hover']}
+                placement="bottomRight"
+                overlayClassName="topbar-user-menu"
               >
-                <Avatar size={28} icon={<UserOutlined />} className="topbar-user__avatar" />
-                <EllipsisText className="topbar-user__name" tooltip={displayName}>
-                  {displayName}
-                </EllipsisText>
-                <DownOutlined className="topbar-user__caret" aria-hidden="true" />
-              </button>
-            </Dropdown>
-          </Space>
-        </Header>
-        <Content className="main-content">
-          <PageTabsProvider>
+                <button
+                  type="button"
+                  className="topbar-user"
+                  aria-label={`${displayName}，打开账户菜单`}
+                  aria-haspopup="menu"
+                >
+                  <Avatar size={28} icon={<UserOutlined />} className="topbar-user__avatar" />
+                  <EllipsisText className="topbar-user__name" tooltip={displayName}>
+                    {displayName}
+                  </EllipsisText>
+                  <DownOutlined className="topbar-user__caret" aria-hidden="true" />
+                </button>
+              </Dropdown>
+            </Space>
+          </Header>
+          <Content className="main-content">
             <PageTabBar />
             <KeepAliveOutlet />
-          </PageTabsProvider>
-        </Content>
-      </Layout>
+          </Content>
+        </Layout>
 
-      <Modal
-        title="修改密码"
-        open={pwdOpen}
-        onCancel={() => setPwdOpen(false)}
-        onOk={handleChangePassword}
-        confirmLoading={pwdSaving}
-        destroyOnHidden
-      >
-        <Form form={pwdForm} layout="vertical">
-          <Form.Item
-            name="oldPassword"
-            label="当前密码"
-            rules={[{ required: true, message: '请输入当前密码' }]}
-          >
-            <Input.Password autoComplete="current-password" />
-          </Form.Item>
-          <Form.Item
-            name="newPassword"
-            label="新密码"
-            rules={[{ required: true, min: 8, message: '新密码至少 8 位' }]}
-          >
-            <Input.Password autoComplete="new-password" />
-          </Form.Item>
-          <Form.Item
-            name="confirmPassword"
-            label="确认新密码"
-            dependencies={['newPassword']}
-            rules={[
-              { required: true, message: '请再次输入新密码' },
-              ({ getFieldValue }) => ({
-                validator(_, value) {
-                  if (!value || getFieldValue('newPassword') === value) {
-                    return Promise.resolve();
+        <Modal
+          title="修改密码"
+          open={pwdOpen}
+          onCancel={() => setPwdOpen(false)}
+          onOk={handleChangePassword}
+          confirmLoading={pwdSaving}
+          destroyOnHidden
+        >
+          <Form form={pwdForm} layout="vertical">
+            <Form.Item
+              name="oldPassword"
+              label="当前密码"
+              rules={[{ required: true, message: '请输入当前密码' }]}
+            >
+              <Input.Password autoComplete="current-password" />
+            </Form.Item>
+            <Form.Item
+              name="newPassword"
+              label="新密码"
+              rules={[{ required: true, min: 8, message: '新密码至少 8 位' }]}
+            >
+              <Input.Password autoComplete="new-password" />
+            </Form.Item>
+            <Form.Item
+              name="confirmPassword"
+              label="确认新密码"
+              dependencies={['newPassword']}
+              rules={[
+                { required: true, message: '请再次输入新密码' },
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    if (!value || getFieldValue('newPassword') === value) {
+                      return Promise.resolve();
+                    }
+                    return Promise.reject(new Error('两次输入的新密码不一致'));
                   }
-                  return Promise.reject(new Error('两次输入的新密码不一致'));
-                }
-              })
-            ]}
-          >
-            <Input.Password autoComplete="new-password" />
-          </Form.Item>
-        </Form>
-      </Modal>
-    </Layout>
+                })
+              ]}
+            >
+              <Input.Password autoComplete="new-password" />
+            </Form.Item>
+          </Form>
+        </Modal>
+      </Layout>
+    </PageTabsProvider>
   );
 }

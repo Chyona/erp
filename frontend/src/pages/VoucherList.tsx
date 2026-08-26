@@ -6,7 +6,7 @@ import {
   UploadOutlined,
   ReloadOutlined
 } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { useApp } from '../context/AppContext';
 import { Voucher } from '../services/voucher';
 import { ExportUtil } from '../services/export';
 import { ErpApi } from '../services/erpApi';
@@ -17,9 +17,9 @@ import VoucherFilterPanel, { EMPTY_VOUCHER_FILTERS } from '../components/Voucher
 import VoucherTimeFilter from '../components/VoucherTimeFilter';
 import { loadStoredTimeFilter, saveStoredTimeFilter } from '../utils/voucherTimeFilter';
 import type { VoucherTimeFilterState } from '../utils/voucherTimeFilter';
-import { useApp } from '../context/AppContext';
 import { useTabDataRefresh } from '../context/PageTabsContext';
 import { useAuth } from '../context/AuthContext';
+import { useVoucherPageNavigation } from '../hooks/useVoucherPageNavigation';
 import { useOperatorDisplayLookup } from '../hooks/useOperatorDisplayLookup';
 import { resolveOperatorDisplayName } from '../utils/operatorDisplayName';
 import { isCarryForwardVoucher } from '../utils/carryForwardVoucher';
@@ -54,7 +54,7 @@ function createInitialFilters(): VoucherFilters {
 }
 
 export default function VoucherList() {
-  const navigate = useNavigate();
+  const { openNewVoucher } = useVoucherPageNavigation();
   const { message, modal } = App.useApp();
   const { refreshKey, accounts, refresh } = useApp();
   const tabDataRefresh = useTabDataRefresh();
@@ -301,7 +301,7 @@ export default function VoucherList() {
         <div className="voucher-list-toolbar__actions">
           <Space wrap>
             {can('voucher.create') ? (
-              <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/vouchers/new')}>
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => openNewVoucher()}>
                 新增
               </Button>
             ) : null}

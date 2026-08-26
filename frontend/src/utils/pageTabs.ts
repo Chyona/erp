@@ -43,10 +43,46 @@ export function parseTabPath(path: string) {
   };
 }
 
+export const VOUCHER_NEW_TAB_KEY = '/vouchers/new';
+export const VOUCHER_EDIT_TAB_KEY = '/vouchers/edit';
+
+export function isVoucherNewPath(pathname: string) {
+  return pathname === VOUCHER_NEW_TAB_KEY;
+}
+
+export function isVoucherEditPath(pathname: string) {
+  return /^\/vouchers\/[^/]+\/edit$/.test(pathname);
+}
+
+export function isVoucherEditTabKey(key: string) {
+  return key === VOUCHER_EDIT_TAB_KEY || isVoucherEditPath(key);
+}
+
+export function resolveTabIdentity(pathname: string, search = '') {
+  const path = `${pathname}${search}`;
+  if (isVoucherNewPath(pathname)) {
+    return { key: VOUCHER_NEW_TAB_KEY, path, pathname };
+  }
+  if (isVoucherEditPath(pathname)) {
+    return { key: VOUCHER_EDIT_TAB_KEY, path, pathname };
+  }
+  return { key: getTabKey(pathname, search), path, pathname };
+}
+
 export function resolvePageTabTitle(pathname: string) {
   if (ROUTE_TITLES[pathname]) return ROUTE_TITLES[pathname];
-  if (/^\/vouchers\/\d+\/edit$/.test(pathname)) return '编辑凭证';
+  if (/^\/vouchers\/[^/]+\/edit$/.test(pathname)) return '凭证';
   return pathname.replace(/^\//, '') || '页面';
+}
+
+/** Tab 标题仅由 tab key 决定，创建后不再变更。 */
+export function resolvePageTabTitleFromKey(key: string) {
+  if (isHomeTabKey(key)) return ROUTE_TITLES[HOME_TAB_KEY] || '工作台';
+  if (key === VOUCHER_NEW_TAB_KEY) return ROUTE_TITLES[VOUCHER_NEW_TAB_KEY];
+  if (key === VOUCHER_EDIT_TAB_KEY) return '凭证';
+  if (isVoucherEditPath(key)) return '凭证';
+  const pathname = key.includes('?') ? key.slice(0, key.indexOf('?')) : key;
+  return resolvePageTabTitle(pathname);
 }
 
 export function isHomeTabKey(key: string) {

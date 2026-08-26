@@ -5,16 +5,14 @@ export default function KeepAliveOutlet() {
   const outlet = useOutlet();
   const { tabs, activeKey, cacheRef } = usePageTabs();
 
-  if (outlet) {
-    cacheRef.current.set(activeKey, outlet);
-  }
-
   return (
     <div className="page-tabs-content">
       {tabs.map((tab) => {
         const isActive = tab.key === activeKey;
-        let content = cacheRef.current.get(tab.key);
-        if (!content && isActive) content = outlet;
+        if (isActive && outlet) {
+          cacheRef.current.set(tab.key, outlet);
+        }
+        const content = isActive ? outlet ?? cacheRef.current.get(tab.key) : cacheRef.current.get(tab.key);
         if (!content) return null;
         return (
           <div

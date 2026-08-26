@@ -7,7 +7,7 @@ import {
   CloseCircleFilled,
   ExclamationCircleFilled
 } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { useVoucherPageNavigation } from '../hooks/useVoucherPageNavigation';
 import { ProfitLossClosing } from '../services/profitLossClosing';
 import { useApp } from '../context/AppContext';
 import { useTabDataRefresh } from '../context/PageTabsContext';
@@ -63,7 +63,7 @@ export default function ProfitLossClosingPanel({
   const { message, modal } = App.useApp();
   const { refreshKey, refresh } = useApp();
   const tabDataRefresh = useTabDataRefresh();
-  const navigate = useNavigate();
+  const { openVoucherEdit } = useVoucherPageNavigation();
   const [period, setPeriod] = useState(defaultProfitLossClosingPeriod);
   const [summary, setSummary] = useState<Awaited<
     ReturnType<typeof ProfitLossClosing.getPeriodSummary>
@@ -279,7 +279,7 @@ export default function ProfitLossClosingPanel({
         </Button>
         {closingVoucher ? (
           <Space size={8}>
-            <Button onClick={() => navigate(`/vouchers/${closingVoucher.id}/edit`)}>
+            <Button onClick={() => openVoucherEdit(closingVoucher.id)}>
               查看结转凭证 {closingVoucher.voucherNo}
               {formatStoredProfitLossClosingPeriod(closingVoucher)
                 ? `（${formatStoredProfitLossClosingPeriod(closingVoucher)}）`

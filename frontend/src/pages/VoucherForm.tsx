@@ -15,8 +15,8 @@ import {
 } from 'antd';
 import { useAsyncLoading } from '../hooks/useAsyncLoading';
 import { disableFutureDate } from '../utils/dateConstraints';
-import { usePageTabs } from '../context/PageTabsContext';
-import { getTabKey } from '../utils/pageTabs';
+import { usePageTabs, useTabDataRefresh, useTabPaneKey } from '../context/PageTabsContext';
+import { resolveTabIdentity } from '../utils/pageTabs';
 import { useNavigate, useParams, useSearchParams, useLocation, Navigate } from 'react-router-dom';
 import dayjs from '../utils/dayjsSetup';
 import { Voucher, isNewVoucherNav } from '../services/voucher';
@@ -120,7 +120,7 @@ export default function VoucherForm() {
     ? `edit:${routeId}`
     : isInsert
       ? `insert:${insertDate ?? ''}:${insertNumber ?? ''}`
-      : `new:${urlPresetDate ?? ''}`;
+      : 'new';
   const initializedKeyRef = useRef<string | null>(null);
   const skipPageInitRef = useRef(false);
   const savedSnapshotRef = useRef<string | null>(null);
@@ -129,8 +129,10 @@ export default function VoucherForm() {
     setSnapshotVersion((v) => v + 1);
   }, []);
   const navigate = useNavigate();
-  const [tabKey] = useState(() => getTabKey(location.pathname, location.search));
-  const { updateTabTitle, closeTabAndOpen } = usePageTabs();
+  const paneKey = useTabPaneKey();
+  const tabDataRefresh = useTabDataRefresh();
+  const handledTabRefreshRef = useRef(tabDataRefresh);
+  const { closeTabAndOpen } = usePageTabs();
   const { message, modal } = App.useApp();
   const { accounts, refresh } = useApp();
   const { user, canAccessOwnVoucher, canMutateVoucher } = useAuth();
@@ -227,20 +229,6 @@ export default function VoucherForm() {
       attachmentIds: attachments.map((a) => a.id).sort()
     });
   }, [form, voucherNumber, entries, attachments]);
-
-  useEffect(() => {
-    if (isEdit) {
-      if (voucherNumber) {
-        updateTabTitle(tabKey, `凭证 ${VOUCHER_TYPE}-${voucherNumber}`);
-      }
-      return;
-    }
-    if (insertNumber) {
-      updateTabTitle(tabKey, `插入凭证 ${insertNumber}`);
-      return;
-    }
-    updateTabTitle(tabKey, '录凭证');
-  }, [tabKey, isEdit, voucherNumber, insertNumber, updateTabTitle]);
 
   const hasUnsavedChanges = useCallback(() => {
     if (savedSnapshotRef.current === null) return false;
@@ -437,15 +425,16 @@ export default function VoucherForm() {
       return;
     }
     if (initializedKeyRef.current === initKey) return;
+    const showLoading = initializedKeyRef.current === null;
     initializedKeyRef.current = initKey;
-    setLoading(true);
+    if (showLoading) setLoading(true);
 
     if (!routeId) {
       (async () => {
         try {
           await applyNewVoucherForm({ presetDate: urlPresetDate || undefined });
         } finally {
-          setLoading(false);
+          if (showLoading) setLoading(false);
         }
       })();
       return;
@@ -464,10 +453,37 @@ export default function VoucherForm() {
           navigate('/vouchers');
         }
       } finally {
-        setLoading(false);
+        if (showLoading) setLoading(false);
       }
     })();
   }, [initKey]);
+
+  useEffect(() => {
+    if (tabDataRefresh === handledTabRefreshRef.current) return;
+    handledTabRefreshRef.current = tabDataRefresh;
+    skipPageInitRef.current = false;
+
+    (async () => {
+      try {
+        if (routeId) {
+          const v = await Voucher.getById(routeId);
+          if (!v) {
+            message.error('凭证不存在');
+            navigate('/vouchers');
+            return;
+          }
+          const ok = await applyVoucherToForm(v);
+          if (!ok) {
+            navigate('/vouchers');
+          }
+        } else {
+          await applyNewVoucherForm({ presetDate: urlPresetDate || undefined });
+        }
+      } finally {
+        initializedKeyRef.current = initKey;
+      }
+    })();
+  }, [tabDataRefresh]);
 
   const toggleEyeCare = () => {
     setEyeCare((prev) => {
@@ -491,9 +507,10 @@ export default function VoucherForm() {
   };
 
   const closeFormTabAndOpenVoucherList = useCallback(() => {
-    const closingKey = getTabKey(location.pathname, location.search);
+    const closingKey =
+      paneKey ?? resolveTabIdentity(location.pathname, location.search).key;
     closeTabAndOpen(closingKey, VOUCHER_LIST_PATH);
-  }, [location.pathname, location.search, closeTabAndOpen]);
+  }, [paneKey, location.pathname, location.search, closeTabAndOpen]);
 
   const confirmDiscardIfDirty = useCallback(async () => {
     if (!hasUnsavedChanges()) return true;
@@ -516,7 +533,7 @@ export default function VoucherForm() {
       });
       if (!willRemount) {
         await applyNewVoucherForm({ presetDate });
-        initializedKeyRef.current = presetDate ? `new:${presetDate}` : 'new:';
+        initializedKeyRef.current = 'new';
       }
       skipPageInitRef.current = false;
     },
@@ -1145,8 +1162,8 @@ export default function VoucherForm() {
     form.setFieldsValue({
       businessType: example.businessType,
       invoiceType: example.invoiceType || INVOICE_TYPE.NONE,
-      taxAmount: example.taxAmount,
-      remark: example.remark || '',
+      taxAmount: undefined,
+      remark: '',
       invoiceNumbers: example.invoiceNumbers || ''
     });
     setEntries(

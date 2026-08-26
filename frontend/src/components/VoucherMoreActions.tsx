@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button, Dropdown, Modal, InputNumber, Space, Typography, App, Tooltip } from 'antd';
 import { MoreOutlined, QuestionCircleOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { useVoucherPageNavigation } from '../hooks/useVoucherPageNavigation';
 import { Voucher } from '../services/voucher';
 import { confirmWarning } from '../utils/confirmAction';
 import { useApp } from '../context/AppContext';
@@ -10,7 +10,7 @@ import { isCarryForwardVoucher } from '../utils/carryForwardVoucher';
 const { Text } = Typography;
 
 export default function VoucherMoreActions({ voucher }) {
-  const navigate = useNavigate();
+  const { openVoucherEdit, openNewVoucher } = useVoucherPageNavigation();
   const { message, modal } = App.useApp();
   const { refresh } = useApp();
   const [reorderOpen, setReorderOpen] = useState(false);
@@ -41,7 +41,7 @@ export default function VoucherMoreActions({ voucher }) {
           const saved = await Voucher.reverse(voucher.id);
           message.success(`已生成冲销凭证 ${saved.voucherNo}`);
           notifyDataChanged();
-          navigate(`/vouchers/${saved.id}/edit`);
+          openVoucherEdit(saved.id);
         } catch (err) {
           message.error(err.message || '冲销失败');
         }
@@ -104,7 +104,7 @@ export default function VoucherMoreActions({ voucher }) {
       setInsertOpen(false);
       setTargetNumber(null);
       await notifyDataChanged();
-      navigate(`/vouchers/new?date=${voucher.date}&number=${reservedNumber}`);
+      openNewVoucher(`/vouchers/new?date=${voucher.date}&number=${reservedNumber}`);
     } catch (err) {
       message.error(err.message || '插入凭证失败');
     } finally {
