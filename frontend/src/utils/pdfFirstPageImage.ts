@@ -2,11 +2,12 @@ import { getPdfDocumentInit, pdfjs } from './pdfWorker';
 
 export { fetchPdfBuffer, renderPdfPageImages } from './pdfPreview';
 
-export async function pdfFirstPageToPngFile(file: File): Promise<File> {
+export async function pdfPageToPngFile(file: File, pageNum = 1, scale = 2.5): Promise<File | null> {
   const data = await file.arrayBuffer();
   const pdf = await pdfjs.getDocument(getPdfDocumentInit(data)).promise;
-  const page = await pdf.getPage(1);
-  const viewport = page.getViewport({ scale: 2 });
+  if (pageNum < 1 || pageNum > pdf.numPages) return null;
+  const page = await pdf.getPage(pageNum);
+  const viewport = page.getViewport({ scale });
   const canvas = document.createElement('canvas');
   const context = canvas.getContext('2d');
   if (!context) throw new Error('PDF 转图片失败');
@@ -23,5 +24,11 @@ export async function pdfFirstPageToPngFile(file: File): Promise<File> {
   });
 
   const baseName = file.name.replace(/\.pdf$/i, '') || 'invoice';
-  return new File([blob], `${baseName}.png`, { type: 'image/png' });
+  return new File([blob], `${baseName}-p${pageNum}.png`, { type: 'image/png' });
+}
+
+export async function pdfFirstPageToPngFile(file: File): Promise<File> {
+  const png = await pdfPageToPngFile(file, 1);
+  if (!png) throw new Error('PDF 没有可识别的页面');
+  return png;
 }

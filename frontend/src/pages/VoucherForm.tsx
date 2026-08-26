@@ -48,6 +48,7 @@ import {
   findDuplicateAttachment
 } from '../utils/attachmentDuplicate';
 import { recognizeInvoiceNumbersFromFile } from '../services/invoiceNumberRecognition';
+import { resolveUploadFile, resolveUploadFileName } from '../utils/uploadFile';
 import { syncSalesVoucherMeta } from '../utils/salesInvoiceTax';
 import { INVOICE_TYPE, INVOICE_TYPE_OPTIONS } from '../constants/invoice';
 import { isCarryForwardVoucher, CARRY_FORWARD_VOUCHER_READONLY_TIP } from '../utils/carryForwardVoucher';
@@ -840,13 +841,14 @@ export default function VoucherForm() {
   const getAttachmentNameContext = () => attachmentNameContext;
 
   const tryAutoRecognizeInvoiceNumber = async (
-    file: File
+    file: File,
+    fileName = file.name
   ): Promise<{ numbers: string[]; hint?: string }> => {
-    if (readOnly || !isInvoiceRecognizableFile(file)) {
+    if (readOnly || !isInvoiceRecognizableFile({ name: fileName, type: file.type })) {
       return { numbers: [] };
     }
     try {
-      const numbers = await recognizeInvoiceNumbersFromFile(file);
+      const numbers = await recognizeInvoiceNumbersFromFile(file, fileName);
       if (!numbers.length) {
         return { numbers: [], hint: '未识别到发票号码，请手动填写' };
       }
@@ -912,20 +914,21 @@ export default function VoucherForm() {
     uploadQueueRef.current = uploadQueueRef.current
       .catch(() => undefined)
       .then(async () => {
-        const fileObj = file as File;
-        const invoiceLike = isInvoiceRecognizableFile(fileObj);
-        beginAttachmentUploadStatus(`正在检查 ${fileObj.name}…`);
-        const duplicate = await findDuplicateAttachment(fileObj, attachmentsRef.current);
-        if (duplicate) {
-          message.warning(duplicateAttachmentMessage(fileObj.name));
-          onSuccess();
-          return;
-        }
-        updateAttachmentUploadStatus(`正在上传 ${fileObj.name}…`);
+        const fileObj = resolveUploadFile(file);
+        const uploadName = resolveUploadFileName(file, fileObj.name);
+        const invoiceLike = isInvoiceRecognizableFile({ name: uploadName, type: fileObj.type });
+        beginAttachmentUploadStatus(`正在检查 ${uploadName}…`);
         try {
+          const duplicate = await findDuplicateAttachment(fileObj, attachmentsRef.current);
+          if (duplicate) {
+            message.warning(duplicateAttachmentMessage(uploadName));
+            onSuccess();
+            return;
+          }
+          updateAttachmentUploadStatus(`正在上传 ${uploadName}…`);
           const fileName = buildAttachmentDisplayName({
             ...getAttachmentNameContext(),
-            originalName: fileObj.name,
+            originalName: uploadName,
             index: attachmentsRef.current.length
           });
           const att = await Voucher.saveAttachment(
@@ -936,7 +939,7 @@ export default function VoucherForm() {
           if (invoiceLike) {
             updateAttachmentUploadStatus('正在识别发票号…');
           }
-          const { numbers: recognized, hint } = await tryAutoRecognizeInvoiceNumber(fileObj);
+          const { numbers: recognized, hint } = await tryAutoRecognizeInvoiceNumber(fileObj, uploadName);
           let savedAtt = att;
           if (recognized.length) {
             savedAtt = {
@@ -954,6 +957,9 @@ export default function VoucherForm() {
           setAttachmentPanelOpen(true);
           noteSuccess(recognized, hint, invoiceLike);
           onSuccess();
+        } catch (err) {
+          message.error((err as Error)?.message || '附件上传失败');
+          onError(err);
         } finally {
           endAttachmentUploadStatus();
         }

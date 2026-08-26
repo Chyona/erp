@@ -12,12 +12,23 @@ export async function hashFile(file: File): Promise<string> {
   return hashBlob(file);
 }
 
-async function hashAttachmentContent(att: Attachment): Promise<string> {
-  const res = await fetch(att.url);
-  if (!res.ok) {
-    throw new Error(`无法读取附件 ${att.name}`);
+async function fetchBlobWithTimeout(url: string, timeoutMs = 12000): Promise<Blob> {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) {
+      throw new Error(`无法读取附件（HTTP ${res.status}）`);
+    }
+    return await res.blob();
+  } finally {
+    window.clearTimeout(timer);
   }
-  return hashBlob(await res.blob());
+}
+
+async function hashAttachmentContent(att: Attachment): Promise<string> {
+  const blob = await fetchBlobWithTimeout(att.url);
+  return hashBlob(blob);
 }
 
 /** 在当前凭证已有附件中查找与待上传文件内容相同的项（先比大小，再比 SHA-256）。 */

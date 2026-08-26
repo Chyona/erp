@@ -100,59 +100,61 @@ export default function VoucherAttachmentColumn({
             </button>
           </div>
         </div>
-        <Spin spinning={busy} tip="处理中…">
-          <div className="voucher-sheet__attach-col-body">
-            {attachments.map((att, index) => {
-              const isPdf = isPdfAttachment(att);
-              const label = att.displayName || att.name;
-              return (
-                <div key={att.id} className="voucher-attach-panel__item">
-                  <div className="voucher-attach-panel__item-head">
-                    <EllipsisText className="voucher-attach-panel__name" tooltip={label}>
-                      {label}
-                    </EllipsisText>
-                    {canModify ? (
-                      <Popconfirm
-                        title="确定删除该附件？"
-                        okText="删除"
-                        cancelText="取消"
-                        okButtonProps={{ danger: true }}
-                        onConfirm={() => runRemoveOne(index)}
-                      >
-                        <button
-                          type="button"
-                          className="voucher-attach-panel__delete"
-                          aria-label="删除"
-                          disabled={busy}
+        <div className="voucher-sheet__attach-col-body">
+          <Spin spinning={busy} tip="处理中…">
+            <div className="voucher-sheet__attach-col-list">
+              {attachments.map((att, index) => {
+                const isPdf = isPdfAttachment(att);
+                const label = att.displayName || att.name;
+                return (
+                  <div key={att.id} className="voucher-attach-panel__item">
+                    <div className="voucher-attach-panel__item-head">
+                      <EllipsisText className="voucher-attach-panel__name" tooltip={label}>
+                        {label}
+                      </EllipsisText>
+                      {canModify ? (
+                        <Popconfirm
+                          title="确定删除该附件？"
+                          okText="删除"
+                          cancelText="取消"
+                          okButtonProps={{ danger: true }}
+                          onConfirm={() => runRemoveOne(index)}
                         >
-                          <DeleteOutlined />
-                        </button>
-                      </Popconfirm>
-                    ) : null}
+                          <button
+                            type="button"
+                            className="voucher-attach-panel__delete"
+                            aria-label="删除"
+                            disabled={busy}
+                          >
+                            <DeleteOutlined />
+                          </button>
+                        </Popconfirm>
+                      ) : null}
+                    </div>
+                    <button
+                      type="button"
+                      className="voucher-attach-panel__preview"
+                      onClick={() => {
+                        setPreviewIndex(index);
+                      }}
+                      title="点击预览"
+                      disabled={busy}
+                    >
+                      {isPdf ? (
+                        <div className="voucher-attach-panel__pdf">
+                          <FilePdfOutlined />
+                          <span>PDF</span>
+                        </div>
+                      ) : (
+                        <img src={att.url} alt={label} />
+                      )}
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    className="voucher-attach-panel__preview"
-                    onClick={() => {
-                      setPreviewIndex(index);
-                    }}
-                    title="点击预览"
-                    disabled={busy}
-                  >
-                    {isPdf ? (
-                      <div className="voucher-attach-panel__pdf">
-                        <FilePdfOutlined />
-                        <span>PDF</span>
-                      </div>
-                    ) : (
-                      <img src={att.url} alt={label} />
-                    )}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </Spin>
+                );
+              })}
+            </div>
+          </Spin>
+        </div>
         {onUpload && (
           <div className="voucher-sheet__attach-col-footer">
             {canModify ? (

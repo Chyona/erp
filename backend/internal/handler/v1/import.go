@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"erp/internal/middleware"
 	"erp/internal/pkg/llm"
 	"erp/internal/pkg/response"
 	"github.com/gin-gonic/gin"
@@ -111,10 +112,18 @@ func (h *ImportHandler) ParseImportImage(c *gin.Context) {
 	})
 }
 
+func requireLogin(c *gin.Context) bool {
+	if middleware.GetActor(c) == nil {
+		response.Unauthorized(c, "请先登录")
+		return false
+	}
+	return true
+}
+
 // ParseInvoiceNumber POST /vouchers/parse-invoice-number
 // 支持 multipart file，或 JSON { imageBase64, mimeType }。
 func (h *ImportHandler) ParseInvoiceNumber(c *gin.Context) {
-	if !requireAdmin(c) {
+	if !requireLogin(c) {
 		return
 	}
 	if h.llm == nil || !h.llm.Enabled() {

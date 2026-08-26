@@ -1,10 +1,11 @@
-import { apiRequest } from './apiClient';
+import { apiRequest, ApiError } from './apiClient';
 import {
   dedupeInvoiceNumbers,
+  extractInvoiceNumbersFromFileName,
   extractInvoiceNumbersFromPdf,
   isInvoiceRecognizableFile
 } from '../utils/invoiceNumberExtract';
-import { pdfFirstPageToPngFile } from '../utils/pdfFirstPageImage';
+import { pdfPageToPngFile } from '../utils/pdfFirstPageImage';
 
 const IMAGE_MIME = /^image\//i;
 const PDF_MIME = /^application\/pdf$/i;
@@ -23,45 +24,65 @@ async function fileToBase64(file: File): Promise<{ mimeType: string; base64: str
   };
 }
 
-async function recognizeInvoiceNumbersFromImage(file: File): Promise<string[]> {
-  const { mimeType, base64 } = await fileToBase64(file);
-  const data = await apiRequest<{ invoiceNumbers?: string[] }>('POST', '/vouchers/parse-invoice-number', {
-    imageBase64: base64,
-    mimeType
-  });
-  return dedupeInvoiceNumbers(data.invoiceNumbers || []);
+async function recognizeInvoiceNumbersFromImage(
+  file: File,
+  options?: { allowEmpty?: boolean }
+): Promise<string[]> {
+  try {
+    const { mimeType, base64 } = await fileToBase64(file);
+    const data = await apiRequest<{ invoiceNumbers?: string[] }>('POST', '/vouchers/parse-invoice-number', {
+      imageBase64: base64,
+      mimeType
+    });
+    return dedupeInvoiceNumbers(data.invoiceNumbers || []);
+  } catch (err) {
+    if (
+      options?.allowEmpty &&
+      err instanceof ApiError &&
+      (err.httpStatus === 422 || err.code === 422)
+    ) {
+      return [];
+    }
+    throw err;
+  }
 }
 
-function isPdfFile(file: File) {
+function isPdfFile(file: Pick<File, 'name' | 'type'>) {
   return PDF_MIME.test(file.type) || /\.pdf$/i.test(file.name || '');
 }
 
-function isImageFile(file: File) {
+function isImageFile(file: Pick<File, 'name' | 'type'>) {
   return IMAGE_MIME.test(file.type) || /\.(png|jpe?g|webp|bmp|gif)$/i.test(file.name || '');
 }
 
-export async function recognizeInvoiceNumbersFromFile(file: File): Promise<string[]> {
-  if (!isInvoiceRecognizableFile(file)) {
+export async function recognizeInvoiceNumbersFromFile(
+  file: File,
+  fileName = file.name
+): Promise<string[]> {
+  if (!isInvoiceRecognizableFile({ name: fileName, type: file.type })) {
     throw new Error('仅支持发票截图（PNG/JPG）或 PDF');
   }
 
-  if (isPdfFile(file)) {
+  const fromName = extractInvoiceNumbersFromFileName(fileName);
+  if (fromName.length) return fromName;
+
+  const pdfLike = PDF_MIME.test(file.type) || /\.pdf$/i.test(fileName);
+
+  if (pdfLike) {
     const fromPdf = await extractInvoiceNumbersFromPdf(file);
     if (fromPdf.length) return fromPdf;
 
-    try {
-      const png = await pdfFirstPageToPngFile(file);
-      return recognizeInvoiceNumbersFromImage(png);
-    } catch (err) {
-      throw new Error(
-        (err as Error)?.message ||
-          '未能从 PDF 识别发票号码，请确认已配置 APP_LLM_API_KEY 且后端已重启'
-      );
+    for (let pageNum = 1; pageNum <= 3; pageNum++) {
+      const png = await pdfPageToPngFile(file, pageNum);
+      if (!png) break;
+      const numbers = await recognizeInvoiceNumbersFromImage(png, { allowEmpty: true });
+      if (numbers.length) return numbers;
     }
+    return [];
   }
 
-  if (isImageFile(file)) {
-    return recognizeInvoiceNumbersFromImage(file);
+  if (isImageFile({ ...file, name: fileName } as File)) {
+    return recognizeInvoiceNumbersFromImage(file, { allowEmpty: true });
   }
 
   throw new Error('不支持的文件格式，请上传 PNG/JPG 截图或 PDF');

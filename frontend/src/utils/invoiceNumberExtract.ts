@@ -1,3 +1,5 @@
+import { getPdfDocumentInit, pdfjs } from './pdfWorker';
+
 const IMAGE_EXT = /\.(png|jpe?g|webp|bmp|gif)$/i;
 const PDF_EXT = /\.pdf$/i;
 
@@ -53,6 +55,7 @@ export function extractInvoiceNumbersFromText(text: string): string[] {
 
   const patterns = [
     /发票号码[^\d]{0,20}(\d{8,20})/gi,
+    /数电(?:票|发票)号码[^\d]{0,20}(\d{8,20})/gi,
     /Invoice\s*No\.?[^\d]{0,20}(\d{8,20})/gi,
     /"fphm"\s*:\s*"(\d{8,20})"/gi,
     /<fphm>\s*(\d{8,20})\s*<\/fphm>/gi,
@@ -64,21 +67,70 @@ export function extractInvoiceNumbersFromText(text: string): string[] {
     found.push(...collectMatches(source, pattern));
   }
 
-  for (const label of ['发票号码', '发票号码：', '发票号码:', 'fphm', 'FPHM']) {
+  for (const label of [
+    '发票号码',
+    '发票号码：',
+    '发票号码:',
+    '数电票号码',
+    '数电发票号码',
+    'fphm',
+    'FPHM'
+  ]) {
     found.push(...extractNearLabel(source, label));
   }
 
   return dedupeInvoiceNumbers(found);
 }
 
+async function extractPdfPageText(data: ArrayBuffer, maxPages = 3): Promise<string[]> {
+  const pdf = await pdfjs.getDocument(getPdfDocumentInit(data)).promise;
+  const pageCount = Math.min(pdf.numPages, maxPages);
+  const parts: string[] = [];
+  for (let pageNum = 1; pageNum <= pageCount; pageNum++) {
+    const page = await pdf.getPage(pageNum);
+    const content = await page.getTextContent();
+    parts.push(
+      content.items
+        .map((item) => ('str' in item ? String(item.str || '') : ''))
+        .join(' ')
+    );
+  }
+  return parts;
+}
+
 export async function extractInvoiceNumbersFromPdf(file: File): Promise<string[]> {
   const buffer = await file.arrayBuffer();
+
+  try {
+    const pageTexts = await extractPdfPageText(buffer);
+    const fromTextLayer = dedupeInvoiceNumbers(
+      pageTexts.flatMap((text) => extractInvoiceNumbersFromText(text))
+    );
+    if (fromTextLayer.length) return fromTextLayer;
+  } catch {
+    // 扫描件 PDF 无文字层，继续尝试嵌入元数据与大模型识别
+  }
+
   const latin1 = new TextDecoder('latin1').decode(buffer);
   const utf8 = new TextDecoder('utf-8', { fatal: false }).decode(buffer);
   return dedupeInvoiceNumbers([
     ...extractInvoiceNumbersFromText(latin1),
     ...extractInvoiceNumbersFromText(utf8)
   ]);
+}
+
+export function extractInvoiceNumbersFromFileName(name: string): string[] {
+  const source = String(name || '');
+  const found: string[] = [];
+
+  for (const match of source.matchAll(/dzfp[_-]?(\d{8,20})/gi)) {
+    if (match[1]) found.push(match[1]);
+  }
+  for (const match of source.matchAll(/(?<!\d)(\d{20})(?!\d)/g)) {
+    found.push(match[1]);
+  }
+
+  return dedupeInvoiceNumbers(found);
 }
 
 export function dedupeInvoiceNumbers(numbers: string[]): string[] {

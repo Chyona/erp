@@ -211,11 +211,9 @@ function VoucherEntrySheet({
                           )}
                         </td>
                         <td
-                          className={`voucher-sheet__td-summary${
-                            summaryLibraryRow === index ? ' voucher-sheet__td-summary--library-open' : ''
-                          }${
-                            summaryDropdownRow === index ? ' voucher-sheet__td-summary--dropdown-open' : ''
-                          }`}
+                          className={`voucher-sheet__td-summary${summaryLibraryRow === index ? ' voucher-sheet__td-summary--library-open' : ''
+                            }${summaryDropdownRow === index ? ' voucher-sheet__td-summary--dropdown-open' : ''
+                            }`}
                         >
                           {readOnly ? (
                             <span className="voucher-sheet__readonly-text">{entry?.summary || ''}</span>
@@ -364,16 +362,16 @@ function VoucherEntrySheet({
               </table>
             </div>
           </div>
-          <VoucherAttachmentColumn
-            attachments={attachments}
-            open={attachmentPanelOpen}
-            onClose={onAttachmentPanelClose}
-            onRemove={onRemoveAttachment}
-            onRemoveMany={onRemoveAttachments}
-            onUpload={onUpload}
-            canModify={canModifyAttachments}
-          />
         </div>
+        <VoucherAttachmentColumn
+          attachments={attachments}
+          open={attachmentPanelOpen}
+          onClose={onAttachmentPanelClose}
+          onRemove={onRemoveAttachment}
+          onRemoveMany={onRemoveAttachments}
+          onUpload={onUpload}
+          canModify={canModifyAttachments}
+        />
       </div>
 
       <div className="voucher-sheet__footer">
