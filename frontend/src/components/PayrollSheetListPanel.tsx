@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import type { ColumnsType } from 'antd/es/table';
-import { Button, DatePicker, Dropdown, Modal, Pagination, Space, App } from 'antd';
+import { Button, DatePicker, Dropdown, Modal, Pagination, Space, Tag, App, Tooltip } from 'antd';
 import {
   EditOutlined,
   DeleteOutlined,
@@ -12,17 +12,22 @@ import {
 import dayjs, { type Dayjs } from 'dayjs';
 import ScrollTable from './ScrollTable';
 import PayrollVoucherPickerModal from './PayrollVoucherPickerModal';
-import { Salary, type PayrollSheetListItem, type PayrollVoucherLinkType } from '../services/salary';
+import { Salary, formatPayrollVoucherLinkNo, hasPayrollVoucherLinks, PAYROLL_DELETE_BLOCKED_BY_VOUCHER_MESSAGE, resolvePayrollVoucherShortLabel, type PayrollSheetListItem, type PayrollVoucherLinkType, type PayrollVoucherLinkView } from '../services/salary';
 import { useTabDataRefresh } from '../context/PageTabsContext';
 import { useApp } from '../context/AppContext';
 import { usePageTabs } from '../context/PageTabsContext';
 import { useAuth } from '../context/AuthContext';
 import { useVoucherPageNavigation } from '../hooks/useVoucherPageNavigation';
 import { confirmDanger } from '../utils/confirmAction';
+import { clampMonthRangeToToday, clampMonthToToday, disableFutureMonth } from '../utils/dateConstraints';
 import { defaultReportPeriod, taxExemptionPeriodKey } from '../utils/reportPeriod';
 
 function monthKey(value: Dayjs) {
   return taxExemptionPeriodKey({ type: 'month', year: value.year(), month: value.month() + 1 });
+}
+
+function tableScrollX(columns: ColumnsType<PayrollSheetListItem>) {
+  return columns.reduce((sum, column) => sum + (typeof column.width === 'number' ? column.width : 120), 0);
 }
 
 function defaultMonthRange(): [Dayjs, Dayjs] {
@@ -103,7 +108,7 @@ export default function PayrollSheetListPanel({ readOnly = false }: { readOnly?:
   };
 
   const openCopyModal = () => {
-    setCopyTargetMonth(dayjs(`${endKey}-01`));
+    setCopyTargetMonth(clampMonthToToday(dayjs(`${endKey}-01`)));
     setCopyModalOpen(true);
   };
 
@@ -117,20 +122,20 @@ export default function PayrollSheetListPanel({ readOnly = false }: { readOnly?:
 
     setCopySubmitting(true);
     try {
-      const hasSource = await Salary.hasPeriodSalaryData(prevKey);
+      const hasSource = await Salary.hasPeriodCopySource(prevKey);
       if (!hasSource) {
-        message.warning(`${Salary.formatPeriodLabel(prevKey)}暂无工资表数据`);
-        return Promise.reject(new Error('上月暂无工资表数据'));
+        message.warning(`${Salary.formatPeriodLabel(prevKey)}暂无工资或劳务数据`);
+        return Promise.reject(new Error('上月暂无工资或劳务数据'));
       }
 
       await Salary.copyFromPreviousMonth(periodKey, user?.nickname || user?.username);
-      message.success('已复制上月工资表');
+      message.success('已复制上月工资及劳务数据');
       setCopyModalOpen(false);
       refresh();
       await loadData();
       openDetail(periodKey);
     } catch (err) {
-      if ((err as Error).message !== '上月暂无工资表数据') {
+      if ((err as Error).message !== '上月暂无工资或劳务数据') {
         message.error((err as Error).message || '复制失败');
       }
       return Promise.reject(err);
@@ -140,6 +145,10 @@ export default function PayrollSheetListPanel({ readOnly = false }: { readOnly?:
   };
 
   const handleDelete = async (record: PayrollSheetListItem) => {
+    if (hasPayrollVoucherLinks(record)) {
+      message.warning(PAYROLL_DELETE_BLOCKED_BY_VOUCHER_MESSAGE);
+      return;
+    }
     const ok = await confirmDanger(modal, {
       title: '删除工资表？',
       content: `确定删除「${record.periodLabel}」工资表吗？`
@@ -186,13 +195,54 @@ export default function PayrollSheetListPanel({ readOnly = false }: { readOnly?:
     }
   };
 
+  const renderVoucherLinks = (record: PayrollSheetListItem, links: PayrollVoucherLinkView[]) => {
+    if (!links.length) return '—';
+    return (
+      <div className="payroll-sheet-list__voucher-links">
+        {links.map((link) => (
+          <div key={link.id} className="payroll-sheet-list__voucher-link-row">
+            <Tag bordered={false} className="payroll-sheet-list__voucher-tag">
+              {resolvePayrollVoucherShortLabel(link)}
+            </Tag>
+            <Button
+              type="link"
+              size="small"
+              className="payroll-sheet-list__voucher-link"
+              disabled={link.missing}
+              onClick={() => (link.missing ? undefined : openVoucherEdit(link.voucherId))}
+            >
+              {formatPayrollVoucherLinkNo(link)}
+            </Button>
+            {!readOnly ? (
+              <Button
+                type="link"
+                size="small"
+                danger
+                onClick={() =>
+                  void Salary.removeVoucherLink(record.periodKey, link.id).then(() => {
+                    refresh();
+                    return loadData();
+                  })
+                }
+              >
+                删除
+              </Button>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   const columns: ColumnsType<PayrollSheetListItem> = [
     {
       title: '操作',
       key: 'actions',
-      width: readOnly ? 96 : 128,
+      width: 90,
+      fixed: 'left',
+      align: 'center',
       render: (_, record) => (
-        <Space size={4}>
+        <Space size={2}>
           <Button
             type="text"
             size="small"
@@ -210,127 +260,86 @@ export default function PayrollSheetListPanel({ readOnly = false }: { readOnly?:
                 title="关联凭证"
                 onClick={() => void openLinkModal(record)}
               />
-              <Button
-                type="text"
-                size="small"
-                danger
-                icon={<DeleteOutlined />}
-                aria-label="删除"
-                onClick={() => void handleDelete(record)}
-              />
+              <Tooltip
+                title={
+                  hasPayrollVoucherLinks(record) ? PAYROLL_DELETE_BLOCKED_BY_VOUCHER_MESSAGE : undefined
+                }
+              >
+                <Button
+                  type="text"
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />}
+                  aria-label="删除"
+                  disabled={hasPayrollVoucherLinks(record)}
+                  onClick={() => void handleDelete(record)}
+                />
+              </Tooltip>
             </>
           ) : null}
-          <Button type="text" size="small" icon={<UploadOutlined />} aria-label="导出" disabled />
         </Space>
       )
     },
-    { title: '工资月份', dataIndex: 'periodLabel', width: 110 },
     {
-      title: '工资类别',
-      dataIndex: 'salaryCategory',
+      title: '工资月份',
+      dataIndex: 'periodLabel',
       width: 100,
-      render: (value) => value || '—'
+      fixed: 'left'
     },
     {
       title: '职员数',
       dataIndex: 'staffCount',
-      width: 80,
+      width: 75,
       align: 'center'
     },
     {
       title: '应发工资汇总',
       dataIndex: 'grossTotal',
-      width: 120,
       align: 'right',
       render: (value) => Salary.formatMoneyDisplay(value)
     },
     {
       title: '实发工资汇总',
       dataIndex: 'netSalary',
-      width: 120,
       align: 'right',
       render: (value) => Salary.formatMoneyDisplay(value)
     },
     {
-      title: '计提工资凭证',
-      key: 'accrualVoucher',
-      width: 160,
-      render: (_, record) =>
-        record.accrualVoucher ? (
-          <Space size={4}>
-            <Button
-              type="link"
-              size="small"
-              className="payroll-sheet-list__voucher-link"
-              onClick={() =>
-                record.accrualVoucher?.missing
-                  ? undefined
-                  : openVoucherEdit(record.accrualVoucher.voucherId)
-              }
-            >
-              {record.accrualVoucher.voucherNo || '凭证已删除'}
-            </Button>
-            {!readOnly ? (
-              <Button
-                type="link"
-                size="small"
-                danger
-                onClick={() =>
-                  void Salary.removeVoucherLink(record.periodKey, record.accrualVoucher!.id).then(
-                    loadData
-                  )
-                }
-              >
-                删除
-              </Button>
-            ) : null}
-          </Space>
-        ) : (
-          '—'
-        )
+      title: '劳务人数',
+      dataIndex: 'laborCount',
+      width: 75,
+      align: 'center'
     },
     {
-      title: '发放工资凭证',
-      key: 'paymentVoucher',
-      width: 160,
-      render: (_, record) =>
-        record.paymentVoucher ? (
-          <Space size={4}>
-            <Button
-              type="link"
-              size="small"
-              className="payroll-sheet-list__voucher-link"
-              onClick={() =>
-                record.paymentVoucher?.missing
-                  ? undefined
-                  : openVoucherEdit(record.paymentVoucher.voucherId)
-              }
-            >
-              {record.paymentVoucher.voucherNo || '凭证已删除'}
-            </Button>
-            {!readOnly ? (
-              <Button
-                type="link"
-                size="small"
-                danger
-                onClick={() =>
-                  void Salary.removeVoucherLink(record.periodKey, record.paymentVoucher!.id).then(
-                    loadData
-                  )
-                }
-              >
-                删除
-              </Button>
-            ) : null}
-          </Space>
-        ) : (
-          '—'
-        )
+      title: '应发劳务汇总',
+      dataIndex: 'laborGrossTotal',
+      align: 'right',
+      render: (value) => Salary.formatMoneyDisplay(value)
     },
-    { title: '创建方式', dataIndex: 'creationMethod', width: 100 },
-    { title: '创建人', dataIndex: 'createdBy', width: 100, ellipsis: true },
-    { title: '创建时间', dataIndex: 'createdAt', width: 170 }
+    {
+      title: '实发劳务汇总',
+      dataIndex: 'laborNetTotal',
+      align: 'right',
+      render: (value) => Salary.formatMoneyDisplay(value)
+    },
+    {
+      title: '计提',
+      key: 'accrualVouchers',
+      width: 240,
+      render: (_, record) => renderVoucherLinks(record, record.accrualVouchers)
+    },
+    {
+      title: '发放/支付',
+      key: 'paymentVouchers',
+      width: 240,
+      render: (_, record) => renderVoucherLinks(record, record.paymentVouchers)
+    },
+    { title: '创建方式', dataIndex: 'creationMethod', width: 80 },
+    { title: '创建人', dataIndex: 'createdBy', width: 80, ellipsis: true },
+    { title: '创建时间', dataIndex: 'createdAt', width: 160 }
   ];
+
+  const scrollX = tableScrollX(columns) + (readOnly ? 0 : 48);
 
   return (
     <div className="payroll-sheet-list-panel">
@@ -341,8 +350,12 @@ export default function PayrollSheetListPanel({ readOnly = false }: { readOnly?:
             picker="month"
             allowClear={false}
             value={range}
+            disabledDate={disableFutureMonth}
             onChange={(values) => {
-              if (values?.[0] && values[1]) setRange([values[0], values[1]]);
+              if (values?.[0] && values[1]) {
+                const clamped = clampMonthRangeToToday([values[0], values[1]]);
+                if (clamped) setRange(clamped);
+              }
             }}
           />
           <Button icon={<ReloadOutlined />} loading={loading} onClick={() => void loadData()}>
@@ -372,11 +385,20 @@ export default function PayrollSheetListPanel({ readOnly = false }: { readOnly?:
           autoHeight
           size="small"
           bordered
+          tableLayout="fixed"
           loading={loading}
           rowKey="periodKey"
           columns={columns}
           dataSource={pagedRows}
           pagination={false}
+          scroll={{ x: scrollX }}
+          className="payroll-sheet-list-table"
+          bodyClassName="page-table-body--payroll-sheet-list"
+          wrapStyle={
+            {
+              '--payroll-sheet-list-scroll-x': `${scrollX}px`
+            } as CSSProperties
+          }
           rowSelection={
             readOnly
               ? undefined
@@ -428,11 +450,12 @@ export default function PayrollSheetListPanel({ readOnly = false }: { readOnly?:
             allowClear={false}
             value={copyTargetMonth}
             className="payroll-copy-modal__picker"
+            disabledDate={disableFutureMonth}
             onChange={(value) => {
-              if (value) setCopyTargetMonth(value.startOf('month'));
+              if (value) setCopyTargetMonth(clampMonthToToday(value));
             }}
           />
-          <span>的工资数据</span>
+          <span>的工资及劳务数据</span>
         </div>
       </Modal>
 

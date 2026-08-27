@@ -7,6 +7,8 @@ const SETTING_KEY = 'payrollPeriods';
 export type PayrollVoucherLinkType =
   | 'accrual'
   | 'payment'
+  | 'laborAccrual'
+  | 'laborPayment'
   | 'tax'
   | 'socialSecurity'
   | 'housingFund'
@@ -15,13 +17,89 @@ export type PayrollVoucherLinkType =
 export type PayrollCreationMethod = 'import' | 'manual' | 'copy';
 
 export const PAYROLL_VOUCHER_LABELS: Record<PayrollVoucherLinkType, string> = {
-  accrual: '计提凭证',
-  payment: '发工资凭证',
+  accrual: '计提工资凭证',
+  payment: '发放工资凭证',
+  laborAccrual: '计提劳务凭证',
+  laborPayment: '支付劳务凭证',
   tax: '缴个税凭证',
   socialSecurity: '社保扣款凭证',
   housingFund: '公积金扣款凭证',
   other: '其他'
 };
+
+export const PAYROLL_VOUCHER_SHORT_LABELS: Record<PayrollVoucherLinkType, string> = {
+  accrual: '工资',
+  payment: '工资',
+  laborAccrual: '劳务',
+  laborPayment: '劳务',
+  tax: '个税',
+  socialSecurity: '社保',
+  housingFund: '公积金',
+  other: '其他'
+};
+
+export function payrollVoucherSearchKeyword(linkType: PayrollVoucherLinkType): string {
+  if (linkType === 'other') return '';
+  return PAYROLL_VOUCHER_SHORT_LABELS[linkType];
+}
+
+export const PAYROLL_ACCRUAL_LINK_TYPES: PayrollVoucherLinkType[] = ['accrual', 'laborAccrual'];
+
+export const PAYROLL_PAYMENT_LINK_TYPES: PayrollVoucherLinkType[] = [
+  'payment',
+  'laborPayment',
+  'tax',
+  'socialSecurity',
+  'housingFund',
+  'other'
+];
+
+export function isPayrollAccrualLinkType(linkType: PayrollVoucherLinkType) {
+  return PAYROLL_ACCRUAL_LINK_TYPES.includes(linkType);
+}
+
+export function isPayrollPaymentLinkType(linkType: PayrollVoucherLinkType) {
+  return PAYROLL_PAYMENT_LINK_TYPES.includes(linkType);
+}
+
+export function resolvePayrollVoucherShortLabel(link: Pick<PayrollVoucherLink, 'linkType' | 'customLabel'>) {
+  if (link.linkType === 'other' && link.customLabel?.trim()) {
+    return link.customLabel.trim();
+  }
+  return PAYROLL_VOUCHER_SHORT_LABELS[link.linkType];
+}
+
+export function formatPayrollVoucherLinkNo(
+  link: Pick<PayrollVoucherLinkView, 'voucherNo' | 'voucherDate' | 'missing'>
+) {
+  if (link.missing) return '凭证已删除';
+  if (!link.voucherNo) return '—';
+  const date = link.voucherDate?.trim().slice(0, 10);
+  const match = date?.match(/^(\d{4})-(\d{2})/);
+  if (!match) return link.voucherNo;
+  return `${match[1]}${match[2]}_${link.voucherNo}`;
+}
+
+export function splitPayrollVoucherLinks(links: PayrollVoucherLinkView[]) {
+  return {
+    accrualVouchers: links.filter((item) => isPayrollAccrualLinkType(item.linkType)),
+    paymentVouchers: links.filter((item) => isPayrollPaymentLinkType(item.linkType))
+  };
+}
+
+export const PAYROLL_DELETE_BLOCKED_BY_VOUCHER_MESSAGE =
+  '已关联凭证的工资表不允许删除，请先解除凭证关联';
+
+export function hasPayrollVoucherLinks(
+  source:
+    | Pick<PayrollPeriodData, 'voucherLinks'>
+    | Pick<PayrollSheetListItem, 'accrualVouchers' | 'paymentVouchers'>
+): boolean {
+  if ('voucherLinks' in source) {
+    return source.voucherLinks.length > 0;
+  }
+  return source.accrualVouchers.length > 0 || source.paymentVouchers.length > 0;
+}
 
 export const PAYROLL_CREATION_METHOD_LABELS: Record<PayrollCreationMethod, string> = {
   import: '导入生成',
@@ -90,13 +168,24 @@ export type LaborLedgerRow = {
   id: string;
   salaryMonth: string;
   name: string;
+  /** 税前总额 */
   grossAmount: number;
+  /** 个人缴纳增值税 */
+  personalVat: number;
+  /** 代扣个税 */
   withheldTax: number;
   paymentDate?: string;
   remark?: string;
 };
 
 export type LaborLedgerRowCalculated = LaborLedgerRow & {
+  /** 个人缴纳增值税后收入 */
+  incomeAfterVat: number;
+  /** 免税费用（法定减除费用） */
+  taxExemptExpense: number;
+  /** 应纳税所得额 */
+  taxableIncome: number;
+  /** 实发劳务费 */
   netAmount: number;
 };
 
@@ -126,7 +215,15 @@ export type PayrollPeriodView = PayrollPeriodData & {
     SalaryPayrollRowCalculated,
     'id' | 'salaryMonth' | 'name' | 'staffId' | 'departmentId' | 'idNumber' | 'salaryType' | 'incomeItem' | 'paymentDate'
   >;
-  laborTotals: { grossAmount: number; withheldTax: number; netAmount: number };
+  laborTotals: {
+    grossAmount: number;
+    personalVat: number;
+    incomeAfterVat: number;
+    taxExemptExpense: number;
+    taxableIncome: number;
+    withheldTax: number;
+    netAmount: number;
+  };
   voucherLinksView: PayrollVoucherLinkView[];
 };
 
@@ -137,8 +234,11 @@ export type PayrollSheetListItem = {
   staffCount: number;
   grossTotal: number;
   netSalary: number;
-  accrualVoucher?: PayrollVoucherLinkView;
-  paymentVoucher?: PayrollVoucherLinkView;
+  laborCount: number;
+  laborGrossTotal: number;
+  laborNetTotal: number;
+  accrualVouchers: PayrollVoucherLinkView[];
+  paymentVouchers: PayrollVoucherLinkView[];
   creationMethod: string;
   createdBy: string;
   createdAt: string;
@@ -225,14 +325,33 @@ export function calcSalaryRow(row: SalaryPayrollRow): SalaryPayrollRowCalculated
   };
 }
 
-export function calcLaborRow(row: LaborLedgerRow): LaborLedgerRowCalculated {
-  const grossAmount = num(row.grossAmount);
-  const withheldTax = num(row.withheldTax);
+export function normalizeLaborRow(row: LaborLedgerRow): LaborLedgerRow {
   return {
     ...row,
+    grossAmount: num(row.grossAmount),
+    personalVat: num(row.personalVat)
+  };
+}
+
+export function calcLaborRow(row: LaborLedgerRow): LaborLedgerRowCalculated {
+  const normalized = normalizeLaborRow(row);
+  const grossAmount = num(normalized.grossAmount);
+  const personalVat = num(normalized.personalVat);
+  const incomeAfterVat = roundMoney(Math.max(0, grossAmount - personalVat));
+  const taxExemptExpense = roundMoney(Math.max(incomeAfterVat * 0.2, 800));
+  const taxableIncome = roundMoney(Math.max(0, incomeAfterVat - taxExemptExpense));
+  const withheldTax = roundMoney(taxableIncome * 0.2);
+  const netAmount = roundMoney(Math.max(0, grossAmount - withheldTax));
+
+  return {
+    ...normalized,
     grossAmount,
+    personalVat,
     withheldTax,
-    netAmount: roundMoney(grossAmount - withheldTax)
+    incomeAfterVat,
+    taxExemptExpense,
+    taxableIncome,
+    netAmount
   };
 }
 
@@ -305,15 +424,31 @@ function sumSalaryRows(rows: SalaryPayrollRowCalculated[]) {
   ) as PayrollPeriodView['salaryTotals'];
 }
 
-function sumLaborRows(rows: LaborLedgerRowCalculated[]) {
-  return rows.reduce(
+function sumLaborRows(rows: LaborLedgerRowCalculated[]): PayrollPeriodView['laborTotals'] {
+  const totals = rows.reduce(
     (acc, row) => ({
-      grossAmount: roundMoney(acc.grossAmount + num(row.grossAmount)),
-      withheldTax: roundMoney(acc.withheldTax + num(row.withheldTax)),
-      netAmount: roundMoney(acc.netAmount + num(row.netAmount))
+      grossAmount: acc.grossAmount + num(row.grossAmount),
+      personalVat: acc.personalVat + num(row.personalVat),
+      incomeAfterVat: acc.incomeAfterVat + num(row.incomeAfterVat),
+      taxExemptExpense: acc.taxExemptExpense + num(row.taxExemptExpense),
+      taxableIncome: acc.taxableIncome + num(row.taxableIncome),
+      withheldTax: acc.withheldTax + num(row.withheldTax),
+      netAmount: acc.netAmount + num(row.netAmount)
     }),
-    { grossAmount: 0, withheldTax: 0, netAmount: 0 }
+    {
+      grossAmount: 0,
+      personalVat: 0,
+      incomeAfterVat: 0,
+      taxExemptExpense: 0,
+      taxableIncome: 0,
+      withheldTax: 0,
+      netAmount: 0
+    }
   );
+
+  return Object.fromEntries(
+    Object.entries(totals).map(([key, value]) => [key, roundMoney(value)])
+  ) as PayrollPeriodView['laborTotals'];
 }
 
 function resolveLinkLabel(link: PayrollVoucherLink) {
@@ -346,7 +481,8 @@ function emptyPeriod(periodKey: string): PayrollPeriodData {
 function normalizePeriod(data: PayrollPeriodData): PayrollPeriodData {
   return {
     ...data,
-    salaryRows: (data.salaryRows || []).map(normalizeSalaryRow)
+    salaryRows: (data.salaryRows || []).map(normalizeSalaryRow),
+    laborRows: (data.laborRows || []).map(normalizeLaborRow)
   };
 }
 
@@ -392,12 +528,22 @@ export function createSalaryRow(periodKey: string): SalaryPayrollRow {
   };
 }
 
+export function seedPayrollPeriodRows(data: PayrollPeriodData): PayrollPeriodData {
+  const salaryRows = data.salaryRows.length ? data.salaryRows : [createSalaryRow(data.periodKey)];
+  const laborRows = data.laborRows.length ? data.laborRows : [createLaborRow(data.periodKey)];
+  if (salaryRows === data.salaryRows && laborRows === data.laborRows) {
+    return data;
+  }
+  return { ...data, salaryRows, laborRows };
+}
+
 export function createLaborRow(periodKey: string): LaborLedgerRow {
   return {
     id: ErpApi.generateId(),
     salaryMonth: periodKey,
     name: '',
     grossAmount: 0,
+    personalVat: 0,
     withheldTax: 0,
     paymentDate: '',
     remark: ''
@@ -456,10 +602,13 @@ async function buildListItem(
   voucherLinksView: PayrollVoucherLinkView[]
 ): Promise<PayrollSheetListItem> {
   const salaryRows = data.salaryRows.map(calcSalaryRow);
+  const laborRows = data.laborRows.map(calcLaborRow);
   const totals = sumSalaryRows(salaryRows);
+  const laborTotals = sumLaborRows(laborRows);
   const staffCount = salaryRows.filter((row) => row.name.trim()).length;
-  const accrualVoucher = voucherLinksView.find((item) => item.linkType === 'accrual');
-  const paymentVoucher = voucherLinksView.find((item) => item.linkType === 'payment');
+  const laborCount = laborRows.filter((row) => row.name.trim()).length;
+  const { accrualVouchers, paymentVouchers } = splitPayrollVoucherLinks(voucherLinksView);
+  const hasRows = staffCount > 0 || laborCount > 0;
 
   return {
     periodKey: data.periodKey,
@@ -468,16 +617,23 @@ async function buildListItem(
     staffCount,
     grossTotal: totals.preTaxSalary,
     netSalary: totals.netSalary,
-    accrualVoucher,
-    paymentVoucher,
+    laborCount,
+    laborGrossTotal: laborTotals.grossAmount,
+    laborNetTotal: laborTotals.netAmount,
+    accrualVouchers,
+    paymentVouchers,
     creationMethod: data.creationMethod
       ? PAYROLL_CREATION_METHOD_LABELS[data.creationMethod]
-      : salaryRows.length
+      : hasRows
         ? '手动录入'
         : '—',
     createdBy: data.createdBy || '—',
     createdAt: formatDateTime(data.createdAt || data.updatedAt)
   };
+}
+
+export function calcLaborTotals(rows: LaborLedgerRow[]) {
+  return sumLaborRows(rows.map(calcLaborRow));
 }
 
 export function calcSalaryTotals(rows: SalaryPayrollRow[]) {
@@ -529,16 +685,18 @@ export const Salary = {
     } = {}
   ) {
     const store = await readStore();
-    if (store[periodKey]?.salaryRows?.length) {
+    if (store[periodKey]?.salaryRows?.length || store[periodKey]?.laborRows?.length) {
       return buildPeriodView(store[periodKey]);
     }
-    const next = normalizePeriod({
-      ...emptyPeriod(periodKey),
-      creationMethod: options.creationMethod || 'manual',
-      createdBy: options.createdBy,
-      salaryCategory: options.salaryCategory || '',
-      createdAt: new Date().toISOString()
-    });
+    const next = normalizePeriod(
+      seedPayrollPeriodRows({
+        ...emptyPeriod(periodKey),
+        creationMethod: options.creationMethod || 'manual',
+        createdBy: options.createdBy,
+        salaryCategory: options.salaryCategory || '',
+        createdAt: new Date().toISOString()
+      })
+    );
     store[periodKey] = next;
     await writeStore(store);
     return buildPeriodView(next);
@@ -549,7 +707,9 @@ export const Salary = {
     if (!prevKey) throw new Error('无法计算上月');
     const store = await readStore();
     const source = store[prevKey];
-    if (!source?.salaryRows?.length) throw new Error('上月暂无工资表数据');
+    if (!source?.salaryRows?.length && !source?.laborRows?.length) {
+      throw new Error('上月暂无工资或劳务数据');
+    }
 
     const next = normalizePeriod({
       ...emptyPeriod(periodKey),
@@ -557,12 +717,16 @@ export const Salary = {
       creationMethod: 'copy',
       createdBy,
       createdAt: new Date().toISOString(),
-      salaryRows: source.salaryRows.map((row) => ({
+      salaryRows: (source.salaryRows || []).map((row) => ({
         ...normalizeSalaryRow(row),
         id: ErpApi.generateId(),
         salaryMonth: periodKey
       })),
-      laborRows: []
+      laborRows: (source.laborRows || []).map((row) => ({
+        ...row,
+        id: ErpApi.generateId(),
+        salaryMonth: periodKey
+      }))
     });
     store[periodKey] = next;
     await writeStore(store);
@@ -577,9 +741,24 @@ export const Salary = {
     return Boolean(store[periodKey]?.salaryRows?.length);
   },
 
+  async hasPeriodLaborData(periodKey: string) {
+    const store = await readStore();
+    return Boolean(store[periodKey]?.laborRows?.length);
+  },
+
+  async hasPeriodCopySource(periodKey: string) {
+    const store = await readStore();
+    const data = store[periodKey];
+    return Boolean(data?.salaryRows?.length || data?.laborRows?.length);
+  },
+
   async deletePeriod(periodKey: string) {
     const store = await readStore();
-    if (!store[periodKey]) return;
+    const current = store[periodKey];
+    if (!current) return;
+    if (hasPayrollVoucherLinks(current)) {
+      throw new Error(PAYROLL_DELETE_BLOCKED_BY_VOUCHER_MESSAGE);
+    }
     delete store[periodKey];
     await writeStore(store);
     await ErpApi.addAuditLog('删除', '工资薪金', periodKey);

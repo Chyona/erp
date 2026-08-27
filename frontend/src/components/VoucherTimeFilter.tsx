@@ -12,6 +12,7 @@ import {
   datesToPeriods,
   formatPeriodRange,
   getTimeFilterDisplay,
+  clampPeriodToNow,
   isFutureDate,
   isFuturePeriod,
   normalizePeriodRange,
@@ -244,7 +245,10 @@ export default function VoucherTimeFilter({
         setTimeOpen(false);
         return;
       }
-      const range = periodsToDateRange(draftStartPeriod, draftEndPeriod);
+      let startPeriod = clampPeriodToNow(draftStartPeriod);
+      let endPeriod = clampPeriodToNow(draftEndPeriod);
+      [startPeriod, endPeriod] = normalizePeriodRange(startPeriod, endPeriod);
+      const range = periodsToDateRange(startPeriod, endPeriod);
       const next: VoucherTimeFilterState = {
         mode: 'period',
         startDate: range.startDate,

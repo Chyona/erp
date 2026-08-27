@@ -1,14 +1,44 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Input, Modal, Select, Space, Tag, Typography } from 'antd';
-import AppTable from './AppTable';
-import { Voucher } from '../services/voucher';
-import type { Voucher as VoucherRecord } from '../types';
+import { Input, Modal, Select, Space, Typography } from 'antd';
 import {
+  PAYROLL_ACCRUAL_LINK_TYPES,
+  PAYROLL_PAYMENT_LINK_TYPES,
   PAYROLL_VOUCHER_LABELS,
+  payrollVoucherSearchKeyword,
   type PayrollVoucherLinkType
 } from '../services/salary';
+import { Voucher } from '../services/voucher';
+import type { Voucher as VoucherRecord } from '../types';
 
 const { Text } = Typography;
+
+function formatVoucherEntrySummaries(entries: VoucherRecord['entries'] = []) {
+  const summaries = [...new Set(entries.map((entry) => entry.summary?.trim()).filter(Boolean))];
+  if (!summaries.length) return '—';
+  const text = summaries.join('；');
+  return text.length > 48 ? `${text.slice(0, 48)}…` : text;
+}
+
+function voucherOptionLabel(item: VoucherRecord) {
+  return `${item.voucherNo} · ${item.date} · ${formatVoucherEntrySummaries(item.entries)}`;
+}
+
+const LINK_TYPE_OPTIONS = [
+  {
+    label: '计提',
+    options: PAYROLL_ACCRUAL_LINK_TYPES.map((value) => ({
+      value,
+      label: PAYROLL_VOUCHER_LABELS[value]
+    }))
+  },
+  {
+    label: '发放/支付',
+    options: PAYROLL_PAYMENT_LINK_TYPES.map((value) => ({
+      value,
+      label: PAYROLL_VOUCHER_LABELS[value]
+    }))
+  }
+];
 
 type PayrollVoucherPickerModalProps = {
   open: boolean;
@@ -40,9 +70,10 @@ export default function PayrollVoucherPickerModal({
 
   useEffect(() => {
     if (!open) return;
-    setKeyword('');
+    const initialLinkType: PayrollVoucherLinkType = 'accrual';
+    setKeyword(payrollVoucherSearchKeyword(initialLinkType));
     setVoucherId(null);
-    setLinkType('accrual');
+    setLinkType(initialLinkType);
     setCustomLabel('');
     setLoading(true);
     void Voucher.getAll()
@@ -56,19 +87,26 @@ export default function PayrollVoucherPickerModal({
       .finally(() => setLoading(false));
   }, [open]);
 
+  const handleLinkTypeChange = (value: PayrollVoucherLinkType) => {
+    setLinkType(value);
+    setKeyword(payrollVoucherSearchKeyword(value));
+    setVoucherId(null);
+  };
+
   const options = useMemo(() => {
     const q = keyword.trim().toLowerCase();
     return vouchers
       .filter((item) => !existingVoucherIds.includes(item.id))
       .filter((item) => {
         if (!q) return true;
-        const hay = `${item.voucherNo} ${item.date} ${item.remark || ''} ${item.businessType || ''}`.toLowerCase();
+        const entryText = (item.entries || []).map((entry) => entry.summary || '').join(' ');
+        const hay = `${item.voucherNo} ${item.date} ${item.remark || ''} ${item.businessType || ''} ${entryText}`.toLowerCase();
         return hay.includes(q);
       })
       .slice(0, 200)
       .map((item) => ({
         value: item.id,
-        label: `${item.voucherNo} · ${item.date} · ${item.businessType || '—'}`
+        label: voucherOptionLabel(item)
       }));
   }, [existingVoucherIds, keyword, vouchers]);
 
@@ -101,11 +139,8 @@ export default function PayrollVoucherPickerModal({
           <Select
             style={{ width: '100%', marginTop: 6 }}
             value={linkType}
-            options={Object.entries(PAYROLL_VOUCHER_LABELS).map(([value, label]) => ({
-              value,
-              label
-            }))}
-            onChange={setLinkType}
+            options={LINK_TYPE_OPTIONS}
+            onChange={handleLinkTypeChange}
           />
         </div>
         {linkType === 'other' ? (
@@ -124,18 +159,19 @@ export default function PayrollVoucherPickerModal({
           <Select
             showSearch
             allowClear
-            placeholder="输入凭证号、日期或备注搜索"
+            placeholder="输入凭证号、日期、摘要或备注搜索"
             style={{ width: '100%', marginTop: 6 }}
             value={voucherId ?? undefined}
             options={options}
             loading={loading}
             filterOption={false}
+            searchValue={keyword}
             onSearch={setKeyword}
             onChange={(value) => setVoucherId(value || null)}
           />
         </div>
         <Text type="secondary" style={{ fontSize: 12 }}>
-          可关联多张凭证，例如计提、发放工资、缴纳个税等；本模块不支持上传附件。
+          计提、发放/支付两类均可关联多张凭证（如工资计提、劳务计提等），保存后可继续添加。
         </Text>
       </Space>
     </Modal>

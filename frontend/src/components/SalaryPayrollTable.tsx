@@ -1,11 +1,12 @@
 import { useMemo, type CSSProperties } from 'react';
-import { Button, InputNumber, Select, Space, Table } from 'antd';
+import { Button, DatePicker, InputNumber, Select, Space, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
   DeleteOutlined,
   EditOutlined,
   PlusOutlined
 } from '@ant-design/icons';
+import dayjs from '../utils/dayjsSetup';
 import ScrollTable from './ScrollTable';
 import {
   Salary,
@@ -21,9 +22,11 @@ import {
 
 const PAYROLL_BASIC_ACTION_WIDTH = 88;
 const PAYROLL_BASIC_STAFF_WIDTH = 120;
-const PAYROLL_BASIC_TYPE_WIDTH = 96;
-const PAYROLL_FIXED_WIDTH =
-  PAYROLL_BASIC_ACTION_WIDTH + PAYROLL_BASIC_STAFF_WIDTH + PAYROLL_BASIC_TYPE_WIDTH;
+const PAYROLL_PAYMENT_DATE_WIDTH = 128;
+const PAYROLL_WITHHELD_TAX_WIDTH = 112;
+const PAYROLL_NET_SALARY_WIDTH = 104;
+const PAYROLL_FIXED_RIGHT_WIDTH =
+  PAYROLL_WITHHELD_TAX_WIDTH + PAYROLL_NET_SALARY_WIDTH + PAYROLL_PAYMENT_DATE_WIDTH;
 
 function leafColumnWidth(column: ColumnsType<SalaryPayrollRowCalculated>[number]): number {
   if ('children' in column && column.children?.length) {
@@ -107,7 +110,6 @@ function calcColumn(title: string, dataIndex: keyof SalaryPayrollRowCalculated, 
 }
 
 export default function SalaryPayrollTable({
-  periodKey,
   rows,
   totals,
   staffMembers,
@@ -134,9 +136,9 @@ export default function SalaryPayrollTable({
       rows.map((row) =>
         row.id === id
           ? {
-              ...row,
-              ...patch
-            }
+            ...row,
+            ...patch
+          }
           : row
       )
     );
@@ -158,82 +160,57 @@ export default function SalaryPayrollTable({
 
   const columns: ColumnsType<SalaryPayrollRowCalculated> = [
     {
-      title: '基本信息',
+      title: '操作',
+      key: 'actions',
+      width: PAYROLL_BASIC_ACTION_WIDTH,
       fixed: 'left',
-      width: PAYROLL_FIXED_WIDTH,
-      children: [
-        {
-          title: '操作',
-          key: 'actions',
-          width: PAYROLL_BASIC_ACTION_WIDTH,
-          align: 'center',
-          render: (_, record) =>
-            readOnly ? null : (
-              <Space size={4}>
-                <Button type="text" size="small" icon={<PlusOutlined />} aria-label="新增" onClick={onAddRow} />
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<EditOutlined />}
-                  aria-label="编辑"
-                  onClick={() => undefined}
-                />
-                <Button
-                  type="text"
-                  size="small"
-                  danger
-                  icon={<DeleteOutlined />}
-                  aria-label="删除"
-                  onClick={() => onRemoveRow(record.id)}
-                />
-              </Space>
-            )
-        },
-        {
-          title: '职员',
-          dataIndex: 'name',
-          width: PAYROLL_BASIC_STAFF_WIDTH,
-          render: (_value, record) =>
-            readOnly ? (
-              record.name || '—'
-            ) : (
-              <Select
-                size="small"
-                showSearch
-                allowClear
-                placeholder="选择职员"
-                optionFilterProp="label"
-                style={{ width: '100%' }}
-                value={record.staffId || undefined}
-                options={staffOptions}
-                onChange={(next) => {
-                  if (next) applyStaff(record, next);
-                  else patchRow(record.id, { staffId: '', name: '' });
-                }}
-              />
-            )
-        },
-        {
-          title: '薪资类型',
-          dataIndex: 'salaryType',
-          width: PAYROLL_BASIC_TYPE_WIDTH,
-          render: (value, record) =>
-            readOnly ? (
-              value || '—'
-            ) : (
-              <Select
-                size="small"
-                style={{ width: '100%' }}
-                value={value || PAYROLL_STAFF_TYPE_LABELS.employee}
-                options={Object.values(PAYROLL_STAFF_TYPE_LABELS).map((label) => ({
-                  value: label,
-                  label
-                }))}
-                onChange={(next) => patchRow(record.id, { salaryType: next })}
-              />
-            )
-        }
-      ]
+      align: 'center',
+      render: (_, record) =>
+        readOnly ? null : (
+          <Space size={4}>
+            <Button type="text" size="small" icon={<PlusOutlined />} aria-label="新增" onClick={onAddRow} />
+            <Button
+              type="text"
+              size="small"
+              icon={<EditOutlined />}
+              aria-label="编辑"
+              onClick={() => undefined}
+            />
+            <Button
+              type="text"
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              aria-label="删除"
+              onClick={() => onRemoveRow(record.id)}
+            />
+          </Space>
+        )
+    },
+    {
+      title: '职员',
+      dataIndex: 'name',
+      width: PAYROLL_BASIC_STAFF_WIDTH,
+      fixed: 'left',
+      render: (_value, record) =>
+        readOnly ? (
+          record.name || '—'
+        ) : (
+          <Select
+            size="small"
+            showSearch
+            allowClear
+            placeholder="选择职员"
+            optionFilterProp="label"
+            style={{ width: '100%' }}
+            value={record.staffId || undefined}
+            options={staffOptions}
+            onChange={(next) => {
+              if (next) applyStaff(record, next);
+              else patchRow(record.id, { staffId: '', name: '' });
+            }}
+          />
+        )
     },
     {
       title: '本期工资',
@@ -275,10 +252,35 @@ export default function SalaryPayrollTable({
     moneyColumn('累计其他扣除', 'cumulativeOtherDeduction', patchRow, readOnly, 112),
     moneyColumn('累计应缴个税', 'cumulativeTaxPayable', patchRow, readOnly, 112),
     moneyColumn('累计已缴个税', 'cumulativeTaxPaid', patchRow, readOnly, 112),
-    moneyColumn('本月应缴个税', 'withheldTax', patchRow, readOnly, 112),
     {
-      ...calcColumn('实发工资', 'netSalary', 104),
-      className: 'payroll-table__col-highlight'
+      ...moneyColumn('本月应缴个税', 'withheldTax', patchRow, readOnly, PAYROLL_WITHHELD_TAX_WIDTH),
+
+      fixed: 'right'
+    },
+    {
+      ...calcColumn('实发工资', 'netSalary', PAYROLL_NET_SALARY_WIDTH),
+      className: 'payroll-table__col-highlight',
+      fixed: 'right'
+    },
+    {
+      title: '发放日期',
+      dataIndex: 'paymentDate',
+      width: PAYROLL_PAYMENT_DATE_WIDTH,
+      fixed: 'right',
+      render: (value: string | undefined, record) =>
+        readOnly ? (
+          value || '—'
+        ) : (
+          <DatePicker
+            size="small"
+            allowClear
+            style={{ width: '100%' }}
+            value={value ? dayjs(value) : null}
+            onChange={(next) =>
+              patchRow(record.id, { paymentDate: next ? next.format('YYYY-MM-DD') : undefined })
+            }
+          />
+        )
     }
   ];
 
@@ -309,9 +311,7 @@ export default function SalaryPayrollTable({
     totals.cumulativeSpecialAdditionalTotal,
     totals.cumulativeOtherDeduction,
     totals.cumulativeTaxPayable,
-    totals.cumulativeTaxPaid,
-    totals.withheldTax,
-    totals.netSalary
+    totals.cumulativeTaxPaid
   ];
 
   return (
@@ -332,20 +332,35 @@ export default function SalaryPayrollTable({
         bodyClassName="payroll-table__scroll-body page-table-body--payroll-detail"
         wrapStyle={
           {
-            '--payroll-detail-scroll-x': `${scrollX}px`
+            '--payroll-detail-scroll-x': `${scrollX}px`,
+            '--payroll-fixed-right-width': `${PAYROLL_FIXED_RIGHT_WIDTH}px`
           } as CSSProperties
         }
         summary={() => (
           <Table.Summary fixed>
             <Table.Summary.Row className="payroll-table__summary-row">
-              <Table.Summary.Cell index={0} colSpan={3} align="center">
+              <Table.Summary.Cell index={0} colSpan={2} align="center">
                 合计
               </Table.Summary.Cell>
               {summaryCells.map((value, index) => (
-                <Table.Summary.Cell key={index} index={index + 3} align="right">
+                <Table.Summary.Cell key={index} index={index + 2} align="right">
                   {Salary.formatMoneyDisplay(value)}
                 </Table.Summary.Cell>
               ))}
+              <Table.Summary.Cell
+                index={summaryCells.length + 2}
+                align="right"
+              >
+                {Salary.formatMoneyDisplay(totals.withheldTax)}
+              </Table.Summary.Cell>
+              <Table.Summary.Cell
+                index={summaryCells.length + 3}
+                align="right"
+                className="payroll-table__col-highlight"
+              >
+                {Salary.formatMoneyDisplay(totals.netSalary)}
+              </Table.Summary.Cell>
+              <Table.Summary.Cell index={summaryCells.length + 4} />
             </Table.Summary.Row>
           </Table.Summary>
         )}

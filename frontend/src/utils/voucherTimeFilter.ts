@@ -86,13 +86,51 @@ function normalizeStoredTimeFilter(raw: Partial<VoucherTimeFilterState>): Vouche
   };
 }
 
+export function clampPeriodToNow(period: VoucherPeriod): VoucherPeriod {
+  return isFuturePeriod(period) ? currentPeriod() : period;
+}
+
+export function clampTimeFilterStateToNow(state: VoucherTimeFilterState): VoucherTimeFilterState {
+  if (state.mode === 'date') {
+    if (!state.startDate || !state.endDate) return state;
+    const startDate = clampDateToToday(dayjs(state.startDate)).format('YYYY-MM-DD');
+    const endDate = clampDateToToday(dayjs(state.endDate)).format('YYYY-MM-DD');
+    if (startDate === state.startDate && endDate === state.endDate) return state;
+    const periods = datesToPeriods(startDate, endDate);
+    return { ...state, startDate, endDate, startPeriod: periods.startPeriod, endPeriod: periods.endPeriod };
+  }
+  if (state.startPeriod && state.endPeriod) {
+    let start = clampPeriodToNow(state.startPeriod);
+    let end = clampPeriodToNow(state.endPeriod);
+    [start, end] = normalizePeriodRange(start, end);
+    const range = periodsToDateRange(start, end);
+    if (
+      comparePeriod(start, state.startPeriod) === 0 &&
+      comparePeriod(end, state.endPeriod) === 0 &&
+      state.startDate === range.startDate &&
+      state.endDate === range.endDate
+    ) {
+      return state;
+    }
+    return {
+      mode: 'period',
+      startDate: range.startDate,
+      endDate: range.endDate,
+      startPeriod: range.startPeriod,
+      endPeriod: range.endPeriod
+    };
+  }
+  return state;
+}
+
 /** 从 localStorage 读取上次凭证管理的时间筛选；无效时回退默认（当前月）。 */
 export function loadStoredTimeFilter(): VoucherTimeFilterState {
   try {
     const raw = localStorage.getItem(TIME_FILTER_STORAGE_KEY);
     if (!raw) return defaultTimeFilter();
     const parsed = JSON.parse(raw) as Partial<VoucherTimeFilterState>;
-    return normalizeStoredTimeFilter(parsed) ?? defaultTimeFilter();
+    const normalized = normalizeStoredTimeFilter(parsed) ?? defaultTimeFilter();
+    return clampTimeFilterStateToNow(normalized);
   } catch {
     return defaultTimeFilter();
   }

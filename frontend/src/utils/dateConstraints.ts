@@ -31,3 +31,34 @@ export function clampDateRangeToToday(
   }
   return [start, end];
 }
+
+export function currentMonthStart(): Dayjs {
+  return dayjs().startOf('month');
+}
+
+export function isFutureMonth(date: Dayjs): boolean {
+  return date.startOf('month').isAfter(currentMonthStart(), 'month');
+}
+
+/** Ant Design month picker disabledDate */
+export function disableFutureMonth(date: Dayjs): boolean {
+  return isFutureMonth(date);
+}
+
+export function clampMonthToToday(date: Dayjs): Dayjs {
+  return isFutureMonth(date) ? currentMonthStart() : date.startOf('month');
+}
+
+export function clampMonthRangeToToday(
+  range: [Dayjs, Dayjs] | null | undefined
+): [Dayjs, Dayjs] | null | undefined {
+  if (!range) return range;
+  const currentMonth = currentMonthStart();
+  let [start, end] = range.map((value) => value.startOf('month')) as [Dayjs, Dayjs];
+  if (isFutureMonth(start)) start = currentMonth;
+  if (isFutureMonth(end)) end = currentMonth;
+  if (end.isBefore(start, 'month')) {
+    return [start, start];
+  }
+  return [start, end];
+}

@@ -1,20 +1,36 @@
-import { Button, DatePicker, Input, InputNumber, Tag, Table } from 'antd';
+import { useMemo, type CSSProperties } from 'react';
+import { Button, DatePicker, Input, InputNumber, Select, Space, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import {
+  DeleteOutlined,
+  EditOutlined,
+  PlusOutlined
+} from '@ant-design/icons';
 import dayjs from '../utils/dayjsSetup';
-import AppTable from './AppTable';
+import ScrollTable from './ScrollTable';
 import {
   Salary,
   type LaborLedgerRow,
   type LaborLedgerRowCalculated,
   type PayrollPeriodView
 } from '../services/salary';
+import type { PayrollStaffMember } from '../services/payrollStaff';
+
+const LABOR_BASIC_ACTION_WIDTH = 88;
+const LABOR_BASIC_NAME_WIDTH = 120;
+
+function tableScrollX(columns: ColumnsType<LaborLedgerRowCalculated>): number {
+  return columns.reduce((sum, column) => sum + (typeof column.width === 'number' ? column.width : 120), 0);
+}
 
 type LaborLedgerTableProps = {
   periodKey: string;
   rows: LaborLedgerRowCalculated[];
   totals: PayrollPeriodView['laborTotals'];
+  staffMembers?: PayrollStaffMember[];
   readOnly?: boolean;
   loading?: boolean;
+  fillPage?: boolean;
   onChange: (rows: LaborLedgerRow[]) => void;
   onAddRow: () => void;
   onRemoveRow: (id: string) => void;
@@ -45,102 +61,174 @@ function MoneyCell({
   );
 }
 
+function moneyColumn(
+  title: string,
+  dataIndex: keyof LaborLedgerRow,
+  patchRow: (id: string, patch: Partial<LaborLedgerRow>) => void,
+  readOnly?: boolean,
+  width = 120
+) {
+  return {
+    title,
+    dataIndex,
+    width,
+    align: 'right' as const,
+    render: (value: number, record: LaborLedgerRowCalculated) => (
+      <MoneyCell
+        value={value}
+        readOnly={readOnly}
+        onChange={(next) => patchRow(record.id, { [dataIndex]: next } as Partial<LaborLedgerRow>)}
+      />
+    )
+  };
+}
+
+function calcColumn(title: string, dataIndex: keyof LaborLedgerRowCalculated, width = 120) {
+  return {
+    title,
+    dataIndex,
+    width,
+    align: 'right' as const,
+    className: 'payroll-table__col-total',
+    render: (value: number) => Salary.formatMoneyDisplay(value)
+  };
+}
+
 export default function LaborLedgerTable({
-  periodKey,
   rows,
   totals,
+  staffMembers = [],
   readOnly = false,
   loading = false,
   onChange,
   onAddRow,
   onRemoveRow
 }: LaborLedgerTableProps) {
+  const staffOptions = useMemo(
+    () =>
+      staffMembers
+        .filter((item) => item.enabled !== false && item.staffType === 'temporary')
+        .map((item) => ({
+          value: item.id,
+          label: item.name
+        })),
+    [staffMembers]
+  );
+
   const patchRow = (id: string, patch: Partial<LaborLedgerRow>) => {
-    onChange(rows.map((row) => (row.id === id ? { ...row, ...patch } : row)));
+    onChange(
+      rows.map((row) =>
+        row.id === id
+          ? {
+            ...row,
+            ...patch
+          }
+          : row
+      )
+    );
   };
+
+  const resolveStaffId = (name: string) =>
+    staffOptions.find((option) => option.label === name)?.value;
 
   const columns: ColumnsType<LaborLedgerRowCalculated> = [
     {
-      title: '编号',
-      width: 56,
+      title: '操作',
+      key: 'actions',
+      width: LABOR_BASIC_ACTION_WIDTH,
+      fixed: 'left',
       align: 'center',
-      render: (_value, _row, index) => index + 1
-    },
-    {
-      title: '所属月',
-      dataIndex: 'salaryMonth',
-      width: 108,
-      render: (value) => value || periodKey
-    },
-    {
-      title: (
-        <span>
-          姓名<span className="payroll-table__required">*</span>
-        </span>
-      ),
-      dataIndex: 'name',
-      width: 120,
-      render: (value, record) =>
-        readOnly ? (
-          value || '—'
-        ) : (
-          <Input
-            size="small"
-            value={value}
-            placeholder="必填"
-            onChange={(e) => patchRow(record.id, { name: e.target.value })}
-          />
+      render: (_, record) =>
+        readOnly ? null : (
+          <Space size={4}>
+            <Button type="text" size="small" icon={<PlusOutlined />} aria-label="新增" onClick={onAddRow} />
+            <Button
+              type="text"
+              size="small"
+              icon={<EditOutlined />}
+              aria-label="编辑"
+              onClick={() => undefined}
+            />
+            <Button
+              type="text"
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              aria-label="删除"
+              onClick={() => onRemoveRow(record.id)}
+            />
+          </Space>
         )
     },
     {
-      title: '应发劳务费',
-      dataIndex: 'grossAmount',
-      width: 120,
-      align: 'right',
-      render: (value, record) => (
-        <MoneyCell
-          value={value}
-          readOnly={readOnly}
-          onChange={(next) => patchRow(record.id, { grossAmount: next })}
-        />
-      )
+      title: '姓名',
+      dataIndex: 'name',
+      width: LABOR_BASIC_NAME_WIDTH,
+      fixed: 'left',
+      render: (_value, record) => {
+        if (readOnly) {
+          return record.name || '—';
+        }
+        if (staffOptions.length) {
+          return (
+            <Select
+              size="small"
+              showSearch
+              allowClear
+              placeholder="选择人员"
+              optionFilterProp="label"
+              style={{ width: '100%' }}
+              value={resolveStaffId(record.name) || undefined}
+              options={staffOptions}
+              onChange={(staffId) => {
+                if (!staffId) {
+                  patchRow(record.id, { name: '' });
+                  return;
+                }
+                const staff = staffMembers.find((item) => item.id === staffId);
+                patchRow(record.id, { name: staff?.name || '' });
+              }}
+            />
+          );
+        }
+        return (
+          <Input
+            size="small"
+            placeholder="姓名"
+            value={record.name}
+            onChange={(event) => patchRow(record.id, { name: event.target.value })}
+          />
+        );
+      }
     },
-    {
-      title: '代扣个税',
-      dataIndex: 'withheldTax',
-      width: 120,
-      align: 'right',
-      render: (value, record) => (
-        <MoneyCell
-          value={value}
-          readOnly={readOnly}
-          onChange={(next) => patchRow(record.id, { withheldTax: next })}
-        />
-      )
-    },
+    moneyColumn('税前总额', 'grossAmount', patchRow, readOnly),
+    moneyColumn('个人缴纳增值税', 'personalVat', patchRow, readOnly, 128),
+    calcColumn('个人缴纳增值税后收入', 'incomeAfterVat', 152),
+    calcColumn('免税费用', 'taxExemptExpense', 104),
+    calcColumn('应纳税所得额', 'taxableIncome', 120),
+    calcColumn('代扣个税', 'withheldTax', 104),
     {
       title: '实发劳务费',
       dataIndex: 'netAmount',
       width: 120,
       align: 'right',
-      className: 'payroll-table__col-highlight',
-      render: (value) => Salary.formatMoneyDisplay(value)
+      render: (value: number) => Salary.formatMoneyDisplay(value)
     },
     {
       title: '发放时间',
       dataIndex: 'paymentDate',
       width: 128,
-      render: (value, record) =>
+      render: (value: string | undefined, record) =>
         readOnly ? (
           value || '—'
         ) : (
           <DatePicker
             size="small"
             allowClear
+            style={{ width: '100%' }}
             value={value ? dayjs(value) : null}
-            format="YYYY-MM-DD"
-            onChange={(date) =>
-              patchRow(record.id, { paymentDate: date ? date.format('YYYY-MM-DD') : '' })
+            onChange={(next) =>
+              patchRow(record.id, { paymentDate: next ? next.format('YYYY-MM-DD') : undefined })
             }
           />
         )
@@ -148,72 +236,72 @@ export default function LaborLedgerTable({
     {
       title: '备注',
       dataIndex: 'remark',
+      width: 160,
       ellipsis: true,
-      render: (value, record) =>
+      render: (value: string | undefined, record) =>
         readOnly ? (
           value || '—'
         ) : (
           <Input
             size="small"
+            placeholder="备注"
             value={value}
-            placeholder="项目或说明"
-            onChange={(e) => patchRow(record.id, { remark: e.target.value })}
+            onChange={(event) => patchRow(record.id, { remark: event.target.value })}
           />
         )
     }
   ];
 
-  if (!readOnly) {
-    columns.push({
-      title: '操作',
-      key: 'actions',
-      width: 72,
-      render: (_, record) => (
-        <Button type="link" size="small" danger onClick={() => onRemoveRow(record.id)}>
-          删除
-        </Button>
-      )
-    });
-  }
+  const scrollX = tableScrollX(columns);
+
+  const summaryCells = [
+    totals.grossAmount,
+    totals.personalVat,
+    totals.incomeAfterVat,
+    totals.taxExemptExpense,
+    totals.taxableIncome,
+    totals.withheldTax,
+    totals.netAmount
+  ];
 
   return (
-    <div className="payroll-table-wrap">
-      {!readOnly ? (
-        <div className="payroll-table__toolbar">
-          <Button size="small" onClick={onAddRow}>
-            新增一行
-          </Button>
-          <Tag color="blue">单位：元</Tag>
-        </div>
-      ) : null}
-      <AppTable
+    <div className="payroll-table-wrap payroll-table-wrap--fill">
+      <ScrollTable
+        fillPage
         size="small"
         bordered
+        tableLayout="fixed"
         loading={loading}
         rowKey="id"
         columns={columns}
         dataSource={rows}
         pagination={false}
-        scroll={{ x: 980 }}
-        className="payroll-table"
+        scroll={{ x: scrollX }}
+        scrollBarBelowSummary
+        className="payroll-table payroll-table--labor"
+        bodyClassName="payroll-table__scroll-body page-table-body--payroll-labor"
+        wrapStyle={
+          {
+            '--payroll-labor-scroll-x': `${scrollX}px`
+          } as CSSProperties
+        }
         summary={() => (
           <Table.Summary fixed>
             <Table.Summary.Row className="payroll-table__summary-row">
-              <Table.Summary.Cell index={0} colSpan={3} align="center">
+              <Table.Summary.Cell index={0} colSpan={2} align="center">
                 合计
               </Table.Summary.Cell>
-              <Table.Summary.Cell index={3} align="right">
-                {Salary.formatMoneyDisplay(totals.grossAmount)}
-              </Table.Summary.Cell>
-              <Table.Summary.Cell index={4} align="right">
-                {Salary.formatMoneyDisplay(totals.withheldTax)}
-              </Table.Summary.Cell>
-              <Table.Summary.Cell index={5} align="right" className="payroll-table__col-highlight">
-                {Salary.formatMoneyDisplay(totals.netAmount)}
-              </Table.Summary.Cell>
-              <Table.Summary.Cell index={6} />
-              <Table.Summary.Cell index={7} />
-              {!readOnly ? <Table.Summary.Cell index={8} /> : null}
+              {summaryCells.map((value, index) => (
+                <Table.Summary.Cell
+                  key={index}
+                  index={index + 2}
+                  align="right"
+                >
+                  {Salary.formatMoneyDisplay(value)}
+                </Table.Summary.Cell>
+              ))}
+              <Table.Summary.Cell index={summaryCells.length + 2} />
+              <Table.Summary.Cell index={summaryCells.length + 3} />
             </Table.Summary.Row>
           </Table.Summary>
         )}
