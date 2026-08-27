@@ -50,7 +50,7 @@ export function buildNavMenu(can: CanFn): NavMenuEntry[] {
   if (can('voucher.create')) {
     voucherItems.push({ key: '/vouchers/new', label: '录凭证', path: '/vouchers/new' });
   }
-  voucherItems.push({ key: '/vouchers', label: '凭证管理', path: '/vouchers' });
+  voucherItems.push({ key: '/vouchers', label: '查凭证', path: '/vouchers' });
   if (voucherItems.length) {
     entries.push({
       type: 'group',

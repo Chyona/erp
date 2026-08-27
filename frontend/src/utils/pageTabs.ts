@@ -1,6 +1,6 @@
 const ROUTE_TITLES: Record<string, string> = {
   '/': '工作台',
-  '/vouchers': '凭证管理',
+  '/vouchers': '查凭证',
   '/vouchers/new': '录凭证',
   '/accounts': '会计科目',
   '/ledger': '明细账',

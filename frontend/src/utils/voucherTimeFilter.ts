@@ -123,7 +123,7 @@ export function clampTimeFilterStateToNow(state: VoucherTimeFilterState): Vouche
   return state;
 }
 
-/** 从 localStorage 读取上次凭证管理的时间筛选；无效时回退默认（当前月）。 */
+/** 从 localStorage 读取上次查凭证的时间筛选；无效时回退默认（当前月）。 */
 export function loadStoredTimeFilter(): VoucherTimeFilterState {
   try {
     const raw = localStorage.getItem(TIME_FILTER_STORAGE_KEY);

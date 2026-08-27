@@ -19,7 +19,7 @@ export function compareVouchersDesc(a: Voucher, b: Voucher) {
   return (b.voucherNo || '').localeCompare(a.voucherNo || '');
 }
 
-/** 按凭证管理列表筛选条件过滤（与后端 list 接口语义一致）。 */
+/** 按查凭证列表筛选条件过滤（与后端 list 接口语义一致）。 */
 export function applyVoucherFilters(
   vouchers: Voucher[],
   filters: VoucherFilters = {}
