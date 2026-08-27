@@ -26,6 +26,7 @@ import { ErpApi } from '../services/erpApi';
 import { useApp } from '../context/AppContext';
 import { getCurrentOperatorName, getCurrentOperatorUsername, useAuth } from '../context/AuthContext';
 import { useOperatorDisplayLookup } from '../hooks/useOperatorDisplayLookup';
+import { useVoucherPageNavigation } from '../hooks/useVoucherPageNavigation';
 import {
   normalizePreparedByForSave,
   resolveOperatorDisplayName
@@ -135,7 +136,8 @@ export default function VoucherForm() {
   const { closeTabAndOpen } = usePageTabs();
   const { message, modal } = App.useApp();
   const { accounts, refresh } = useApp();
-  const { user, canAccessOwnVoucher, canMutateVoucher } = useAuth();
+  const { user, canAccessOwnVoucher, canMutateVoucher, can } = useAuth();
+  const { openNewVoucher: openNewVoucherTab } = useVoucherPageNavigation();
   const operatorLookup = useOperatorDisplayLookup();
   const [form] = Form.useForm();
   const [editingId, setEditingId] = useState<string | null>(routeId ?? null);
@@ -520,6 +522,11 @@ export default function VoucherForm() {
       okText: '确认离开'
     });
   }, [hasUnsavedChanges, modal]);
+
+  const handleOpenNewVoucherTab = useCallback(async () => {
+    if (!(await confirmDiscardIfDirty())) return;
+    openNewVoucherTab();
+  }, [confirmDiscardIfDirty, openNewVoucherTab]);
 
   const openNewVoucher = useCallback(
     async (presetDate?: string) => {
@@ -1230,6 +1237,7 @@ export default function VoucherForm() {
       onSaveAndNew={() => save({ continueNew: true })}
       onCancel={() => navigate('/vouchers')}
       onUnapprove={handleUnapprove}
+      onNew={isEdit && can('voucher.create') ? handleOpenNewVoucherTab : undefined}
     />
   );
 

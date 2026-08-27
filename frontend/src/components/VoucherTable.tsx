@@ -835,7 +835,7 @@ export default function VoucherTable({
         />
       ),
       key: 'preparedBy',
-      width: 96,
+      width: 88,
       ellipsis: true,
       onCell: (record) => resolveCellProps(record, 'preparedBy', true),
       render: (_, record) => {
@@ -857,7 +857,7 @@ export default function VoucherTable({
         />
       ),
       key: 'reviewedBy',
-      width: 96,
+      width: 88,
       ellipsis: true,
       onCell: (record) => resolveCellProps(record, 'reviewedBy', true),
       render: (_, record) => {
@@ -879,7 +879,7 @@ export default function VoucherTable({
     {
       title: '操作',
       key: 'actions',
-      width: 76,
+      width: 65,
       align: 'center',
       fixed: 'right',
       onCell: (record) => resolveCellProps(record, 'actions', true),
