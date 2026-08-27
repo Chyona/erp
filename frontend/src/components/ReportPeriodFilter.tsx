@@ -100,12 +100,13 @@ export default function ReportPeriodFilter({
   onRefresh,
   loading = false,
   typeOptions = REPORT_TYPE_OPTIONS,
-  beforeRefresh = null
+  beforeRefresh = null,
+  formatPeriod = formatReportPeriod
 }) {
   const [open, setOpen] = useState(false);
   const [panelYear, setPanelYear] = useState(value.year);
 
-  const displayText = useMemo(() => formatReportPeriod(value), [value]);
+  const displayText = useMemo(() => formatPeriod(value), [formatPeriod, value]);
 
   useEffect(() => {
     const clamped = clampReportPeriodToNow(value);

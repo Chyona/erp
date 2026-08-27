@@ -1,4 +1,4 @@
-import { Button, Input, Space, Spin, Tooltip, Upload } from 'antd';
+import { Button, Spin, Tooltip, Upload } from 'antd';
 import { PaperClipOutlined } from '@ant-design/icons';
 import { Voucher } from '../services/voucher';
 
@@ -14,24 +14,37 @@ export default function VoucherAttachmentControls({
 
   return (
     <div className={`voucher-sheet__attach-wrap ${className}`.trim()}>
-      <Space size={4} align="center" wrap className="voucher-sheet__attach-row">
-        <Space
-          size={4}
+      <div className="voucher-sheet__attach-main">
+        <div
           className={
-            attachmentsCount > 0 ? 'voucher-sheet__attach-group--clickable' : undefined
+            attachmentsCount > 0
+              ? 'voucher-sheet__attach-summary voucher-sheet__attach-summary--clickable'
+              : 'voucher-sheet__attach-summary'
           }
           onClick={attachmentsCount > 0 ? onToggle : undefined}
+          role={attachmentsCount > 0 ? 'button' : undefined}
+          tabIndex={attachmentsCount > 0 ? 0 : undefined}
+          onKeyDown={
+            attachmentsCount > 0
+              ? (event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    onToggle?.();
+                  }
+                }
+              : undefined
+          }
         >
           <span className="voucher-sheet__meta-label">附件</span>
-          <Input readOnly value={attachmentsCount} className="voucher-sheet__attach-count" />
+          <span className="voucher-sheet__attach-count-value">{attachmentsCount}</span>
           <span className="voucher-sheet__attach-suffix">张</span>
-          {attachmentsCount > 0 && (
-            <span className="voucher-sheet__attach-link">
+          {attachmentsCount > 0 ? (
+            <span className="voucher-sheet__attach-link" aria-hidden="true">
               <PaperClipOutlined />
               <sup>{attachmentsCount}</sup>
             </span>
-          )}
-        </Space>
+          ) : null}
+        </div>
         <Tooltip title={canModify ? undefined : Voucher.ATTACHMENT_READONLY_TIP}>
           <Upload
             customRequest={onUpload}
@@ -54,7 +67,7 @@ export default function VoucherAttachmentControls({
             </Button>
           </Upload>
         </Tooltip>
-      </Space>
+      </div>
       {uploadStatus ? (
         <div className="voucher-sheet__upload-status" role="status" aria-live="polite">
           <Spin size="small" />

@@ -9,6 +9,8 @@ import {
   FileTextOutlined,
   FundFilled,
   FundOutlined,
+  MoneyCollectFilled,
+  MoneyCollectOutlined,
   SettingFilled,
   SettingOutlined
 } from '@ant-design/icons';
@@ -33,6 +35,7 @@ const GROUP_ICONS: Record<string, NavIconSet> = {
   voucher: { outline: <FileTextOutlined />, filled: <FileTextFilled /> },
   ledger: { outline: <AccountBookOutlined />, filled: <AccountBookFilled /> },
   reports: { outline: <FundOutlined />, filled: <FundFilled /> },
+  payroll: { outline: <MoneyCollectOutlined />, filled: <MoneyCollectFilled /> },
   closing: { outline: <ClosingNavIcon />, filled: <ClosingNavIcon filled /> },
   system: { outline: <SettingOutlined />, filled: <SettingFilled /> }
 };
@@ -40,6 +43,7 @@ const GROUP_ICONS: Record<string, NavIconSet> = {
 const SECTION_ICONS: Record<string, React.ReactNode> = {
   凭证处理: <FileTextOutlined />,
   账簿查询: <AccountBookOutlined />,
+  日常业务: <MoneyCollectOutlined />,
   结项处理: <ClosingNavIcon />,
   基础资料: <BookOutlined />,
   操作记录: <AuditOutlined />,

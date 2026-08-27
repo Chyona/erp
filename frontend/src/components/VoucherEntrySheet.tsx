@@ -111,16 +111,16 @@ function VoucherEntrySheet({
             {period && <div className="voucher-sheet__period">{period}</div>}
           </div>
           <div className="voucher-sheet__meta-right voucher-sheet__meta-right--compact">
-            {businessTypeField}
-            <span className="voucher-form__toolbar-divider" aria-hidden="true" />
-            <VoucherAttachmentControls
-              attachmentsCount={attachmentsCount}
-              onToggle={onAttachmentPanelToggle}
-              onUpload={onUpload}
-              uploadStatus={uploadStatus}
-              canModify={canModifyAttachments}
-              className="voucher-sheet__attach-row--compact"
-            />
+            <div className="voucher-sheet__meta-right-stack">
+              {businessTypeField}
+              <VoucherAttachmentControls
+                attachmentsCount={attachmentsCount}
+                onToggle={onAttachmentPanelToggle}
+                onUpload={onUpload}
+                uploadStatus={uploadStatus}
+                canModify={canModifyAttachments}
+              />
+            </div>
           </div>
         </div>
 

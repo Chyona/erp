@@ -8,6 +8,9 @@ const ROUTE_TITLES: Record<string, string> = {
   '/reports': '报表',
   '/closing/period-end': '季末结转',
   '/closing/reimbursement': '月底报销',
+  '/payroll/sheet': '工资表',
+  '/payroll/stats': '工资统计',
+  '/payroll/staff': '部门职员',
   '/audit': '操作日志',
   '/users': '用户管理',
   '/settings': '系统设置',
@@ -71,6 +74,8 @@ export function resolveTabIdentity(pathname: string, search = '') {
 
 export function resolvePageTabTitle(pathname: string) {
   if (ROUTE_TITLES[pathname]) return ROUTE_TITLES[pathname];
+  const sheetMatch = pathname.match(/^\/payroll\/sheet\/(\d{4}-\d{2})$/);
+  if (sheetMatch) return '工资详情';
   if (/^\/vouchers\/[^/]+\/edit$/.test(pathname)) return '凭证';
   return pathname.replace(/^\//, '') || '页面';
 }

@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { App as AntApp, ConfigProvider } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { AppProvider } from './context/AppContext';
@@ -16,6 +16,11 @@ import GeneralLedger from './pages/GeneralLedger';
 import Reports from './pages/Reports';
 import ClosingPeriodEnd from './pages/ClosingPeriodEnd';
 import ClosingReimbursement from './pages/ClosingReimbursement';
+import Payroll from './pages/Payroll';
+import PayrollSheet from './pages/PayrollSheet';
+import PayrollSheetDetail from './pages/PayrollSheetDetail';
+import PayrollStats from './pages/PayrollStats';
+import PayrollStaff from './pages/PayrollStaff';
 import Audit from './pages/Audit';
 import Users from './pages/Users';
 import Settings from './pages/Settings';
@@ -84,6 +89,12 @@ export default function App() {
                     <Route path="reports" element={<Reports />} />
                     <Route path="closing/period-end" element={<ClosingPeriodEnd />} />
                     <Route path="closing/reimbursement" element={<ClosingReimbursement />} />
+                    <Route path="closing/salary" element={<Navigate to="/payroll/sheet" replace />} />
+                    <Route path="payroll" element={<Payroll />} />
+                    <Route path="payroll/sheet" element={<PayrollSheet />} />
+                    <Route path="payroll/sheet/:periodKey" element={<PayrollSheetDetail />} />
+                    <Route path="payroll/stats" element={<PayrollStats />} />
+                    <Route path="payroll/staff" element={<PayrollStaff />} />
                     <Route path="audit" element={<Audit />} />
                     <Route path="users" element={<Users />} />
                     <Route path="settings" element={<Settings />} />

@@ -8,6 +8,7 @@ import SensitiveColumnHeader from './SensitiveColumnHeader';
 import { DeleteOutlined, EyeOutlined, PaperClipOutlined } from '@ant-design/icons';
 import { useVoucherPageNavigation } from '../hooks/useVoucherPageNavigation';
 import { enrichAttachmentDisplayNames, attachmentNameContextFromVoucher } from '../utils/attachmentName';
+import { readInvoiceRecognizeOnUpload } from '../hooks/useInvoiceRecognizeOnUpload';
 import { Voucher } from '../services/voucher';
 import type { Attachment, Voucher as VoucherRecord } from '../types';
 import { useApp } from '../context/AppContext';
@@ -433,7 +434,8 @@ export default function VoucherTable({
         try {
           const { voucher: updated, recognizedInvoiceNumbers } = await Voucher.addAttachmentToVoucher(
             voucher.id,
-            file
+            file,
+            { recognizeInvoice: readInvoiceRecognizeOnUpload() }
           );
           option.onSuccess?.({});
           noteListUploadSuccess(recognizedInvoiceNumbers);

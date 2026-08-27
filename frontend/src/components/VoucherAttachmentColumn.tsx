@@ -10,6 +10,7 @@ import {
 } from '@ant-design/icons';
 import { Voucher } from '../services/voucher';
 import AttachmentPreviewModal, { isPdfAttachment, type AttachmentLike } from './AttachmentPreviewModal';
+import InvoiceRecognizeSwitch from './InvoiceRecognizeSwitch';
 
 /** 凭证表格右侧附件列（可展开/收起） */
 export default function VoucherAttachmentColumn({
@@ -157,6 +158,7 @@ export default function VoucherAttachmentColumn({
         </div>
         {onUpload && (
           <div className="voucher-sheet__attach-col-footer">
+            {canModify ? <InvoiceRecognizeSwitch className="voucher-sheet__attach-col-recognize-switch" /> : null}
             {canModify ? (
               <Upload
                 customRequest={onUpload}

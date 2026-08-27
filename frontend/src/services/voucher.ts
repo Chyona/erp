@@ -843,7 +843,11 @@ async function tryRecognizeInvoiceNumbers(file: File): Promise<string[]> {
   }
 }
 
-async function addAttachmentToVoucher(voucherId, file) {
+async function addAttachmentToVoucher(
+  voucherId,
+  file,
+  options: { recognizeInvoice?: boolean } = {}
+) {
   const voucher = await ErpApi.get('vouchers', voucherId);
   if (!voucher) throw new Error('凭证不存在');
   if (!canModifyAttachments(voucher.status)) {
@@ -871,7 +875,7 @@ async function addAttachmentToVoucher(voucherId, file) {
   });
 
   const att = await saveAttachment(file, fileName, voucher.date);
-  const recognized = await tryRecognizeInvoiceNumbers(file);
+  const recognized = options.recognizeInvoice ? await tryRecognizeInvoiceNumbers(file) : [];
   if (recognized.length) {
     att.recognizedInvoiceNumbers = mergeInvoiceNumbers('', recognized);
     await updateAttachment(att);

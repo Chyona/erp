@@ -39,6 +39,7 @@ import VoucherEntrySheet from '../components/VoucherEntrySheet';
 import VoucherSheetTools from '../components/VoucherSheetTools';
 import VoucherFormActions from '../components/VoucherFormActions';
 import VoucherExamples from '../components/VoucherExamples';
+import InvoiceRecognizeSwitch from '../components/InvoiceRecognizeSwitch';
 import {
   buildAttachmentDisplayName,
   enrichAttachmentDisplayNames
@@ -49,6 +50,7 @@ import {
   findDuplicateAttachment
 } from '../utils/attachmentDuplicate';
 import { recognizeInvoiceNumbersFromFile } from '../services/invoiceNumberRecognition';
+import { readInvoiceRecognizeOnUpload } from '../hooks/useInvoiceRecognizeOnUpload';
 import { resolveUploadFile, resolveUploadFileName } from '../utils/uploadFile';
 import { syncSalesVoucherMeta } from '../utils/salesInvoiceTax';
 import { INVOICE_TYPE, INVOICE_TYPE_OPTIONS } from '../constants/invoice';
@@ -927,7 +929,7 @@ export default function VoucherForm() {
           );
           return;
         }
-        if (hint && invoiceLike) {
+        if (hint && invoiceLike && readInvoiceRecognizeOnUpload()) {
           message.warning(n > 1 ? `已上传 ${n} 个附件，${hint}` : `附件上传成功，${hint}`);
           return;
         }
@@ -960,10 +962,12 @@ export default function VoucherForm() {
             fileName,
             voucherDate ? voucherDate.format('YYYY-MM-DD') : undefined
           );
-          if (invoiceLike) {
+          if (invoiceLike && readInvoiceRecognizeOnUpload()) {
             updateAttachmentUploadStatus('正在识别发票号…');
           }
-          const { numbers: recognized, hint } = await tryAutoRecognizeInvoiceNumber(fileObj, uploadName);
+          const { numbers: recognized, hint } = readInvoiceRecognizeOnUpload()
+            ? await tryAutoRecognizeInvoiceNumber(fileObj, uploadName)
+            : { numbers: [] as string[] };
           let savedAtt = att;
           if (recognized.length) {
             savedAtt = {
@@ -1297,16 +1301,19 @@ export default function VoucherForm() {
                       getSnapshot={getTemplateSnapshot}
                     />
                   </Tooltip>
-                  <Tooltip title="开启后，保存凭证时自动将摘要和备注加入短语库">
-                    <label className="voucher-sheet__phrase-auto-switch">
-                      <Switch
-                        size="small"
-                        checked={phraseAutoRemember}
-                        onChange={handlePhraseAutoRememberChange}
-                      />
-                      <span>保存收录短语</span>
-                    </label>
-                  </Tooltip>
+                  <div className="voucher-form__toolbar-toggles">
+                    <Tooltip title="开启后，保存凭证时自动将摘要和备注加入短语库">
+                      <label className="voucher-sheet__phrase-auto-switch">
+                        <Switch
+                          size="small"
+                          checked={phraseAutoRemember}
+                          onChange={handlePhraseAutoRememberChange}
+                        />
+                        <span>保存收录短语</span>
+                      </label>
+                    </Tooltip>
+                    <InvoiceRecognizeSwitch />
+                  </div>
                   <span className="voucher-form__toolbar-divider" aria-hidden="true" />
                 </>
               ) : null}
@@ -1376,7 +1383,7 @@ export default function VoucherForm() {
               <div className="voucher-form__extra-col">
                 <Form.Item name="invoiceNumbers" label="发票号">
                   <Input
-                    placeholder="上传发票附件后自动识别，多个号码用逗号分隔"
+                    placeholder="开启上方「识别发票号」后上传附件可自动填入，多个号码用逗号分隔"
                     readOnly={readOnly}
                   />
                 </Form.Item>

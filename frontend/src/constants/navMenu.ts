@@ -80,6 +80,27 @@ export function buildNavMenu(can: CanFn): NavMenuEntry[] {
   if (can('closing.view')) {
     entries.push({
       type: 'group',
+      key: 'payroll',
+      label: '工资',
+      sections: [
+        {
+          title: '日常业务',
+          items: [
+            { key: '/payroll/sheet', label: '工资表', path: '/payroll/sheet' },
+            { key: '/payroll/stats', label: '工资统计', path: '/payroll/stats' }
+          ]
+        },
+        {
+          title: '基础资料',
+          items: [{ key: '/payroll/staff', label: '部门职员', path: '/payroll/staff' }]
+        }
+      ]
+    });
+  }
+
+  if (can('closing.view')) {
+    entries.push({
+      type: 'group',
       key: 'closing',
       label: '结项',
       sections: [
@@ -140,6 +161,10 @@ export function resolveNavActiveKey(pathname: string): string {
   if (pathname.startsWith('/general-ledger')) return '/general-ledger';
   if (pathname.startsWith('/ledger')) return '/ledger';
   if (pathname.startsWith('/reports')) return '/reports';
+  if (pathname.startsWith('/payroll/staff')) return '/payroll/staff';
+  if (pathname.startsWith('/payroll/stats')) return '/payroll/stats';
+  if (pathname.startsWith('/payroll/sheet/')) return '/payroll/sheet';
+  if (pathname.startsWith('/payroll/sheet') || pathname === '/payroll') return '/payroll/sheet';
   if (pathname.startsWith('/closing/reimbursement')) return '/closing/reimbursement';
   if (pathname.startsWith('/closing/period-end')) return '/closing/period-end';
   if (pathname.startsWith('/closing')) return '/closing/period-end';

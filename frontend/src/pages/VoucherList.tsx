@@ -14,6 +14,7 @@ import VoucherTable from '../components/VoucherTable';
 import VoucherDetailModal from '../components/VoucherDetailModal';
 import VoucherImportModal from '../components/VoucherImportModal';
 import VoucherFilterPanel, { EMPTY_VOUCHER_FILTERS } from '../components/VoucherFilterPanel';
+import InvoiceRecognizeSwitch from '../components/InvoiceRecognizeSwitch';
 import VoucherTimeFilter from '../components/VoucherTimeFilter';
 import { loadStoredTimeFilter, saveStoredTimeFilter } from '../utils/voucherTimeFilter';
 import type { VoucherTimeFilterState } from '../utils/voucherTimeFilter';
@@ -296,6 +297,8 @@ export default function VoucherList() {
           <Checkbox checked={showSubtotal} onChange={(e) => setShowSubtotal(e.target.checked)}>
             显示凭证金额小计
           </Checkbox>
+          <span className="voucher-list-toolbar__divider" aria-hidden="true" />
+          <InvoiceRecognizeSwitch />
         </div>
 
         <div className="voucher-list-toolbar__actions">
