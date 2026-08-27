@@ -5018,9 +5018,8 @@ body,
 
 .voucher-sheet__meta-right-stack {
   display: flex;
-  flex-direction: column;
   align-items: flex-end;
-  gap: 6px;
+  gap: 12px;
   margin-left: auto;
 }
 
