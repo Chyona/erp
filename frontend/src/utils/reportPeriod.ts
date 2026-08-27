@@ -1,4 +1,4 @@
-import dayjs from 'dayjs';
+import dayjs, { type Dayjs } from 'dayjs';
 
 export function defaultReportPeriod() {
   const now = dayjs();
@@ -14,6 +14,18 @@ export function defaultReportPeriod() {
 export function currentReportMonthPeriod() {
   const now = dayjs();
   return { year: now.year(), month: now.month() + 1 };
+}
+
+/** 工资模块默认查询月份（当月） */
+export function defaultPayrollMonthDayjs(): Dayjs {
+  const { year, month } = currentReportMonthPeriod();
+  return dayjs(`${year}-${String(month).padStart(2, '0')}-01`);
+}
+
+/** 工资模块默认月份范围（起止均为当月） */
+export function defaultPayrollMonthRange(): [Dayjs, Dayjs] {
+  const current = defaultPayrollMonthDayjs();
+  return [current, current];
 }
 
 export function currentReportQuarterPeriod() {

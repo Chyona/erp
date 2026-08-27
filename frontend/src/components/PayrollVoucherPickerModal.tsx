@@ -45,6 +45,9 @@ type PayrollVoucherPickerModalProps = {
   periodLabel: string;
   existingVoucherIds: string[];
   confirmLoading?: boolean;
+  defaultLinkType?: PayrollVoucherLinkType;
+  linkTypeLocked?: boolean;
+  hint?: string;
   onCancel: () => void;
   onConfirm: (payload: {
     voucherId: string;
@@ -58,6 +61,9 @@ export default function PayrollVoucherPickerModal({
   periodLabel,
   existingVoucherIds,
   confirmLoading = false,
+  defaultLinkType = 'accrual',
+  linkTypeLocked = false,
+  hint,
   onCancel,
   onConfirm
 }: PayrollVoucherPickerModalProps) {
@@ -65,16 +71,15 @@ export default function PayrollVoucherPickerModal({
   const [vouchers, setVouchers] = useState<VoucherRecord[]>([]);
   const [keyword, setKeyword] = useState('');
   const [voucherId, setVoucherId] = useState<string | null>(null);
-  const [linkType, setLinkType] = useState<PayrollVoucherLinkType>('accrual');
+  const [linkType, setLinkType] = useState<PayrollVoucherLinkType>(defaultLinkType);
   const [customLabel, setCustomLabel] = useState('');
 
   useEffect(() => {
     if (!open) return;
-    const initialLinkType: PayrollVoucherLinkType = 'accrual';
-    setKeyword(payrollVoucherSearchKeyword(initialLinkType));
     setVoucherId(null);
-    setLinkType(initialLinkType);
+    setLinkType(defaultLinkType);
     setCustomLabel('');
+    setKeyword(payrollVoucherSearchKeyword(defaultLinkType));
     setLoading(true);
     void Voucher.getAll()
       .then((list) => {
@@ -85,12 +90,27 @@ export default function PayrollVoucherPickerModal({
         );
       })
       .finally(() => setLoading(false));
-  }, [open]);
+  }, [open, defaultLinkType]);
 
   const handleLinkTypeChange = (value: PayrollVoucherLinkType) => {
     setLinkType(value);
-    setKeyword(payrollVoucherSearchKeyword(value));
     setVoucherId(null);
+    if (value !== 'other') {
+      setCustomLabel('');
+      setKeyword(payrollVoucherSearchKeyword(value));
+    } else {
+      setKeyword('');
+    }
+  };
+
+  const handleCustomLabelChange = (value: string) => {
+    setCustomLabel(value);
+    setVoucherId(null);
+    setKeyword(payrollVoucherSearchKeyword('other', value));
+  };
+
+  const resetSearchKeyword = () => {
+    setKeyword(payrollVoucherSearchKeyword(linkType, customLabel));
   };
 
   const options = useMemo(() => {
@@ -134,22 +154,29 @@ export default function PayrollVoucherPickerModal({
       width={720}
     >
       <Space direction="vertical" size={12} style={{ width: '100%' }}>
-        <div>
-          <Text type="secondary">凭证类型</Text>
-          <Select
-            style={{ width: '100%', marginTop: 6 }}
-            value={linkType}
-            options={LINK_TYPE_OPTIONS}
-            onChange={handleLinkTypeChange}
-          />
-        </div>
+        {linkTypeLocked ? (
+          <div>
+            <Text type="secondary">凭证类型</Text>
+            <div style={{ marginTop: 6 }}>{PAYROLL_VOUCHER_LABELS[linkType]}</div>
+          </div>
+        ) : (
+          <div>
+            <Text type="secondary">凭证类型</Text>
+            <Select
+              style={{ width: '100%', marginTop: 6 }}
+              value={linkType}
+              options={LINK_TYPE_OPTIONS}
+              onChange={handleLinkTypeChange}
+            />
+          </div>
+        )}
         {linkType === 'other' ? (
           <div>
             <Text type="secondary">自定义标签</Text>
             <Input
               value={customLabel}
               placeholder="如：补充计提"
-              onChange={(e) => setCustomLabel(e.target.value)}
+              onChange={(e) => handleCustomLabelChange(e.target.value)}
               style={{ marginTop: 6 }}
             />
           </div>
@@ -167,11 +194,16 @@ export default function PayrollVoucherPickerModal({
             filterOption={false}
             searchValue={keyword}
             onSearch={setKeyword}
-            onChange={(value) => setVoucherId(value || null)}
+            onChange={(value) => {
+              setVoucherId(value || null);
+              if (!value) resetSearchKeyword();
+            }}
+            onClear={resetSearchKeyword}
           />
         </div>
         <Text type="secondary" style={{ fontSize: 12 }}>
-          计提、发放/支付两类均可关联多张凭证（如工资计提、劳务计提等），保存后可继续添加。
+          {hint ||
+            '切换凭证类型后，搜索框会自动填入对应关键字；也可手动修改搜索条件。'}
         </Text>
       </Space>
     </Modal>

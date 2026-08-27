@@ -87,7 +87,7 @@ export function buildNavMenu(can: CanFn): NavMenuEntry[] {
           title: '日常业务',
           items: [
             { key: '/payroll/sheet', label: '工资表', path: '/payroll/sheet' },
-            { key: '/payroll/stats', label: '工资统计', path: '/payroll/stats' }
+            { key: '/payroll/stats', label: '人力成本', path: '/payroll/stats' }
           ]
         },
         {

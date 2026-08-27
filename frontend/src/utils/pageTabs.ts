@@ -9,7 +9,7 @@ const ROUTE_TITLES: Record<string, string> = {
   '/closing/period-end': '季末结转',
   '/closing/reimbursement': '月底报销',
   '/payroll/sheet': '工资表',
-  '/payroll/stats': '工资统计',
+  '/payroll/stats': '人力成本',
   '/payroll/staff': '部门职员',
   '/audit': '操作日志',
   '/users': '用户管理',
@@ -48,6 +48,7 @@ export function parseTabPath(path: string) {
 
 export const VOUCHER_NEW_TAB_KEY = '/vouchers/new';
 export const VOUCHER_EDIT_TAB_KEY = '/vouchers/edit';
+export const PAYROLL_SHEET_DETAIL_TAB_KEY = '/payroll/sheet/detail';
 
 export function isVoucherNewPath(pathname: string) {
   return pathname === VOUCHER_NEW_TAB_KEY;
@@ -61,6 +62,14 @@ export function isVoucherEditTabKey(key: string) {
   return key === VOUCHER_EDIT_TAB_KEY || isVoucherEditPath(key);
 }
 
+export function isPayrollSheetDetailPath(pathname: string) {
+  return /^\/payroll\/sheet\/\d{4}-\d{2}$/.test(pathname);
+}
+
+export function isPayrollSheetDetailTabKey(key: string) {
+  return key === PAYROLL_SHEET_DETAIL_TAB_KEY || isPayrollSheetDetailPath(key);
+}
+
 export function resolveTabIdentity(pathname: string, search = '') {
   const path = `${pathname}${search}`;
   if (isVoucherNewPath(pathname)) {
@@ -68,6 +77,9 @@ export function resolveTabIdentity(pathname: string, search = '') {
   }
   if (isVoucherEditPath(pathname)) {
     return { key: VOUCHER_EDIT_TAB_KEY, path, pathname };
+  }
+  if (isPayrollSheetDetailPath(pathname)) {
+    return { key: PAYROLL_SHEET_DETAIL_TAB_KEY, path, pathname };
   }
   return { key: getTabKey(pathname, search), path, pathname };
 }
@@ -85,7 +97,9 @@ export function resolvePageTabTitleFromKey(key: string) {
   if (isHomeTabKey(key)) return ROUTE_TITLES[HOME_TAB_KEY] || '工作台';
   if (key === VOUCHER_NEW_TAB_KEY) return ROUTE_TITLES[VOUCHER_NEW_TAB_KEY];
   if (key === VOUCHER_EDIT_TAB_KEY) return '凭证';
+  if (key === PAYROLL_SHEET_DETAIL_TAB_KEY) return '工资详情';
   if (isVoucherEditPath(key)) return '凭证';
+  if (isPayrollSheetDetailPath(key)) return '工资详情';
   const pathname = key.includes('?') ? key.slice(0, key.indexOf('?')) : key;
   return resolvePageTabTitle(pathname);
 }

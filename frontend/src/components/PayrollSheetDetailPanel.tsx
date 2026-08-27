@@ -142,6 +142,11 @@ export default function PayrollSheetDetailPanel({ readOnly = false }: { readOnly
   }, [periodKey, message, readOnly]);
 
   useEffect(() => {
+    setKeyword('');
+    setActiveTab('salary');
+  }, [periodKey]);
+
+  useEffect(() => {
     void loadData();
   }, [loadData, refreshKey, tabDataRefresh]);
 

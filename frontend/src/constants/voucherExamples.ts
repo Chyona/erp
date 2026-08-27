@@ -42,8 +42,8 @@ export const VOUCHER_EXAMPLES = [
     businessType: '工资薪酬',
     remark: '社保系统当月从对公账户自动划扣。单位部分直接计入 5401 主营业务成本，个人部分冲减发薪时代扣的 2211 应付职工薪酬。',
     entries: [
-      { summary: '本月社会保险费（单位部分）', accountCode: '5401', debit: 800, credit: 0 },
-      { summary: '本月社会保险费（个人部分）', accountCode: '2211', debit: 400, credit: 0 },
+      { summary: '本月社保费（单位部分）', accountCode: '5401', debit: 800, credit: 0 },
+      { summary: '本月社保费（个人部分）', accountCode: '2211', debit: 400, credit: 0 },
       { summary: '社保系统自动扣款', accountCode: '1002', debit: 0, credit: 1200 }
     ]
   },
@@ -67,7 +67,7 @@ export const VOUCHER_EXAMPLES = [
     entries: [
       { summary: '发放张三上月工资', accountCode: '2211', debit: 5000, credit: 0 },
       { summary: '银行转账（实发工资）', accountCode: '1002', debit: 0, credit: 4100 },
-      { summary: '代扣社会保险费（冲减个人部分）', accountCode: '2211', debit: 0, credit: 400 },
+      { summary: '代扣社保费（冲减个人部分）', accountCode: '2211', debit: 0, credit: 400 },
       { summary: '代扣住房公积金（冲减个人部分）', accountCode: '2211', debit: 0, credit: 300 },
       { summary: '代扣个人所得税（代缴时冲减）', accountCode: '2221', debit: 0, credit: 200 }
     ]

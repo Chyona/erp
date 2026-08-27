@@ -20,7 +20,7 @@ import { useAuth } from '../context/AuthContext';
 import { useVoucherPageNavigation } from '../hooks/useVoucherPageNavigation';
 import { confirmDanger } from '../utils/confirmAction';
 import { clampMonthRangeToToday, clampMonthToToday, disableFutureMonth } from '../utils/dateConstraints';
-import { defaultReportPeriod, taxExemptionPeriodKey } from '../utils/reportPeriod';
+import { defaultPayrollMonthDayjs, defaultPayrollMonthRange, taxExemptionPeriodKey } from '../utils/reportPeriod';
 
 function monthKey(value: Dayjs) {
   return taxExemptionPeriodKey({ type: 'month', year: value.year(), month: value.month() + 1 });
@@ -30,13 +30,6 @@ function tableScrollX(columns: ColumnsType<PayrollSheetListItem>) {
   return columns.reduce((sum, column) => sum + (typeof column.width === 'number' ? column.width : 120), 0);
 }
 
-function defaultMonthRange(): [Dayjs, Dayjs] {
-  const now = defaultReportPeriod();
-  const end = dayjs(`${now.year}-${String(now.month).padStart(2, '0')}-01`);
-  const start = end.subtract(6, 'month');
-  return [start, end];
-}
-
 export default function PayrollSheetListPanel({ readOnly = false }: { readOnly?: boolean }) {
   const { message, modal } = App.useApp();
   const { refreshKey, refresh } = useApp();
@@ -44,14 +37,14 @@ export default function PayrollSheetListPanel({ readOnly = false }: { readOnly?:
   const { openPageTab } = usePageTabs();
   const { user } = useAuth();
   const { openVoucherEdit } = useVoucherPageNavigation();
-  const [range, setRange] = useState<[Dayjs, Dayjs]>(() => defaultMonthRange());
+  const [range, setRange] = useState<[Dayjs, Dayjs]>(() => defaultPayrollMonthRange());
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<PayrollSheetListItem[]>([]);
   const [selectedRowKeys, setSelectedRowKeys] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(500);
   const [copyModalOpen, setCopyModalOpen] = useState(false);
-  const [copyTargetMonth, setCopyTargetMonth] = useState<Dayjs>(() => defaultMonthRange()[1]);
+  const [copyTargetMonth, setCopyTargetMonth] = useState<Dayjs>(() => defaultPayrollMonthDayjs());
   const [copySubmitting, setCopySubmitting] = useState(false);
   const [linkModalPeriod, setLinkModalPeriod] = useState<PayrollSheetListItem | null>(null);
   const [linkExistingIds, setLinkExistingIds] = useState<string[]>([]);
@@ -323,6 +316,12 @@ export default function PayrollSheetListPanel({ readOnly = false }: { readOnly?:
       render: (value) => Salary.formatMoneyDisplay(value)
     },
     {
+      title: '人力成本',
+      dataIndex: 'employerCostTotal',
+      align: 'right',
+      render: (value) => Salary.formatMoneyDisplay(value)
+    },
+    {
       title: '计提',
       key: 'accrualVouchers',
       width: 240,
@@ -430,7 +429,7 @@ export default function PayrollSheetListPanel({ readOnly = false }: { readOnly?:
 
       <Modal
         title="选择新建工资表月份"
-        width={560}
+        width={600}
         open={copyModalOpen}
         centered
         okText="确定"

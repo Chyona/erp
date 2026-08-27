@@ -38,9 +38,20 @@ export const PAYROLL_VOUCHER_SHORT_LABELS: Record<PayrollVoucherLinkType, string
   other: '其他'
 };
 
-export function payrollVoucherSearchKeyword(linkType: PayrollVoucherLinkType): string {
-  if (linkType === 'other') return '';
-  return PAYROLL_VOUCHER_SHORT_LABELS[linkType];
+export const PAYROLL_VOUCHER_SEARCH_KEYWORDS: Record<PayrollVoucherLinkType, string> = {
+  accrual: PAYROLL_VOUCHER_SHORT_LABELS.accrual,
+  payment: PAYROLL_VOUCHER_SHORT_LABELS.payment,
+  laborAccrual: PAYROLL_VOUCHER_SHORT_LABELS.laborAccrual,
+  laborPayment: PAYROLL_VOUCHER_SHORT_LABELS.laborPayment,
+  tax: PAYROLL_VOUCHER_SHORT_LABELS.tax,
+  socialSecurity: PAYROLL_VOUCHER_SHORT_LABELS.socialSecurity,
+  housingFund: PAYROLL_VOUCHER_SHORT_LABELS.housingFund,
+  other: ''
+};
+
+export function payrollVoucherSearchKeyword(linkType: PayrollVoucherLinkType, customLabel = ''): string {
+  if (linkType === 'other') return customLabel.trim();
+  return PAYROLL_VOUCHER_SEARCH_KEYWORDS[linkType];
 }
 
 export const PAYROLL_ACCRUAL_LINK_TYPES: PayrollVoucherLinkType[] = ['accrual', 'laborAccrual'];
@@ -189,12 +200,127 @@ export type LaborLedgerRowCalculated = LaborLedgerRow & {
   netAmount: number;
 };
 
+export type PayrollEmployerCosts = {
+  /** 公司缴纳社保（单位部分） */
+  socialSecurity: number;
+  /** 公司缴纳公积金（单位部分） */
+  housingFund: number;
+};
+
+export type EmployerCostSummary = {
+  salaryGross: number;
+  laborGross: number;
+  companySocialSecurity: number;
+  companyHousingFund: number;
+  totalCost: number;
+  salaryHeadcount: number;
+  laborHeadcount: number;
+};
+
+export function normalizeEmployerCosts(costs?: Partial<PayrollEmployerCosts>): PayrollEmployerCosts {
+  return {
+    socialSecurity: num(costs?.socialSecurity),
+    housingFund: num(costs?.housingFund)
+  };
+}
+
+export type EmployerCostMonthlyRow = EmployerCostSummary & {
+  periodKey: string;
+  periodLabel: string;
+};
+
+export type EmployerCostRangeResult = {
+  startKey: string;
+  endKey: string;
+  summary: EmployerCostSummary;
+  monthly: EmployerCostMonthlyRow[];
+  periods: PayrollPeriodView[];
+};
+
+export function mergeEmployerCostSummaries(rows: EmployerCostSummary[]): EmployerCostSummary {
+  const totals = rows.reduce(
+    (acc, row) => ({
+      salaryGross: acc.salaryGross + num(row.salaryGross),
+      laborGross: acc.laborGross + num(row.laborGross),
+      companySocialSecurity: acc.companySocialSecurity + num(row.companySocialSecurity),
+      companyHousingFund: acc.companyHousingFund + num(row.companyHousingFund),
+      totalCost: acc.totalCost + num(row.totalCost),
+      salaryHeadcount: acc.salaryHeadcount + row.salaryHeadcount,
+      laborHeadcount: acc.laborHeadcount + row.laborHeadcount
+    }),
+    {
+      salaryGross: 0,
+      laborGross: 0,
+      companySocialSecurity: 0,
+      companyHousingFund: 0,
+      totalCost: 0,
+      salaryHeadcount: 0,
+      laborHeadcount: 0
+    }
+  );
+
+  return {
+    salaryGross: roundMoney(totals.salaryGross),
+    laborGross: roundMoney(totals.laborGross),
+    companySocialSecurity: roundMoney(totals.companySocialSecurity),
+    companyHousingFund: roundMoney(totals.companyHousingFund),
+    totalCost: roundMoney(totals.totalCost),
+    salaryHeadcount: totals.salaryHeadcount,
+    laborHeadcount: totals.laborHeadcount
+  };
+}
+
+export function calcEmployerCostSummary(
+  data: Pick<PayrollPeriodData, 'employerCosts' | 'salaryRows' | 'laborRows'> & {
+    salaryTotals?: PayrollPeriodView['salaryTotals'];
+    laborTotals?: PayrollPeriodView['laborTotals'];
+  }
+): EmployerCostSummary {
+  const salaryRowsCalculated = data.salaryRows.map(calcSalaryRow);
+  const laborRowsCalculated = data.laborRows.map(calcLaborRow);
+  const salaryGross =
+    data.salaryTotals?.preTaxSalary ?? sumSalaryRows(salaryRowsCalculated).preTaxSalary;
+  const laborGross =
+    data.laborTotals?.grossAmount ?? sumLaborRows(laborRowsCalculated).grossAmount;
+  const costs = normalizeEmployerCosts(data.employerCosts);
+  const companySocialSecurity = costs.socialSecurity;
+  const companyHousingFund = costs.housingFund;
+
+  return {
+    salaryGross,
+    laborGross,
+    companySocialSecurity,
+    companyHousingFund,
+    totalCost: roundMoney(
+      salaryGross + laborGross + companySocialSecurity + companyHousingFund
+    ),
+    salaryHeadcount: salaryRowsCalculated.filter((row) => row.name.trim()).length,
+    laborHeadcount: laborRowsCalculated.filter((row) => row.name.trim()).length
+  };
+}
+
+function sumEmployerPortionFromVoucher(voucher: VoucherRecord): number {
+  const entries = voucher.entries || [];
+  const employerEntries = entries.filter(
+    (entry) => num(entry.debit) > 0 && (entry.summary || '').includes('单位部分')
+  );
+  if (employerEntries.length) {
+    return roundMoney(employerEntries.reduce((sum, entry) => sum + num(entry.debit), 0));
+  }
+  return roundMoney(
+    entries
+      .filter((entry) => num(entry.debit) > 0 && String(entry.accountCode || '').startsWith('5401'))
+      .reduce((sum, entry) => sum + num(entry.debit), 0)
+  );
+}
+
 export type PayrollPeriodData = {
   periodKey: string;
   salaryCategory?: string;
   creationMethod?: PayrollCreationMethod;
   createdBy?: string;
   createdAt?: string;
+  employerCosts?: PayrollEmployerCosts;
   voucherLinks: PayrollVoucherLink[];
   salaryRows: SalaryPayrollRow[];
   laborRows: LaborLedgerRow[];
@@ -237,6 +363,7 @@ export type PayrollSheetListItem = {
   laborCount: number;
   laborGrossTotal: number;
   laborNetTotal: number;
+  employerCostTotal: number;
   accrualVouchers: PayrollVoucherLinkView[];
   paymentVouchers: PayrollVoucherLinkView[];
   creationMethod: string;
@@ -481,6 +608,7 @@ function emptyPeriod(periodKey: string): PayrollPeriodData {
 function normalizePeriod(data: PayrollPeriodData): PayrollPeriodData {
   return {
     ...data,
+    employerCosts: normalizeEmployerCosts(data.employerCosts),
     salaryRows: (data.salaryRows || []).map(normalizeSalaryRow),
     laborRows: (data.laborRows || []).map(normalizeLaborRow)
   };
@@ -609,6 +737,13 @@ async function buildListItem(
   const laborCount = laborRows.filter((row) => row.name.trim()).length;
   const { accrualVouchers, paymentVouchers } = splitPayrollVoucherLinks(voucherLinksView);
   const hasRows = staffCount > 0 || laborCount > 0;
+  const employerCostTotal = calcEmployerCostSummary({
+    employerCosts: data.employerCosts,
+    salaryRows: data.salaryRows,
+    laborRows: data.laborRows,
+    salaryTotals: totals,
+    laborTotals
+  }).totalCost;
 
   return {
     periodKey: data.periodKey,
@@ -620,6 +755,7 @@ async function buildListItem(
     laborCount,
     laborGrossTotal: laborTotals.grossAmount,
     laborNetTotal: laborTotals.netAmount,
+    employerCostTotal,
     accrualVouchers,
     paymentVouchers,
     creationMethod: data.creationMethod
@@ -662,6 +798,31 @@ export const Salary = {
     );
   },
 
+  async getEmployerCostRange(startKey: string, endKey: string): Promise<EmployerCostRangeResult> {
+    const store = await readStore();
+    const periods = Object.values(store)
+      .filter((item) => item.periodKey >= startKey && item.periodKey <= endKey)
+      .sort((a, b) => a.periodKey.localeCompare(b.periodKey));
+
+    const periodViews = await Promise.all(
+      periods.map((item) => buildPeriodView(normalizePeriod(item)))
+    );
+
+    const monthly: EmployerCostMonthlyRow[] = periodViews.map((view) => ({
+      ...calcEmployerCostSummary(view),
+      periodKey: view.periodKey,
+      periodLabel: formatPeriodLabel(view.periodKey)
+    }));
+
+    return {
+      startKey,
+      endKey,
+      summary: mergeEmployerCostSummaries(monthly),
+      monthly,
+      periods: periodViews
+    };
+  },
+
   async savePeriod(data: PayrollPeriodData) {
     const store = await readStore();
     const existing = store[data.periodKey];
@@ -674,6 +835,71 @@ export const Salary = {
     await writeStore(store);
     await ErpApi.addAuditLog('保存', '工资薪金', data.periodKey);
     return next;
+  },
+
+  async saveEmployerCosts(periodKey: string, costs: PayrollEmployerCosts) {
+    const store = await readStore();
+    const current = store[periodKey] || emptyPeriod(periodKey);
+    const next = normalizePeriod({
+      ...current,
+      employerCosts: normalizeEmployerCosts(costs),
+      updatedAt: new Date().toISOString()
+    });
+    store[periodKey] = next;
+    await writeStore(store);
+    return buildPeriodView(next);
+  },
+
+  async syncEmployerCostsFromVouchers(periodKey: string) {
+    const costs = await this.suggestEmployerCosts(periodKey);
+    return this.saveEmployerCosts(periodKey, costs);
+  },
+
+  async addVoucherLinkAndSyncEmployerCosts(
+    periodKey: string,
+    link: Omit<PayrollVoucherLink, 'id'> & { id?: string }
+  ) {
+    await this.addVoucherLink(periodKey, link);
+    if (link.linkType === 'socialSecurity' || link.linkType === 'housingFund') {
+      return this.syncEmployerCostsFromVouchers(periodKey);
+    }
+    return this.getPeriod(periodKey);
+  },
+
+  async removeVoucherLinkAndSyncEmployerCosts(periodKey: string, linkId: string) {
+    const store = await readStore();
+    const removed = store[periodKey]?.voucherLinks.find((item) => item.id === linkId);
+    await this.removeVoucherLink(periodKey, linkId);
+    if (
+      removed &&
+      (removed.linkType === 'socialSecurity' || removed.linkType === 'housingFund')
+    ) {
+      return this.syncEmployerCostsFromVouchers(periodKey);
+    }
+    return this.getPeriod(periodKey);
+  },
+
+  async suggestEmployerCosts(periodKey: string): Promise<PayrollEmployerCosts> {
+    const store = await readStore();
+    const data = store[periodKey] || emptyPeriod(periodKey);
+    const vouchers = await Voucher.getAll();
+    const byId = new Map(vouchers.map((item) => [item.id, item]));
+    let socialSecurity = 0;
+    let housingFund = 0;
+
+    for (const link of data.voucherLinks) {
+      const voucher = byId.get(link.voucherId);
+      if (!voucher) continue;
+      const amount = sumEmployerPortionFromVoucher(voucher);
+      if (link.linkType === 'socialSecurity') {
+        socialSecurity = roundMoney(socialSecurity + amount);
+      }
+      if (link.linkType === 'housingFund') {
+        housingFund = roundMoney(housingFund + amount);
+      }
+    }
+
+    return { socialSecurity, housingFund };
   },
 
   async ensurePeriod(

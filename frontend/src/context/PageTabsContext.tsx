@@ -20,11 +20,13 @@ import {
   resolvePageTabTitleFromKey,
   isVoucherEditPath,
   isVoucherNewPath,
+  isPayrollSheetDetailPath,
   resolveTabIdentity,
-  VOUCHER_NEW_TAB_KEY
+  VOUCHER_NEW_TAB_KEY,
+  PAYROLL_SHEET_DETAIL_TAB_KEY
 } from '../utils/pageTabs';
 
-function removeDuplicateVoucherTabs<T extends { key: string; path: string }>(
+function removeDuplicateSingletonTabs<T extends { key: string; path: string }>(
   tabs: T[],
   key: string,
   pathname: string,
@@ -46,6 +48,21 @@ function removeDuplicateVoucherTabs<T extends { key: string; path: string }>(
       const tabPathname = parseTabPath(tab.path).pathname;
       const isEditTab = tab.key === key || isVoucherEditPath(tab.key) || isVoucherEditPath(tabPathname);
       if (isEditTab && tab.key !== key) {
+        cacheRef.current.delete(tab.key);
+        return false;
+      }
+      return true;
+    });
+  }
+  if (isPayrollSheetDetailPath(pathname)) {
+    next = next.filter((tab) => {
+      const tabPathname = parseTabPath(tab.path).pathname;
+      const isDetailTab =
+        tab.key === key ||
+        tab.key === PAYROLL_SHEET_DETAIL_TAB_KEY ||
+        isPayrollSheetDetailPath(tab.key) ||
+        isPayrollSheetDetailPath(tabPathname);
+      if (isDetailTab && tab.key !== key) {
         cacheRef.current.delete(tab.key);
         return false;
       }
@@ -125,7 +142,7 @@ export function PageTabsProvider({ children }: { children: ReactNode }) {
 
     setTabs((prev) => {
       let withHome = prev.some((tab) => isHomeTabKey(tab.key)) ? prev : ensureHomeTabFirst(prev, homeTab);
-      withHome = removeDuplicateVoucherTabs(withHome, key, pathname, cacheRef);
+      withHome = removeDuplicateSingletonTabs(withHome, key, pathname, cacheRef);
 
       const existing = withHome.find((tab) => tab.key === key);
       if (existing) {
@@ -238,7 +255,7 @@ export function PageTabsProvider({ children }: { children: ReactNode }) {
 
       setTabs((prev) => {
         let withHome = prev.some((tab) => isHomeTabKey(tab.key)) ? prev : ensureHomeTabFirst(prev, homeTab);
-        withHome = removeDuplicateVoucherTabs(withHome, identity.key, pathname, cacheRef);
+        withHome = removeDuplicateSingletonTabs(withHome, identity.key, pathname, cacheRef);
 
         tabExisted = withHome.some((tab) => tab.key === identity.key);
 
@@ -273,7 +290,10 @@ export function PageTabsProvider({ children }: { children: ReactNode }) {
         const currentPath = `${location.pathname}${location.search}`;
         if (currentPath !== identity.path) {
           navigate(identity.path);
-          if (identity.key === VOUCHER_NEW_TAB_KEY) {
+          if (
+            identity.key === VOUCHER_NEW_TAB_KEY ||
+            identity.key === PAYROLL_SHEET_DETAIL_TAB_KEY
+          ) {
             queueMicrotask(() => refreshTab(identity.key));
           }
           return;

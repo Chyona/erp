@@ -65,7 +65,6 @@ import {
 const VOUCHER_TYPE = '记';
 const EYE_CARE_KEY = 'voucherEyeCare';
 const FULLSCREEN_KEY = 'voucherFullscreen';
-const PHRASE_AUTO_REMEMBER_KEY = 'voucherPhraseAutoRemember';
 const VOUCHER_LIST_PATH = '/vouchers';
 const SAVE_MSG_KEY = 'voucher-save';
 
@@ -165,9 +164,7 @@ export default function VoucherForm() {
   }>({ older: null, newer: null });
   const [eyeCare, setEyeCare] = useState(() => localStorage.getItem(EYE_CARE_KEY) === '1');
   const [fullscreen, setFullscreen] = useState(() => localStorage.getItem(FULLSCREEN_KEY) === '1');
-  const [phraseAutoRemember, setPhraseAutoRemember] = useState(
-    () => localStorage.getItem(PHRASE_AUTO_REMEMBER_KEY) === '1'
-  );
+  const [phraseAutoRemember, setPhraseAutoRemember] = useState(false);
   const [carryForwardPeriodLabel, setCarryForwardPeriodLabel] = useState('');
   const [carryForwardReadOnly, setCarryForwardReadOnly] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -507,7 +504,6 @@ export default function VoucherForm() {
 
   const handlePhraseAutoRememberChange = (checked: boolean) => {
     setPhraseAutoRemember(checked);
-    localStorage.setItem(PHRASE_AUTO_REMEMBER_KEY, checked ? '1' : '0');
   };
 
   const closeFormTabAndOpenVoucherList = useCallback(() => {
