@@ -12,7 +12,7 @@ import {
 import dayjs, { type Dayjs } from 'dayjs';
 import ScrollTable from './ScrollTable';
 import PayrollVoucherPickerModal from './PayrollVoucherPickerModal';
-import { Salary, formatPayrollVoucherLinkNo, hasPayrollVoucherLinks, PAYROLL_DELETE_BLOCKED_BY_VOUCHER_MESSAGE, resolvePayrollVoucherShortLabel, type PayrollSheetListItem, type PayrollVoucherLinkType, type PayrollVoucherLinkView } from '../services/salary';
+import { Salary, formatPayrollVoucherLinkNo, hasPayrollVoucherLinks, PAYROLL_DELETE_BLOCKED_BY_VOUCHER_MESSAGE, resolvePayrollVoucherShortLabel, resolvePayrollVoucherTagClassName, type PayrollSheetListItem, type PayrollVoucherLinkType, type PayrollVoucherLinkView } from '../services/salary';
 import { useTabDataRefresh } from '../context/PageTabsContext';
 import { useApp } from '../context/AppContext';
 import { usePageTabs } from '../context/PageTabsContext';
@@ -194,23 +194,29 @@ export default function PayrollSheetListPanel({ readOnly = false }: { readOnly?:
       <div className="payroll-sheet-list__voucher-links">
         {links.map((link) => (
           <div key={link.id} className="payroll-sheet-list__voucher-link-row">
-            <Tag bordered={false} className="payroll-sheet-list__voucher-tag">
-              {resolvePayrollVoucherShortLabel(link)}
-            </Tag>
-            <Button
-              type="link"
-              size="small"
-              className="payroll-sheet-list__voucher-link"
-              disabled={link.missing}
-              onClick={() => (link.missing ? undefined : openVoucherEdit(link.voucherId))}
-            >
-              {formatPayrollVoucherLinkNo(link)}
-            </Button>
+            <span className="payroll-sheet-list__voucher-badge">
+              <Button
+                type="link"
+                size="small"
+                className="payroll-sheet-list__voucher-link"
+                disabled={link.missing}
+                onClick={() => (link.missing ? undefined : openVoucherEdit(link.voucherId))}
+              >
+                {formatPayrollVoucherLinkNo(link)}
+              </Button>
+              <Tag
+                bordered={false}
+                className={`payroll-sheet-list__voucher-badge-tag ${resolvePayrollVoucherTagClassName(link.linkType)}`}
+              >
+                {resolvePayrollVoucherShortLabel(link)}
+              </Tag>
+            </span>
             {!readOnly ? (
               <Button
                 type="link"
                 size="small"
                 danger
+                className="payroll-sheet-list__voucher-remove"
                 onClick={() =>
                   void Salary.removeVoucherLink(record.periodKey, link.id).then(() => {
                     refresh();
@@ -324,13 +330,13 @@ export default function PayrollSheetListPanel({ readOnly = false }: { readOnly?:
     {
       title: '计提',
       key: 'accrualVouchers',
-      width: 240,
+      width: 210,
       render: (_, record) => renderVoucherLinks(record, record.accrualVouchers)
     },
     {
       title: '发放/支付',
       key: 'paymentVouchers',
-      width: 240,
+      width: 210,
       render: (_, record) => renderVoucherLinks(record, record.paymentVouchers)
     },
     { title: '创建方式', dataIndex: 'creationMethod', width: 80 },

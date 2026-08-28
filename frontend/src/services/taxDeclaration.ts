@@ -41,6 +41,28 @@ function quarterFromDate(dateStr: string): QuarterPeriod {
   return { type: 'quarter', year, quarter: Math.ceil(month / 3) };
 }
 
+function quarterFromPeriodKey(periodKey: string): QuarterPeriod {
+  const match = periodKey.match(/^(\d{4})-(\d{2})$/);
+  if (!match) {
+    throw new Error(`无效期间：${periodKey}`);
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  return { type: 'quarter', year, quarter: Math.ceil(month / 3) };
+}
+
+async function isPayrollPeriodDeclared(periodKey: string): Promise<boolean> {
+  return isQuarterDeclared(quarterFromPeriodKey(periodKey));
+}
+
+async function assertPayrollPeriodNotDeclared(periodKey: string): Promise<void> {
+  if (!(await isPayrollPeriodDeclared(periodKey))) return;
+  const period = quarterFromPeriodKey(periodKey);
+  throw new Error(
+    `${formatQuarterLabel(period.year, period.quarter)} 已申报，不可修改公司缴纳数据。${DECLARED_QUARTER_READONLY_TIP}`
+  );
+}
+
 async function getDeclaredQuarters(): Promise<DeclaredQuarterRecord[]> {
   const raw = await ErpApi.getSetting(SETTING_KEY);
   return normalizeDeclaredList(raw).sort((a, b) => {
@@ -121,10 +143,13 @@ export const TaxDeclaration = {
   DECLARED_QUARTER_READONLY_TIP,
   getDeclaredQuarters,
   isQuarterDeclared,
+  isPayrollPeriodDeclared,
+  assertPayrollPeriodNotDeclared,
   isDateInDeclaredQuarter,
   assertDateNotInDeclaredQuarter,
   markQuarterDeclared,
   unmarkQuarterDeclared,
   syncDeclaredQuarterVoucherLocks,
-  quarterFromDate
+  quarterFromDate,
+  quarterFromPeriodKey
 };

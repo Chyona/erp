@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
 import type { Account, AppContextValue } from '../types';
 import { runAppInit } from '../services/appInit';
+import { ErpApi } from '../services/erpApi';
 
 const AppContext = createContext<AppContextValue | null>(null);
 
@@ -10,7 +11,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [refreshKey, setRefreshKey] = useState(0);
   const [initWarning, setInitWarning] = useState<string | null>(null);
 
-  const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
+  const refresh = useCallback(() => {
+    ErpApi.invalidateListCache();
+    setRefreshKey((k) => k + 1);
+  }, []);
   const clearInitWarning = useCallback(() => setInitWarning(null), []);
 
   const reinitApp = useCallback(async () => {

@@ -238,6 +238,11 @@ body,
   min-height: var(--app-min-height);
   height: max(100vh, var(--app-min-height));
   overflow: hidden;
+  background: #fff;
+}
+
+.ant-layout {
+  background: #fff;
 }
 
 .app-sider {
@@ -610,6 +615,7 @@ body,
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  background: #fff;
   transition: margin-left 0.2s ease, min-width 0.2s ease;
 }
 
@@ -786,6 +792,7 @@ body,
 
 .main-content.ant-layout-content {
   padding: 0;
+  background: #fff;
 }
 
 .page-tab-bar {
@@ -793,8 +800,10 @@ body,
   min-height: 40px;
   padding: 0 12px;
   background: #f8fafc;
-  border-bottom: 1px solid #e5e7eb;
-  overflow: hidden;
+  border-bottom: none;
+  overflow: visible;
+  position: relative;
+  z-index: 2;
 }
 
 .page-tab-bar__scroll {
@@ -803,9 +812,23 @@ body,
   gap: 4px;
   min-width: 0;
   overflow-x: auto;
-  overflow-y: hidden;
+  overflow-y: visible;
   padding-top: 6px;
+  padding-bottom: 0;
   scrollbar-width: thin;
+  position: relative;
+}
+
+.page-tab-bar__scroll::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: #e5e7eb;
+  pointer-events: none;
+  z-index: 0;
 }
 
 .page-tab-bar__scroll::-webkit-scrollbar {
@@ -817,6 +840,8 @@ body,
   align-items: flex-end;
   gap: 4px;
   flex: 0 0 auto;
+  position: relative;
+  z-index: 1;
 }
 
 .page-tab-bar__item {
@@ -845,9 +870,12 @@ body,
 .page-tab-bar__item--active {
   color: #1a56db;
   background: #fff;
-  border-color: #e5e7eb;
-  box-shadow: 0 -1px 0 #fff inset;
+  border: 1px solid #e5e7eb;
+  border-bottom: none;
+  position: relative;
+  z-index: 2;
   font-weight: 500;
+  box-shadow: 0 1px 0 #fff;
 }
 
 .page-tab-bar__item--home {
@@ -909,6 +937,8 @@ body,
   color: #64748b;
   cursor: pointer;
   font-size: 11px;
+  position: relative;
+  z-index: 1;
   transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
 }
 
@@ -924,6 +954,9 @@ body,
   display: flex;
   flex-direction: column;
   position: relative;
+  background: #fff;
+  margin-top: -1px;
+  z-index: 1;
 }
 
 .page-tab-pane {
@@ -933,6 +966,7 @@ body,
   overflow-y: auto;
   padding: 12px 24px 24px;
   font-size: var(--app-font-size);
+  background: #fff;
 }
 
 .page-tab-pane--active {
@@ -3119,6 +3153,31 @@ body,
   text-align: right;
 }
 
+.payroll-table__col-title {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  max-width: 100%;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.payroll-table__col-title-text {
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.payroll-table .ant-table-thead > tr > th {
+  white-space: nowrap;
+}
+
+.payroll-table .ant-table-thead > tr > th .payroll-table__col-hint {
+  flex-shrink: 0;
+  margin-left: 2px;
+  font-size: 12px;
+}
+
 .payroll-table__summary-row .ant-table-cell {
   font-weight: 600;
   background: #f8fafc;
@@ -3307,24 +3366,79 @@ body,
 .payroll-sheet-list__voucher-links {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .payroll-sheet-list__voucher-link-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 2px 4px;
+  column-gap: 6px;
   line-height: 1.4;
 }
 
-.payroll-sheet-list__voucher-tag {
+.payroll-sheet-list__voucher-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  justify-self: start;
+  max-width: 100%;
+}
+
+.payroll-sheet-list__voucher-badge-tag {
+  position: relative;
   margin: 0;
-  padding-inline: 6px;
-  font-size: 12px;
-  line-height: 18px;
+  padding-inline: 3px;
+  font-size: 10px;
+  line-height: 13px;
+  border-radius: 3px;
+  pointer-events: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: -8px;
+}
+
+.payroll-sheet-list__voucher-badge-tag--wage {
+  color: #389e0d;
+  background: #f6ffed;
+}
+
+.payroll-sheet-list__voucher-badge-tag--labor {
+  color: #531dab;
+  background: #f9f0ff;
+}
+
+.payroll-sheet-list__voucher-badge-tag--social-security {
+  color: #ad6800;
+  background: #fffbe6;
+}
+
+.payroll-sheet-list__voucher-badge-tag--housing-fund {
+  color: #cf1322;
+  background: #fff1f0;
+}
+
+.payroll-sheet-list__voucher-badge-tag--tax {
+  color: #d46b08;
+  background: #fff7e6;
+}
+
+.payroll-sheet-list__voucher-badge-tag--other {
   color: #64748b;
   background: #f1f5f9;
+}
+
+.payroll-sheet-list__voucher-remove,
+.payroll-sheet-list__voucher-remove-placeholder {
+  justify-self: end;
+}
+
+.payroll-sheet-list__voucher-remove {
+  padding-inline: 0;
+}
+
+.payroll-sheet-list__voucher-link-row:not(:has(.payroll-sheet-list__voucher-remove)) {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .payroll-copy-modal__body {
@@ -3543,6 +3657,14 @@ body,
   margin-top: 8px;
   font-size: 12px;
   color: #94a3b8;
+}
+
+.payroll-cost-employer-panel--readonly .payroll-cost-employer-table__amount.ant-input-number-disabled {
+  background: #f8fafc;
+}
+
+.payroll-cost-employer-panel--readonly .payroll-cost-employer-panel__hint {
+  color: #64748b;
 }
 
 .payroll-cost-monthly-panel {
@@ -4233,7 +4355,7 @@ body,
   width: 118px;
 }
 
-.dashboard-period-picker .ant-picker-input > input {
+.dashboard-period-picker .ant-picker-input>input {
   font-size: 12px;
   color: #64748b;
 }
@@ -4318,7 +4440,7 @@ body,
   margin-bottom: 10px;
 }
 
-.dashboard-list > div {
+.dashboard-list>div {
   display: flex;
   justify-content: space-between;
   gap: 8px;
@@ -4362,7 +4484,7 @@ body,
   color: #94a3b8;
 }
 
-.dashboard-metric-pair + .dashboard-metric-pair {
+.dashboard-metric-pair+.dashboard-metric-pair {
   margin-top: 10px;
 }
 
@@ -4406,7 +4528,7 @@ body,
   color: #94a3b8;
 }
 
-.dashboard-formula > div {
+.dashboard-formula>div {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -4424,7 +4546,7 @@ body,
   margin-top: 10px;
 }
 
-.dashboard-ratio-row > div {
+.dashboard-ratio-row>div {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -4467,7 +4589,7 @@ body,
   background: #fee2e2;
 }
 
-.dashboard-progress-compare__bar > span {
+.dashboard-progress-compare__bar>span {
   display: block;
   height: 100%;
   background: #60a5fa;
@@ -4699,7 +4821,7 @@ body,
   background: #fbfdff;
 }
 
-.dashboard-indicator-settings-table__row + .dashboard-indicator-settings-table__row {
+.dashboard-indicator-settings-table__row+.dashboard-indicator-settings-table__row {
   border-top: 1px solid #f1f5f9;
 }
 
@@ -4719,6 +4841,7 @@ body,
 }
 
 @media (max-width: 960px) {
+
   .dashboard-grid--4,
   .dashboard-grid--analysis,
   .dashboard-analysis,

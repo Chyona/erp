@@ -24,6 +24,7 @@ import { useApp } from '../context/AppContext';
 import { useVoucherPageNavigation } from '../hooks/useVoucherPageNavigation';
 import { clampMonthRangeToToday, disableFutureMonth } from '../utils/dateConstraints';
 import { defaultPayrollMonthRange, taxExemptionPeriodKey } from '../utils/reportPeriod';
+import { TaxDeclaration } from '../services/taxDeclaration';
 
 const COST_ITEMS: {
   key: keyof Pick<
@@ -186,6 +187,7 @@ function EmployerCostTable({
   housingFundLinks,
   saving,
   costsDirty,
+  readOnly = false,
   onAmountChange,
   onLink,
   onRemoveLink,
@@ -197,6 +199,7 @@ function EmployerCostTable({
   housingFundLinks: PayrollVoucherLinkView[];
   saving: boolean;
   costsDirty: boolean;
+  readOnly?: boolean;
   onAmountChange: (field: keyof PayrollEmployerCosts, value: number) => void;
   onLink: (type: 'socialSecurity' | 'housingFund') => void;
   onRemoveLink: (linkId: string) => void;
@@ -224,12 +227,14 @@ function EmployerCostTable({
     ];
 
   return (
-    <div className="payroll-cost-employer-panel">
+    <div className={`payroll-cost-employer-panel${readOnly ? ' payroll-cost-employer-panel--readonly' : ''}`}>
       <div className="payroll-cost-employer-panel__header">
         <div className="payroll-cost-employer-panel__title">公司缴纳（单位部分）</div>
-        <Button type="primary" size="small" loading={saving} disabled={!costsDirty} onClick={onSave}>
-          保存手动调整
-        </Button>
+        {!readOnly ? (
+          <Button type="primary" size="small" loading={saving} disabled={!costsDirty} onClick={onSave}>
+            保存手动调整
+          </Button>
+        ) : null}
       </div>
 
       <div className="payroll-cost-employer-table">
@@ -245,6 +250,7 @@ function EmployerCostTable({
               min={0}
               precision={2}
               controls={false}
+              disabled={readOnly}
               className="payroll-cost-employer-table__amount"
               value={draftCosts[row.key] || undefined}
               onChange={(value) => onAmountChange(row.key, Number(value) || 0)}
@@ -260,21 +266,27 @@ function EmployerCostTable({
                   >
                     {formatPayrollVoucherLinkNo(link)}
                   </Button>
-                  <Button type="link" size="small" danger onClick={() => onRemoveLink(link.id)}>
-                    删除
-                  </Button>
+                  {!readOnly ? (
+                    <Button type="link" size="small" danger onClick={() => onRemoveLink(link.id)}>
+                      删除
+                    </Button>
+                  ) : null}
                 </div>
               ))}
-              <Button size="small" icon={<LinkOutlined />} onClick={() => onLink(row.linkType)}>
-                关联凭证
-              </Button>
+              {!readOnly ? (
+                <Button size="small" icon={<LinkOutlined />} onClick={() => onLink(row.linkType)}>
+                  关联凭证
+                </Button>
+              ) : null}
             </div>
           </div>
         ))}
       </div>
 
       <div className="payroll-cost-employer-panel__hint">
-        关联社保/公积金扣款凭证后自动读取单位部分金额；可手动修改后保存。
+        {readOnly
+          ? '该月份所属季度已申报，公司缴纳数据不可修改。'
+          : '关联社保/公积金扣款凭证后自动读取单位部分金额；可手动修改后保存。'}
       </div>
     </div>
   );
@@ -296,6 +308,7 @@ export default function PayrollStatsPanel() {
     socialSecurity: 0,
     housingFund: 0
   });
+  const [employerCostsReadOnly, setEmployerCostsReadOnly] = useState(false);
 
   const startKey = monthKey(range[0]);
   const endKey = monthKey(range[1]);
@@ -317,11 +330,14 @@ export default function PayrollStatsPanel() {
     setLoading(true);
     try {
       if (isSingleMonth) {
+        const declared = await TaxDeclaration.isPayrollPeriodDeclared(periodKey);
+        setEmployerCostsReadOnly(declared);
+
         let next = await Salary.getPeriod(periodKey);
         const hasEmployerLinks = next.voucherLinks.some(
           (link) => link.linkType === 'socialSecurity' || link.linkType === 'housingFund'
         );
-        if (hasEmployerLinks) {
+        if (!declared && hasEmployerLinks) {
           const suggested = await Salary.suggestEmployerCosts(periodKey);
           const savedEmpty =
             !(next.employerCosts?.socialSecurity ?? 0) && !(next.employerCosts?.housingFund ?? 0);
@@ -331,6 +347,7 @@ export default function PayrollStatsPanel() {
         }
         applyPeriodData(next);
       } else {
+        setEmployerCostsReadOnly(false);
         const nextRange = await Salary.getEmployerCostRange(startKey, endKey);
         setRangeData(nextRange);
         setData(null);
@@ -349,11 +366,11 @@ export default function PayrollStatsPanel() {
     if (isSingleMonth && data) {
       return calcEmployerCostSummary({
         ...data,
-        employerCosts: draftCosts
+        employerCosts: employerCostsReadOnly ? data.employerCosts : draftCosts
       });
     }
     return rangeData?.summary ?? null;
-  }, [data, draftCosts, isSingleMonth, rangeData]);
+  }, [data, draftCosts, employerCostsReadOnly, isSingleMonth, rangeData]);
 
   const salaryRows = useMemo((): SalaryRowWithPeriod[] | SalaryPayrollRowCalculated[] => {
     if (isSingleMonth) {
@@ -551,6 +568,7 @@ export default function PayrollStatsPanel() {
               housingFundLinks={housingFundLinks}
               saving={saving}
               costsDirty={costsDirty}
+              readOnly={employerCostsReadOnly}
               onAmountChange={(field, value) =>
                 setDraftCosts((prev) => ({ ...prev, [field]: value }))
               }
@@ -689,7 +707,7 @@ export default function PayrollStatsPanel() {
         ]}
       />
 
-      {isSingleMonth ? (
+      {isSingleMonth && !employerCostsReadOnly ? (
         <PayrollVoucherPickerModal
           open={Boolean(linkModalType)}
           periodLabel={periodLabel}

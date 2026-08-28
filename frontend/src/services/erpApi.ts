@@ -38,6 +38,25 @@ const STORE_PATHS: Record<StoreName, string> = {
   settings: '/settings'
 };
 
+const LIST_CACHE_STORES = new Set<StoreName>(['accounts', 'vouchers', 'attachments']);
+const listCache = new Map<StoreName, StoreRecordMap[StoreName][]>();
+
+function invalidateListCache(...stores: StoreName[]) {
+  if (!stores.length) {
+    listCache.clear();
+    return;
+  }
+  for (const store of stores) {
+    listCache.delete(store);
+  }
+}
+
+function touchListCache(storeName: StoreName) {
+  if (LIST_CACHE_STORES.has(storeName)) {
+    invalidateListCache(storeName);
+  }
+}
+
 /** 附件只允许元数据 + 未签名 URL，禁止夹带文件内容字段。 */
 function sanitizeAttachment(item: Attachment): Attachment {
   const raw = item as Attachment & { data?: unknown };
@@ -91,7 +110,15 @@ async function getAll<K extends StoreName>(storeName: K): Promise<StoreRecordMap
   if (storeName === 'auditLogs') {
     return (await apiRequest<AuditLog[]>('GET', `${STORE_PATHS.auditLogs}?limit=0`)) as StoreRecordMap[K][];
   }
-  return apiRequest<StoreRecordMap[K][]>('GET', STORE_PATHS[storeName]);
+  const cached = listCache.get(storeName);
+  if (cached) {
+    return cached as StoreRecordMap[K][];
+  }
+  const data = await apiRequest<StoreRecordMap[K][]>('GET', STORE_PATHS[storeName]);
+  if (LIST_CACHE_STORES.has(storeName)) {
+    listCache.set(storeName, data as StoreRecordMap[StoreName][]);
+  }
+  return data;
 }
 
 async function get<K extends StoreName>(
@@ -137,6 +164,7 @@ async function put<K extends StoreName>(
       : data;
   const record = payload as { id: string };
   await apiRequest('PUT', `${STORE_PATHS[storeName]}/${encodeURIComponent(record.id)}`, payload);
+  touchListCache(storeName);
   return record.id;
 }
 
@@ -179,6 +207,7 @@ async function vouchersBatch(input: {
     }
   }
   const result = await apiRequest<VoucherBatchOpResult>('POST', '/vouchers/batch', body);
+  touchListCache('vouchers');
   return {
     action: result.action ?? input.action,
     approved: result.approved ?? 0,
@@ -209,6 +238,7 @@ async function putMany<K extends BatchStore>(
     action: 'upsert',
     items: payload
   });
+  touchListCache(storeName);
 }
 
 /** 批量删除；凭证删除会附带清关联附件。 */
@@ -235,6 +265,7 @@ async function removeMany(
     action: 'delete',
     ids: unique
   });
+  touchListCache(storeName);
 }
 
 async function approveVouchersBatch(ids: string | string[]): Promise<VoucherBatchOpResult> {
@@ -257,14 +288,17 @@ async function remove(
       : `${STORE_PATHS[storeName]}/${encodeURIComponent(key)}`;
   if (storeName === 'vouchers' && options?.confirmPassword) {
     await apiRequest('DELETE', path, { confirmPassword: options.confirmPassword });
+    touchListCache(storeName);
     return;
   }
   await apiRequest('DELETE', path);
+  touchListCache(storeName);
 }
 
 async function clear(storeName: StoreName): Promise<void> {
   await open();
   await apiRequest('DELETE', STORE_PATHS[storeName]);
+  touchListCache(storeName);
 }
 
 /** 生成业务主键（UUID v4）。 */
@@ -322,10 +356,12 @@ async function importAll(data: Partial<ExportData>): Promise<void> {
     settings: data.settings ?? [],
     attachments: sanitizeAttachments(data.attachments ?? [])
   });
+  invalidateListCache('accounts', 'vouchers', 'attachments', 'auditLogs', 'settings');
 }
 
 export const ErpApi = {
   open,
+  invalidateListCache,
   getAll,
   get,
   put,

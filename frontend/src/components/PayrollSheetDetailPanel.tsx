@@ -12,7 +12,7 @@ import LaborLedgerTable from './LaborLedgerTable';
 import {
   Salary,
   calcLaborRow,
-  calcSalaryRow,
+  calcSalaryRowsWithYtdMap,
   calcSalaryTotals,
   calcLaborTotals,
   createLaborRow,
@@ -21,7 +21,9 @@ import {
   PAYROLL_DELETE_BLOCKED_BY_VOUCHER_MESSAGE,
   seedPayrollPeriodRows,
   type PayrollPeriodData,
-  type PayrollPeriodView
+  type PayrollPeriodView,
+  type PayrollStore,
+  type SalaryYtdPriorTotals
 } from '../services/salary';
 import { PayrollStaff } from '../services/payrollStaff';
 import { useApp } from '../context/AppContext';
@@ -42,7 +44,8 @@ const EMPTY_SALARY_TOTALS = {
   pension: 0,
   medical: 0,
   unemployment: 0,
-  criticalIllness: 0,
+  workInjury: 0,
+  maternityInsurance: 0,
   housingFund: 0,
   socialSecurityTotal: 0,
   otherDeduction: 0,
@@ -81,6 +84,14 @@ export default function PayrollSheetDetailPanel({ readOnly = false }: { readOnly
   const [saving, setSaving] = useState(false);
   const [keyword, setKeyword] = useState('');
   const [activeTab, setActiveTab] = useState('salary');
+  const [payrollStore, setPayrollStore] = useState<PayrollStore>({});
+  const [ytdPriorMap, setYtdPriorMap] = useState<Map<string, SalaryYtdPriorTotals>>(new Map());
+
+  const calcSalaryRows = useCallback(
+    (rows: PayrollPeriodData['salaryRows']) =>
+      calcSalaryRowsWithYtdMap(payrollStore, periodKey, rows, ytdPriorMap),
+    [payrollStore, periodKey, ytdPriorMap]
+  );
 
   const periodLabel = Salary.formatPeriodLabel(periodKey);
 
@@ -107,10 +118,13 @@ export default function PayrollSheetDetailPanel({ readOnly = false }: { readOnly
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [sheet, org] = await Promise.all([
+      const [sheet, org, calcContext] = await Promise.all([
         Salary.getPeriod(periodKey),
-        PayrollStaff.getAll()
+        PayrollStaff.getAll(),
+        Salary.getSalaryCalcContext(periodKey)
       ]);
+      setPayrollStore(calcContext.store);
+      setYtdPriorMap(calcContext.ytdPriorMap);
       if (!readOnly) {
         const seeded = seedPayrollPeriodRows(sheet);
         const needsSeed =
@@ -121,8 +135,18 @@ export default function PayrollSheetDetailPanel({ readOnly = false }: { readOnly
             ...sheet,
             salaryRows: seeded.salaryRows,
             laborRows: seeded.laborRows,
-            salaryRowsCalculated: seeded.salaryRows.map(calcSalaryRow),
-            salaryTotals: calcSalaryTotals(seeded.salaryRows),
+            salaryRowsCalculated: calcSalaryRowsWithYtdMap(
+              calcContext.store,
+              periodKey,
+              seeded.salaryRows,
+              calcContext.ytdPriorMap
+            ),
+            salaryTotals: calcSalaryTotals(
+              seeded.salaryRows,
+              calcContext.store,
+              periodKey,
+              calcContext.ytdPriorMap
+            ),
             laborRowsCalculated: seeded.laborRows.map(calcLaborRow),
             laborTotals: calcLaborTotals(seeded.laborRows)
           });
@@ -173,7 +197,12 @@ export default function PayrollSheetDetailPanel({ readOnly = false }: { readOnly
           createdBy: nextData.createdBy || user?.nickname || user?.username,
           creationMethod: nextData.creationMethod || data?.creationMethod || 'manual'
         });
-        const refreshed = await Salary.getPeriod(periodKey);
+        const [refreshed, calcContext] = await Promise.all([
+          Salary.getPeriod(periodKey),
+          Salary.getSalaryCalcContext(periodKey)
+        ]);
+        setPayrollStore(calcContext.store);
+        setYtdPriorMap(calcContext.ytdPriorMap);
         setData(refreshed);
         refresh();
         if (!options.silent) message.success('已保存');
@@ -188,14 +217,14 @@ export default function PayrollSheetDetailPanel({ readOnly = false }: { readOnly
 
   const updateSalaryRows = (salaryRows: PayrollPeriodData['salaryRows']) => {
     if (!data) return;
-    const salaryRowsCalculated = salaryRows.map(calcSalaryRow);
+    const salaryRowsCalculated = calcSalaryRows(salaryRows);
     setData((prev) =>
       prev
         ? {
             ...prev,
             salaryRows,
             salaryRowsCalculated,
-            salaryTotals: calcSalaryTotals(salaryRows)
+            salaryTotals: calcSalaryTotals(salaryRows, payrollStore, periodKey, ytdPriorMap)
           }
         : prev
     );

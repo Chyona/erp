@@ -1,5 +1,6 @@
 import { ErpApi } from './erpApi';
 import { Voucher } from './voucher';
+import { TaxDeclaration } from './taxDeclaration';
 import type { Voucher as VoucherRecord } from '../types';
 
 const SETTING_KEY = 'payrollPeriods';
@@ -37,6 +38,37 @@ export const PAYROLL_VOUCHER_SHORT_LABELS: Record<PayrollVoucherLinkType, string
   housingFund: '公积金',
   other: '其他'
 };
+
+export const PAYROLL_VOUCHER_TAG_CLASS: Record<
+  'wage' | 'labor' | 'socialSecurity' | 'housingFund' | 'tax' | 'other',
+  string
+> = {
+  wage: 'payroll-sheet-list__voucher-badge-tag--wage',
+  labor: 'payroll-sheet-list__voucher-badge-tag--labor',
+  socialSecurity: 'payroll-sheet-list__voucher-badge-tag--social-security',
+  housingFund: 'payroll-sheet-list__voucher-badge-tag--housing-fund',
+  tax: 'payroll-sheet-list__voucher-badge-tag--tax',
+  other: 'payroll-sheet-list__voucher-badge-tag--other'
+};
+
+export function resolvePayrollVoucherTagClassName(linkType: PayrollVoucherLinkType): string {
+  switch (linkType) {
+    case 'accrual':
+    case 'payment':
+      return PAYROLL_VOUCHER_TAG_CLASS.wage;
+    case 'laborAccrual':
+    case 'laborPayment':
+      return PAYROLL_VOUCHER_TAG_CLASS.labor;
+    case 'socialSecurity':
+      return PAYROLL_VOUCHER_TAG_CLASS.socialSecurity;
+    case 'housingFund':
+      return PAYROLL_VOUCHER_TAG_CLASS.housingFund;
+    case 'tax':
+      return PAYROLL_VOUCHER_TAG_CLASS.tax;
+    default:
+      return PAYROLL_VOUCHER_TAG_CLASS.other;
+  }
+}
 
 export const PAYROLL_VOUCHER_SEARCH_KEYWORDS: Record<PayrollVoucherLinkType, string> = {
   accrual: PAYROLL_VOUCHER_SHORT_LABELS.accrual,
@@ -142,7 +174,8 @@ export type SalaryPayrollRow = {
   pension: number;
   medical: number;
   unemployment: number;
-  criticalIllness: number;
+  workInjury: number;
+  maternityInsurance: number;
   housingFund: number;
   otherDeduction: number;
   cumulativeIncome: number;
@@ -276,7 +309,7 @@ export function calcEmployerCostSummary(
     laborTotals?: PayrollPeriodView['laborTotals'];
   }
 ): EmployerCostSummary {
-  const salaryRowsCalculated = data.salaryRows.map(calcSalaryRow);
+  const salaryRowsCalculated = data.salaryRows.map((row) => calcSalaryRow(row));
   const laborRowsCalculated = data.laborRows.map(calcLaborRow);
   const salaryGross =
     data.salaryTotals?.preTaxSalary ?? sumSalaryRows(salaryRowsCalculated).preTaxSalary;
@@ -373,6 +406,8 @@ export type PayrollSheetListItem = {
 
 type PayrollStore = Record<string, PayrollPeriodData>;
 
+export type { PayrollStore };
+
 function roundMoney(n: number | string) {
   return Math.round((parseFloat(String(n)) || 0) * 100) / 100;
 }
@@ -386,9 +421,237 @@ function formatPeriodLabel(periodKey: string) {
   return `${year}年${month}月`;
 }
 
-export function normalizeSalaryRow(row: SalaryPayrollRow): SalaryPayrollRow {
+/** 综合所得累计预扣预缴税率表（年度档位） */
+const SALARY_INCOME_TAX_BRACKETS = [
+  { limit: 36000, rate: 0.03, quickDeduction: 0 },
+  { limit: 144000, rate: 0.1, quickDeduction: 2520 },
+  { limit: 300000, rate: 0.2, quickDeduction: 16920 },
+  { limit: 420000, rate: 0.25, quickDeduction: 31920 },
+  { limit: 660000, rate: 0.3, quickDeduction: 52920 },
+  { limit: 960000, rate: 0.35, quickDeduction: 85920 },
+  { limit: Number.POSITIVE_INFINITY, rate: 0.45, quickDeduction: 181920 }
+] as const;
+
+const SALARY_BASIC_DEDUCTION_PER_MONTH = 5000;
+
+function salaryMonthNumber(salaryMonth: string) {
+  const month = Number(salaryMonth.split('-')[1]);
+  return month >= 1 && month <= 12 ? month : 1;
+}
+
+/** 累计应预扣预缴税额 = 累计应纳税所得额 × 税率 − 速算扣除数 */
+export function calcCumulativeSalaryTax(cumulativeTaxableIncome: number) {
+  const income = Math.max(0, roundMoney(cumulativeTaxableIncome));
+  for (const bracket of SALARY_INCOME_TAX_BRACKETS) {
+    if (income <= bracket.limit) {
+      return Math.max(0, roundMoney(income * bracket.rate - bracket.quickDeduction));
+    }
+  }
+  return 0;
+}
+
+export function calcSalaryWithholdingTax(input: {
+  employmentMonthNumber: number;
+  cumulativeIncome: number;
+  cumulativeSpecialDeduction: number;
+  cumulativeSpecialAdditionalTotal: number;
+  cumulativeOtherDeduction: number;
+  cumulativeTaxPaid: number;
+}) {
+  const employmentMonths = Math.max(1, input.employmentMonthNumber);
+  const basicDeduction = roundMoney(SALARY_BASIC_DEDUCTION_PER_MONTH * employmentMonths);
+  const cumulativeTaxableIncome = roundMoney(
+    Math.max(
+      0,
+      num(input.cumulativeIncome) -
+        basicDeduction -
+        num(input.cumulativeSpecialDeduction) -
+        num(input.cumulativeSpecialAdditionalTotal) -
+        num(input.cumulativeOtherDeduction)
+    )
+  );
+  const cumulativeTaxPayable = calcCumulativeSalaryTax(cumulativeTaxableIncome);
+  const withheldTax = roundMoney(
+    Math.max(0, cumulativeTaxPayable - num(input.cumulativeTaxPaid))
+  );
   return {
-    ...row,
+    cumulativeTaxableIncome,
+    cumulativeTaxPayable,
+    withheldTax
+  };
+}
+
+export type SalaryYtdPriorTotals = {
+  preTaxSalary: number;
+  socialSecurityTotal: number;
+  withheldTax: number;
+  childEducation: number;
+  housingLoan: number;
+  housingRent: number;
+  elderlySupport: number;
+  continuingEducation: number;
+  infantCare: number;
+  otherDeduction: number;
+};
+
+export function emptySalaryYtdPriorTotals(): SalaryYtdPriorTotals {
+  return {
+    preTaxSalary: 0,
+    socialSecurityTotal: 0,
+    withheldTax: 0,
+    childEducation: 0,
+    housingLoan: 0,
+    housingRent: 0,
+    elderlySupport: 0,
+    continuingEducation: 0,
+    infantCare: 0,
+    otherDeduction: 0
+  };
+}
+
+export function salaryRowMatchKey(
+  row: Pick<SalaryPayrollRow, 'staffId' | 'name' | 'idNumber'>
+) {
+  if (row.staffId?.trim()) return `staff:${row.staffId.trim()}`;
+  if (row.idNumber?.trim()) return `id:${row.idNumber.trim()}`;
+  if (row.name?.trim()) return `name:${row.name.trim()}`;
+  return '';
+}
+
+/** 往月汇总优先使用已保存的「本月应缴个税」，避免重算后与历史实扣不一致。 */
+function resolveRowWithheldTaxForYtd(row: SalaryPayrollRow, calculated: number) {
+  const stored = num(row.withheldTax);
+  if (stored > 0.005) return stored;
+  return calculated;
+}
+
+/** 当年在本单位任职受雇月数（含当月），用于 5000 元/月减除费用；年中入职从首月工资表起算。 */
+export function resolveEmploymentMonthNumber(
+  store: PayrollStore,
+  periodKey: string,
+  matchKey: string
+) {
+  if (!matchKey) return salaryMonthNumber(periodKey);
+  const year = periodKey.slice(0, 4);
+  const monthKeys = Object.keys(store)
+    .filter((key) => key.startsWith(`${year}-`) && key <= periodKey)
+    .sort();
+  let firstMonthKey: string | null = null;
+  for (const key of monthKeys) {
+    const period = store[key];
+    if (!period?.salaryRows?.length) continue;
+    const found = period.salaryRows.some((row) => salaryRowMatchKey(row) === matchKey);
+    if (found) {
+      firstMonthKey = firstMonthKey ?? key;
+    }
+  }
+  if (!firstMonthKey) return salaryMonthNumber(periodKey);
+  const firstMonth = Number(firstMonthKey.split('-')[1]);
+  const currentMonth = Number(periodKey.split('-')[1]);
+  if (!firstMonth || !currentMonth) return salaryMonthNumber(periodKey);
+  return Math.max(1, currentMonth - firstMonth + 1);
+}
+
+export type SalaryRowCalcOptions = {
+  employmentMonthNumber?: number;
+};
+
+function periodKeysInSameYearBefore(periodKey: string) {
+  const [yearText, monthText] = periodKey.split('-');
+  const year = Number(yearText);
+  const month = Number(monthText);
+  if (!year || !month) return [];
+  const keys: string[] = [];
+  for (let index = 1; index < month; index += 1) {
+    keys.push(`${year}-${String(index).padStart(2, '0')}`);
+  }
+  return keys;
+}
+
+function addSalaryYtdTotals(
+  base: SalaryYtdPriorTotals,
+  addition: SalaryYtdPriorTotals
+): SalaryYtdPriorTotals {
+  return {
+    preTaxSalary: roundMoney(base.preTaxSalary + addition.preTaxSalary),
+    socialSecurityTotal: roundMoney(base.socialSecurityTotal + addition.socialSecurityTotal),
+    withheldTax: roundMoney(base.withheldTax + addition.withheldTax),
+    childEducation: roundMoney(base.childEducation + addition.childEducation),
+    housingLoan: roundMoney(base.housingLoan + addition.housingLoan),
+    housingRent: roundMoney(base.housingRent + addition.housingRent),
+    elderlySupport: roundMoney(base.elderlySupport + addition.elderlySupport),
+    continuingEducation: roundMoney(base.continuingEducation + addition.continuingEducation),
+    infantCare: roundMoney(base.infantCare + addition.infantCare),
+    otherDeduction: roundMoney(base.otherDeduction + addition.otherDeduction)
+  };
+}
+
+function salaryRowMonthlySpecialAdditional(row: SalaryPayrollRow) {
+  return {
+    childEducation: num(row.childEducation),
+    housingLoan: num(row.housingLoan),
+    housingRent: num(row.housingRent),
+    elderlySupport: num(row.elderlySupport),
+    continuingEducation: num(row.continuingEducation),
+    infantCare: num(row.infantCare)
+  };
+}
+
+export function buildSalaryYtdPriorMap(store: PayrollStore, periodKey: string) {
+  const map = new Map<string, SalaryYtdPriorTotals>();
+  for (const priorKey of periodKeysInSameYearBefore(periodKey)) {
+    const period = store[priorKey];
+    if (!period?.salaryRows?.length) continue;
+    const priorMap = buildSalaryYtdPriorMap(store, priorKey);
+    for (const row of period.salaryRows) {
+      const matchKey = salaryRowMatchKey(row);
+      if (!matchKey) continue;
+      const calculated = calcSalaryRow(row, priorMap.get(matchKey), {
+        employmentMonthNumber: resolveEmploymentMonthNumber(store, priorKey, matchKey)
+      });
+      const monthlySpecial = salaryRowMonthlySpecialAdditional(row);
+      const addition: SalaryYtdPriorTotals = {
+        preTaxSalary: calculated.preTaxSalary,
+        socialSecurityTotal: calculated.socialSecurityTotal,
+        withheldTax: resolveRowWithheldTaxForYtd(row, calculated.withheldTax),
+        ...monthlySpecial,
+        otherDeduction: num(row.otherDeduction)
+      };
+      map.set(matchKey, addSalaryYtdTotals(map.get(matchKey) || emptySalaryYtdPriorTotals(), addition));
+    }
+  }
+  return map;
+}
+
+export function calcSalaryRowsWithYtdMap(
+  store: PayrollStore,
+  periodKey: string,
+  rows: SalaryPayrollRow[],
+  ytdPriorMap: Map<string, SalaryYtdPriorTotals>
+) {
+  return rows.map((row) => {
+    const matchKey = salaryRowMatchKey(row);
+    return calcSalaryRow(row, ytdPriorMap.get(matchKey), {
+      employmentMonthNumber: resolveEmploymentMonthNumber(store, periodKey, matchKey)
+    });
+  });
+}
+
+export function calcSalaryRowsForPeriod(
+  store: PayrollStore,
+  periodKey: string,
+  rows: SalaryPayrollRow[]
+) {
+  const ytdPriorMap = buildSalaryYtdPriorMap(store, periodKey);
+  return calcSalaryRowsWithYtdMap(store, periodKey, rows, ytdPriorMap);
+}
+
+export function normalizeSalaryRow(
+  row: SalaryPayrollRow & { criticalIllness?: number }
+): SalaryPayrollRow {
+  const { criticalIllness, ...rest } = row;
+  return {
+    ...rest,
     allowance: num(row.allowance ?? row.housingAllowance),
     subsidy: num(row.subsidy ?? row.transportAllowance),
     absenceDeduction: num(row.absenceDeduction ?? row.personalLeave),
@@ -398,25 +661,32 @@ export function normalizeSalaryRow(row: SalaryPayrollRow): SalaryPayrollRow {
     pension: num(row.pension),
     medical: num(row.medical),
     unemployment: num(row.unemployment),
-    criticalIllness: num(row.criticalIllness),
+    workInjury: num(row.workInjury ?? criticalIllness),
+    maternityInsurance: num(row.maternityInsurance),
     housingFund: num(row.housingFund),
     otherDeduction: num(row.otherDeduction),
-    cumulativeIncome: num(row.cumulativeIncome),
-    cumulativeSpecialDeduction: num(row.cumulativeSpecialDeduction),
     childEducation: num(row.childEducation),
     housingRent: num(row.housingRent),
     elderlySupport: num(row.elderlySupport),
     continuingEducation: num(row.continuingEducation),
     infantCare: num(row.infantCare),
-    cumulativeOtherDeduction: num(row.cumulativeOtherDeduction),
-    cumulativeTaxPayable: num(row.cumulativeTaxPayable),
-    cumulativeTaxPaid: num(row.cumulativeTaxPaid),
+    cumulativeIncome: 0,
+    cumulativeSpecialDeduction: 0,
+    cumulativeOtherDeduction: 0,
+    cumulativeTaxPaid: 0,
+    cumulativeTaxPayable: 0,
     withheldTax: num(row.withheldTax)
   };
 }
 
-export function calcSalaryRow(row: SalaryPayrollRow): SalaryPayrollRowCalculated {
+export function calcSalaryRow(
+  row: SalaryPayrollRow,
+  priorYtd: SalaryYtdPriorTotals = emptySalaryYtdPriorTotals(),
+  options: SalaryRowCalcOptions = {}
+): SalaryPayrollRowCalculated {
   const normalized = normalizeSalaryRow(row);
+  const employmentMonthNumber =
+    options.employmentMonthNumber ?? salaryMonthNumber(normalized.salaryMonth);
   const preTaxSalary = roundMoney(
     num(normalized.baseSalary) +
       num(normalized.allowance) +
@@ -428,26 +698,56 @@ export function calcSalaryRow(row: SalaryPayrollRow): SalaryPayrollRowCalculated
     num(normalized.pension) +
       num(normalized.medical) +
       num(normalized.unemployment) +
-      num(normalized.criticalIllness) +
+      num(normalized.workInjury) +
+      num(normalized.maternityInsurance) +
       num(normalized.housingFund)
   );
-  const cumulativeSpecialAdditionalTotal = roundMoney(
-    num(normalized.childEducation) +
-      num(normalized.housingLoan) +
-      num(normalized.housingRent) +
-      num(normalized.elderlySupport) +
-      num(normalized.continuingEducation) +
-      num(normalized.infantCare)
+  const monthlySpecial = salaryRowMonthlySpecialAdditional(normalized);
+  const cumulativeIncome = roundMoney(priorYtd.preTaxSalary + preTaxSalary);
+  const cumulativeSpecialDeduction = roundMoney(
+    priorYtd.socialSecurityTotal + socialSecurityTotal
   );
+  const cumulativeSpecialAdditionalTotal = roundMoney(
+    priorYtd.childEducation +
+      priorYtd.housingLoan +
+      priorYtd.housingRent +
+      priorYtd.elderlySupport +
+      priorYtd.continuingEducation +
+      priorYtd.infantCare +
+      monthlySpecial.childEducation +
+      monthlySpecial.housingLoan +
+      monthlySpecial.housingRent +
+      monthlySpecial.elderlySupport +
+      monthlySpecial.continuingEducation +
+      monthlySpecial.infantCare
+  );
+  const cumulativeOtherDeduction = roundMoney(
+    priorYtd.otherDeduction + num(normalized.otherDeduction)
+  );
+  const cumulativeTaxPaid = roundMoney(priorYtd.withheldTax);
+  const { cumulativeTaxPayable, withheldTax } = calcSalaryWithholdingTax({
+    employmentMonthNumber,
+    cumulativeIncome,
+    cumulativeSpecialDeduction,
+    cumulativeSpecialAdditionalTotal,
+    cumulativeOtherDeduction,
+    cumulativeTaxPaid
+  });
   const netSalary = roundMoney(
-    preTaxSalary - socialSecurityTotal - num(normalized.otherDeduction) - num(normalized.withheldTax)
+    preTaxSalary - socialSecurityTotal - num(normalized.otherDeduction) - withheldTax
   );
 
   return {
     ...normalized,
     preTaxSalary,
     socialSecurityTotal,
+    cumulativeIncome,
+    cumulativeSpecialDeduction,
     cumulativeSpecialAdditionalTotal,
+    cumulativeOtherDeduction,
+    cumulativeTaxPaid,
+    cumulativeTaxPayable,
+    withheldTax,
     netSalary
   };
 }
@@ -494,7 +794,8 @@ function sumSalaryRows(rows: SalaryPayrollRowCalculated[]) {
       pension: acc.pension + num(row.pension),
       medical: acc.medical + num(row.medical),
       unemployment: acc.unemployment + num(row.unemployment),
-      criticalIllness: acc.criticalIllness + num(row.criticalIllness),
+      workInjury: acc.workInjury + num(row.workInjury),
+      maternityInsurance: acc.maternityInsurance + num(row.maternityInsurance),
       housingFund: acc.housingFund + num(row.housingFund),
       socialSecurityTotal: acc.socialSecurityTotal + num(row.socialSecurityTotal),
       otherDeduction: acc.otherDeduction + num(row.otherDeduction),
@@ -525,7 +826,8 @@ function sumSalaryRows(rows: SalaryPayrollRowCalculated[]) {
       pension: 0,
       medical: 0,
       unemployment: 0,
-      criticalIllness: 0,
+      workInjury: 0,
+      maternityInsurance: 0,
       housingFund: 0,
       socialSecurityTotal: 0,
       otherDeduction: 0,
@@ -637,7 +939,8 @@ export function createSalaryRow(periodKey: string): SalaryPayrollRow {
     pension: 0,
     medical: 0,
     unemployment: 0,
-    criticalIllness: 0,
+    workInjury: 0,
+    maternityInsurance: 0,
     housingFund: 0,
     otherDeduction: 0,
     cumulativeIncome: 0,
@@ -709,10 +1012,15 @@ function formatDateTime(value?: string) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 }
 
-async function buildPeriodView(data: PayrollPeriodData): Promise<PayrollPeriodView> {
+async function buildPeriodView(data: PayrollPeriodData, store?: PayrollStore): Promise<PayrollPeriodView> {
   const normalized = normalizePeriod(data);
+  const payrollStore = store ?? (await readStore());
   const vouchers = await Voucher.getAll();
-  const salaryRowsCalculated = normalized.salaryRows.map(calcSalaryRow);
+  const salaryRowsCalculated = calcSalaryRowsForPeriod(
+    payrollStore,
+    normalized.periodKey,
+    normalized.salaryRows
+  );
   const laborRowsCalculated = normalized.laborRows.map(calcLaborRow);
 
   return {
@@ -727,9 +1035,10 @@ async function buildPeriodView(data: PayrollPeriodData): Promise<PayrollPeriodVi
 
 async function buildListItem(
   data: PayrollPeriodData,
-  voucherLinksView: PayrollVoucherLinkView[]
+  voucherLinksView: PayrollVoucherLinkView[],
+  store: PayrollStore
 ): Promise<PayrollSheetListItem> {
-  const salaryRows = data.salaryRows.map(calcSalaryRow);
+  const salaryRows = calcSalaryRowsForPeriod(store, data.periodKey, data.salaryRows);
   const laborRows = data.laborRows.map(calcLaborRow);
   const totals = sumSalaryRows(salaryRows);
   const laborTotals = sumLaborRows(laborRows);
@@ -772,15 +1081,33 @@ export function calcLaborTotals(rows: LaborLedgerRow[]) {
   return sumLaborRows(rows.map(calcLaborRow));
 }
 
-export function calcSalaryTotals(rows: SalaryPayrollRow[]) {
-  return sumSalaryRows(rows.map(calcSalaryRow));
+export function calcSalaryTotals(
+  rows: SalaryPayrollRow[],
+  store: PayrollStore,
+  periodKey: string,
+  ytdPriorMap: Map<string, SalaryYtdPriorTotals>
+) {
+  return sumSalaryRows(calcSalaryRowsWithYtdMap(store, periodKey, rows, ytdPriorMap));
 }
 
 export const Salary = {
   async getPeriod(periodKey: string): Promise<PayrollPeriodView> {
     const store = await readStore();
     const data = store[periodKey] || emptyPeriod(periodKey);
-    return buildPeriodView(data);
+    return buildPeriodView(data, store);
+  },
+
+  async getSalaryYtdPriorMap(periodKey: string) {
+    const store = await readStore();
+    return buildSalaryYtdPriorMap(store, periodKey);
+  },
+
+  async getSalaryCalcContext(periodKey: string) {
+    const store = await readStore();
+    return {
+      store,
+      ytdPriorMap: buildSalaryYtdPriorMap(store, periodKey)
+    };
   },
 
   async listSheets(startKey: string, endKey: string): Promise<PayrollSheetListItem[]> {
@@ -793,7 +1120,7 @@ export const Salary = {
     return Promise.all(
       rows.map(async (item) => {
         const links = await enrichVoucherLinks(item.voucherLinks, vouchers);
-        return buildListItem(normalizePeriod(item), links);
+        return buildListItem(normalizePeriod(item), links, store);
       })
     );
   },
@@ -805,7 +1132,7 @@ export const Salary = {
       .sort((a, b) => a.periodKey.localeCompare(b.periodKey));
 
     const periodViews = await Promise.all(
-      periods.map((item) => buildPeriodView(normalizePeriod(item)))
+      periods.map((item) => buildPeriodView(normalizePeriod(item), store))
     );
 
     const monthly: EmployerCostMonthlyRow[] = periodViews.map((view) => ({
@@ -826,8 +1153,14 @@ export const Salary = {
   async savePeriod(data: PayrollPeriodData) {
     const store = await readStore();
     const existing = store[data.periodKey];
+    const calculatedRows = calcSalaryRowsForPeriod(store, data.periodKey, data.salaryRows);
+    const salaryRows = data.salaryRows.map((row, index) => ({
+      ...normalizeSalaryRow(row),
+      withheldTax: calculatedRows[index]?.withheldTax ?? 0
+    }));
     const next: PayrollPeriodData = normalizePeriod({
       ...data,
+      salaryRows,
       createdAt: data.createdAt || existing?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString()
     });
@@ -838,6 +1171,7 @@ export const Salary = {
   },
 
   async saveEmployerCosts(periodKey: string, costs: PayrollEmployerCosts) {
+    await TaxDeclaration.assertPayrollPeriodNotDeclared(periodKey);
     const store = await readStore();
     const current = store[periodKey] || emptyPeriod(periodKey);
     const next = normalizePeriod({
@@ -847,7 +1181,7 @@ export const Salary = {
     });
     store[periodKey] = next;
     await writeStore(store);
-    return buildPeriodView(next);
+    return buildPeriodView(next, store);
   },
 
   async syncEmployerCostsFromVouchers(periodKey: string) {
@@ -859,6 +1193,9 @@ export const Salary = {
     periodKey: string,
     link: Omit<PayrollVoucherLink, 'id'> & { id?: string }
   ) {
+    if (link.linkType === 'socialSecurity' || link.linkType === 'housingFund') {
+      await TaxDeclaration.assertPayrollPeriodNotDeclared(periodKey);
+    }
     await this.addVoucherLink(periodKey, link);
     if (link.linkType === 'socialSecurity' || link.linkType === 'housingFund') {
       return this.syncEmployerCostsFromVouchers(periodKey);
@@ -869,6 +1206,12 @@ export const Salary = {
   async removeVoucherLinkAndSyncEmployerCosts(periodKey: string, linkId: string) {
     const store = await readStore();
     const removed = store[periodKey]?.voucherLinks.find((item) => item.id === linkId);
+    if (
+      removed &&
+      (removed.linkType === 'socialSecurity' || removed.linkType === 'housingFund')
+    ) {
+      await TaxDeclaration.assertPayrollPeriodNotDeclared(periodKey);
+    }
     await this.removeVoucherLink(periodKey, linkId);
     if (
       removed &&
@@ -912,7 +1255,7 @@ export const Salary = {
   ) {
     const store = await readStore();
     if (store[periodKey]?.salaryRows?.length || store[periodKey]?.laborRows?.length) {
-      return buildPeriodView(store[periodKey]);
+      return buildPeriodView(store[periodKey], store);
     }
     const next = normalizePeriod(
       seedPayrollPeriodRows({
@@ -925,7 +1268,7 @@ export const Salary = {
     );
     store[periodKey] = next;
     await writeStore(store);
-    return buildPeriodView(next);
+    return buildPeriodView(next, store);
   },
 
   async copyFromPreviousMonth(periodKey: string, createdBy?: string) {
@@ -957,7 +1300,7 @@ export const Salary = {
     store[periodKey] = next;
     await writeStore(store);
     await ErpApi.addAuditLog('复制', '工资薪金', periodKey);
-    return buildPeriodView(next);
+    return buildPeriodView(next, store);
   },
 
   previousPeriodKey,
@@ -1040,7 +1383,7 @@ export const Salary = {
       .sort((a, b) => a.periodKey.localeCompare(b.periodKey));
 
     const rows = periods.map((period) => {
-      const salaryRows = period.salaryRows.map(calcSalaryRow);
+      const salaryRows = calcSalaryRowsForPeriod(store, period.periodKey, period.salaryRows);
       const laborRows = period.laborRows.map(calcLaborRow);
       const salaryTotals = sumSalaryRows(salaryRows);
       const laborTotals = sumLaborRows(laborRows);

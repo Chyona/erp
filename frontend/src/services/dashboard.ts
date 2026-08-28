@@ -156,26 +156,26 @@ function monthPeriodsEndingAt(period: DashboardPeriod, count: number) {
   });
 }
 
-async function loadPeriodSnapshot(period: DashboardPeriod): Promise<PeriodSnapshot> {
-  const [start, end] = reportPeriodToDateRange(period);
-  const startDate = start.format('YYYY-MM-DD');
-  const endDate = end.format('YYYY-MM-DD');
-  const [trial, income] = await Promise.all([
-    Reports.getTrialBalance(startDate, endDate, period),
-    Reports.getIncomeStatement(startDate, endDate)
-  ]);
-
-  const incomeValues = Object.fromEntries(
-    income.rows.filter((row) => row.key).map((row) => [row.key, row.amount || 0])
-  );
-
-  return {
-    period,
-    periodLabel: formatReportPeriod(period),
-    trialRows: trial.rows,
-    incomeValues,
-    netProfit: income.summary.netProfit || 0
-  };
+async function loadPeriodSnapshots(periods: DashboardPeriod[]): Promise<PeriodSnapshot[]> {
+  const inputs = periods.map((period) => {
+    const [start, end] = reportPeriodToDateRange(period);
+    return {
+      startDate: start.format('YYYY-MM-DD'),
+      endDate: end.format('YYYY-MM-DD'),
+      reportPeriod: period
+    };
+  });
+  const snapshots = await Reports.getDashboardPeriodSnapshots(inputs);
+  return snapshots.map((snapshot, index) => {
+    const period = periods[index];
+    return {
+      period,
+      periodLabel: formatReportPeriod(period),
+      trialRows: snapshot.trialRows,
+      incomeValues: snapshot.incomeValues,
+      netProfit: snapshot.netProfit
+    };
+  });
 }
 
 function indicatorAmount(snapshot: PeriodSnapshot, indicator: DashboardIndicatorDefinition) {
@@ -195,11 +195,8 @@ export async function getDashboardData(period: DashboardPeriod): Promise<Dashboa
   const visibleIndicators = indicatorConfigs.filter((item) => item.visible);
   const prevPeriod = previousMonth(period);
   const trendPeriods = monthPeriodsEndingAt(period, 6);
-  const snapshots = await Promise.all([
-    loadPeriodSnapshot(period),
-    loadPeriodSnapshot(prevPeriod),
-    ...trendPeriods.map((item) => loadPeriodSnapshot(item))
-  ]);
+  const allPeriods = [period, prevPeriod, ...trendPeriods];
+  const snapshots = await loadPeriodSnapshots(allPeriods);
 
   const current = snapshots[0];
   const previous = snapshots[1];

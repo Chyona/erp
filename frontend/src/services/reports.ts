@@ -364,9 +364,13 @@ function buildLedgerAccountRows(
  * 报表统一账簿：凭证 → 科目汇总（科目余额表的数据源）
  * 展示含未审核凭证；损益结转判断仍仅依据已审核凭证。
  */
-async function buildReportLedger(startDate, endDate, reportPeriod = null) {
-  const accounts = await Accounts.getAll();
-  const allVouchers = await getVouchersUpTo(endDate);
+function buildReportLedgerFromData(
+  accounts: Account[],
+  allVouchers: VoucherRecord[],
+  startDate: string,
+  endDate: string,
+  reportPeriod = null
+) {
   const approvedVouchers = allVouchers.filter((v) => !isDraftVoucher(v));
   const yearStart = `${endDate.slice(0, 4)}-01-01`;
   const periodProfitLossClosed =
@@ -398,6 +402,55 @@ async function buildReportLedger(startDate, endDate, reportPeriod = null) {
     periodProfitLossClosed,
     previousPeriodProfitLossClosed
   };
+}
+
+async function buildReportLedger(startDate, endDate, reportPeriod = null) {
+  const accounts = await Accounts.getAll();
+  const allVouchers = await getVouchersUpTo(endDate);
+  return buildReportLedgerFromData(accounts, allVouchers, startDate, endDate, reportPeriod);
+}
+
+export type DashboardPeriodSnapshotInput = {
+  startDate: string;
+  endDate: string;
+  reportPeriod?: { type: 'month'; year: number; month: number } | null;
+};
+
+export type DashboardPeriodSnapshotResult = {
+  trialRows: Awaited<ReturnType<typeof compileTrialBalanceFromLedger>>['rows'];
+  incomeValues: Record<string, number>;
+  netProfit: number;
+};
+
+async function getDashboardPeriodSnapshots(
+  periods: DashboardPeriodSnapshotInput[]
+): Promise<DashboardPeriodSnapshotResult[]> {
+  if (!periods.length) return [];
+
+  const accounts = await Accounts.getAll();
+  const maxEndDate = periods.reduce(
+    (max, item) => (item.endDate > max ? item.endDate : max),
+    periods[0].endDate
+  );
+  const allVouchers = await getVouchersUpTo(maxEndDate);
+
+  return periods.map(({ startDate, endDate, reportPeriod = null }) => {
+    const ledger = buildReportLedgerFromData(
+      accounts,
+      allVouchers,
+      startDate,
+      endDate,
+      reportPeriod
+    );
+    const trial = compileTrialBalanceFromLedger(ledger);
+    const periodByCode = buildPLByCodeFromLedger(ledger, 'periodNetAmount');
+    const income = compileIncomeStatement(periodByCode);
+    return {
+      trialRows: trial.rows,
+      incomeValues: income.values,
+      netProfit: income.values.netProfit || 0
+    };
+  });
 }
 
 function compileTrialBalanceColumns(
@@ -947,5 +1000,6 @@ export const Reports = {
   getTrialBalance,
   getIncomeStatement,
   getBalanceSheet,
-  getGeneralLedger
+  getGeneralLedger,
+  getDashboardPeriodSnapshots
 };

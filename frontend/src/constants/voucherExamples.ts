@@ -30,9 +30,9 @@ export const VOUCHER_EXAMPLES = [
     businessType: '工资薪酬',
     remark: '公积金系统当月从对公账户自动划扣。单位部分直接计入 5401 主营业务成本，个人部分冲减发薪时代扣的 2211 应付职工薪酬。',
     entries: [
-      { summary: '本月住房公积金（单位部分）', accountCode: '5401', debit: 500, credit: 0 },
-      { summary: '本月住房公积金（个人部分）', accountCode: '2211', debit: 500, credit: 0 },
-      { summary: '公积金系统自动扣款', accountCode: '1002', debit: 0, credit: 1000 }
+      { summary: '缴纳本月住房公积金（单位部分）', accountCode: '5401', debit: 500, credit: 0 },
+      { summary: '缴纳本月住房公积金（代垫员工部分）', accountCode: '2211', debit: 500, credit: 0 },
+      { summary: '银行转账（缴纳住房公积金）', accountCode: '1002', debit: 0, credit: 1000 }
     ]
   },
   {
@@ -42,9 +42,9 @@ export const VOUCHER_EXAMPLES = [
     businessType: '工资薪酬',
     remark: '社保系统当月从对公账户自动划扣。单位部分直接计入 5401 主营业务成本，个人部分冲减发薪时代扣的 2211 应付职工薪酬。',
     entries: [
-      { summary: '本月社保费（单位部分）', accountCode: '5401', debit: 800, credit: 0 },
-      { summary: '本月社保费（个人部分）', accountCode: '2211', debit: 400, credit: 0 },
-      { summary: '社保系统自动扣款', accountCode: '1002', debit: 0, credit: 1200 }
+      { summary: '缴纳本月社保费（单位部分）', accountCode: '5401', debit: 800, credit: 0 },
+      { summary: '缴纳本月社保费（代垫员工部分）', accountCode: '2211', debit: 400, credit: 0 },
+      { summary: '银行转账（缴纳社保费）', accountCode: '1002', debit: 0, credit: 1200 }
     ]
   },
   {
@@ -77,9 +77,9 @@ export const VOUCHER_EXAMPLES = [
     category: '工资与劳务',
     title: '计提当月劳务费',
     businessType: '日常费用',
-    remark: '当月月底计提外包劳务费',
+    remark: '当月月底计提本月项目劳务费',
     entries: [
-      { summary: '计提3月项目劳务费', accountCode: '5401', debit: 10000, credit: 0 },
+      { summary: '计提本月项目劳务费', accountCode: '5401', debit: 10000, credit: 0 },
       { summary: '应付劳务费', accountCode: '2241', debit: 0, credit: 10000 }
     ]
   },
