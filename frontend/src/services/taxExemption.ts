@@ -5,7 +5,7 @@ import { TaxDeclaration } from './taxDeclaration';
 import { INVOICE_TYPE } from '../constants/invoice';
 import { syncSalesVoucherMeta } from '../utils/salesInvoiceTax';
 import { getCurrentOperatorName, getCurrentOperatorNickname } from '../context/AuthContext';
-import type { TaxExemptionTaxLine, Voucher as VoucherRecord } from '../types';
+import type { Account, TaxExemptionTaxLine, Voucher as VoucherRecord } from '../types';
 import {
   formatTaxExemptionPeriod,
   reportPeriodEndDate,
@@ -202,7 +202,10 @@ async function repairOrphanTaxExemptionLinks(vouchers) {
 }
 
 /** 指定期间（按月 / 按季）普票 / 专票减免结转汇总 */
-export async function getPeriodSummary(period) {
+export async function getPeriodSummary(
+  period,
+  { includeDrafts = false }: { includeDrafts?: boolean } = {}
+) {
   const periodKey = taxExemptionPeriodKey(period);
   const periodType = period.type;
   let vouchers = await Voucher.getAll();
@@ -212,7 +215,9 @@ export async function getPeriodSummary(period) {
   }
   const voucherById = new Map(vouchers.map((v) => [v.id, v]));
   const inPeriod = vouchers.filter(
-    (v) => voucherInReportPeriod(v.date, period) && v.status !== Voucher.STATUS.DRAFT
+    (v) =>
+      voucherInReportPeriod(v.date, period) &&
+      (includeDrafts || v.status !== Voucher.STATUS.DRAFT)
   );
 
   const ordinaryPending: TaxExemptionTaxLine[] = [];
@@ -429,6 +434,39 @@ export async function reverseCarryForward(period, carryForwardId) {
     voucher: cf,
     restoredCount: linked.length
   };
+}
+
+/** 模拟普票减免结转分录（不写入凭证，供报表虚拟预览） */
+export function buildVirtualTaxExemptionEntries(
+  accounts: Account[],
+  periodLabel: string,
+  pendingLines: TaxExemptionTaxLine[],
+  totalTax: number
+): import('../types').VoucherEntry[] {
+  if (totalTax <= 0 || !pendingLines.length) return [];
+
+  const acc2221 = accounts.find((a) => a.code === '2221');
+  const acc5301 = accounts.find((a) => a.code === '5301');
+  if (!acc2221 || !acc5301) return [];
+
+  return [
+    ...pendingLines.map((line) => ({
+      summary: `${periodLabel}免税结转-${line.entrySummary || acc2221.name}`,
+      accountId: acc2221.id,
+      accountCode: acc2221.code,
+      accountName: acc2221.name,
+      debit: line.taxAmount,
+      credit: 0
+    })),
+    {
+      summary: `${periodLabel}免税结转-${acc5301.name}`,
+      accountId: acc5301.id,
+      accountCode: acc5301.code,
+      accountName: acc5301.name,
+      debit: 0,
+      credit: totalTax
+    }
+  ];
 }
 
 export const TaxExemption = {

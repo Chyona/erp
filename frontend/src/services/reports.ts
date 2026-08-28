@@ -1,6 +1,7 @@
 import { Voucher } from './voucher';
 import { Accounts } from './accounts';
-import { hasProfitLossClosing } from './profitLossClosing';
+import { buildVirtualClosingVouchersForReport, hasProfitLossClosing } from './profitLossClosing';
+import { formatReportPeriod } from '../utils/reportPeriod';
 import type { Account, Voucher as VoucherRecord } from '../types';
 import dayjs from 'dayjs';
 import {
@@ -360,6 +361,13 @@ function buildLedgerAccountRows(
   });
 }
 
+export type ReportLedgerOptions = {
+  /** 未实际结转时，模拟普票免税结转 + 损益结转后的报表展示 */
+  virtualClosing?: boolean;
+  virtualClosingVouchers?: VoucherRecord[];
+  includesProjectedTaxExemption?: boolean;
+};
+
 /**
  * 报表统一账簿：凭证 → 科目汇总（科目余额表的数据源）
  * 展示含未审核凭证；损益结转判断仍仅依据已审核凭证。
@@ -369,27 +377,46 @@ function buildReportLedgerFromData(
   allVouchers: VoucherRecord[],
   startDate: string,
   endDate: string,
-  reportPeriod = null
+  reportPeriod = null,
+  options: ReportLedgerOptions = {}
 ) {
   const approvedVouchers = allVouchers.filter((v) => !isDraftVoucher(v));
   const yearStart = `${endDate.slice(0, 4)}-01-01`;
-  const periodProfitLossClosed =
+  const actualPeriodProfitLossClosed =
     reportPeriod != null && hasProfitLossClosing(approvedVouchers, reportPeriod);
   const previousPeriodProfitLossClosed = resolvePreviousPeriodProfitLossClosed(
     approvedVouchers,
     reportPeriod
   );
 
-  const accountRows = buildLedgerAccountRows(accounts, allVouchers, startDate, endDate);
+  const virtualClosingVouchers = options.virtualClosingVouchers || [];
+  const vouchersForDisplay = virtualClosingVouchers.length
+    ? [...allVouchers, ...virtualClosingVouchers]
+    : allVouchers;
+  const vouchersForApproved = virtualClosingVouchers.length
+    ? [...approvedVouchers, ...virtualClosingVouchers]
+    : approvedVouchers;
+
+  const accountRows = buildLedgerAccountRows(accounts, vouchersForDisplay, startDate, endDate);
   const approvedAccountRows = buildLedgerAccountRows(
     accounts,
-    approvedVouchers,
+    vouchersForApproved,
     startDate,
     endDate
   );
   const hasDraftInPeriod = allVouchers.some(
     (v) => isDraftVoucher(v) && v.date >= startDate && v.date <= endDate
   );
+
+  let periodProfitLossClosed = actualPeriodProfitLossClosed;
+  let virtualClosingApplied = false;
+  let includesProjectedTaxExemption = false;
+
+  if (virtualClosingVouchers.length) {
+    periodProfitLossClosed = true;
+    virtualClosingApplied = true;
+    includesProjectedTaxExemption = Boolean(options.includesProjectedTaxExemption);
+  }
 
   return {
     startDate,
@@ -400,14 +427,54 @@ function buildReportLedgerFromData(
     approvedAccountRows,
     hasDraftInPeriod,
     periodProfitLossClosed,
+    actualPeriodProfitLossClosed,
+    virtualClosingApplied,
+    includesProjectedTaxExemption,
     previousPeriodProfitLossClosed
   };
 }
 
-async function buildReportLedger(startDate, endDate, reportPeriod = null) {
+async function buildReportLedger(
+  startDate: string,
+  endDate: string,
+  reportPeriod = null,
+  options: ReportLedgerOptions = {}
+) {
   const accounts = await Accounts.getAll();
   const allVouchers = await getVouchersUpTo(endDate);
-  return buildReportLedgerFromData(accounts, allVouchers, startDate, endDate, reportPeriod);
+
+  let ledgerOptions = options;
+  if (options.virtualClosing && reportPeriod) {
+    const approvedVouchers = allVouchers.filter((v) => !isDraftVoucher(v));
+    const actualPeriodProfitLossClosed = hasProfitLossClosing(approvedVouchers, reportPeriod);
+    if (!actualPeriodProfitLossClosed) {
+      const periodLabel = formatReportPeriod(reportPeriod);
+      const { virtualVouchers, includesProjectedTaxExemption } =
+        await buildVirtualClosingVouchersForReport(
+          accounts,
+          allVouchers,
+          endDate,
+          reportPeriod,
+          periodLabel
+        );
+      if (virtualVouchers.length > 0) {
+        ledgerOptions = {
+          ...options,
+          virtualClosingVouchers: virtualVouchers,
+          includesProjectedTaxExemption
+        };
+      }
+    }
+  }
+
+  return buildReportLedgerFromData(
+    accounts,
+    allVouchers,
+    startDate,
+    endDate,
+    reportPeriod,
+    ledgerOptions
+  );
 }
 
 export type DashboardPeriodSnapshotInput = {
@@ -578,6 +645,9 @@ function compileTrialBalanceFromLedger(ledger: Awaited<ReturnType<typeof buildRe
     periodOccurrenceDiff: roundMoney(approvedTotals.periodDebit - approvedTotals.periodCredit),
     ytdOccurrenceDiff: roundMoney(approvedTotals.ytdDebit - approvedTotals.ytdCredit),
     periodProfitLossClosed: ledger.periodProfitLossClosed,
+    actualPeriodProfitLossClosed: ledger.actualPeriodProfitLossClosed,
+    virtualClosingApplied: ledger.virtualClosingApplied,
+    includesProjectedTaxExemption: ledger.includesProjectedTaxExemption,
     totals: {
       openingDebit: blankMoney(totals.openingDebit),
       openingCredit: blankMoney(totals.openingCredit),
@@ -592,8 +662,13 @@ function compileTrialBalanceFromLedger(ledger: Awaited<ReturnType<typeof buildRe
   };
 }
 
-async function getTrialBalance(startDate, endDate, reportPeriod = null) {
-  const ledger = await buildReportLedger(startDate, endDate, reportPeriod);
+async function getTrialBalance(
+  startDate: string,
+  endDate: string,
+  reportPeriod = null,
+  options: ReportLedgerOptions = {}
+) {
+  const ledger = await buildReportLedger(startDate, endDate, reportPeriod, options);
   return compileTrialBalanceFromLedger(ledger);
 }
 
@@ -653,8 +728,13 @@ function mapIncomeStatementRows(periodRows, ytdRows, periodApprovedRows, ytdAppr
   }));
 }
 
-async function getIncomeStatement(startDate, endDate) {
-  const ledger = await buildReportLedger(startDate, endDate);
+async function getIncomeStatement(
+  startDate: string,
+  endDate: string,
+  reportPeriod = null,
+  options: ReportLedgerOptions = {}
+) {
+  const ledger = await buildReportLedger(startDate, endDate, reportPeriod, options);
   const periodByCode = buildPLByCodeFromLedger(ledger, 'periodNetAmount');
   const ytdByCode = buildPLByCodeFromLedger(ledger, 'ytdNetAmount');
   const periodApprovedByCode = buildPLByCodeFromLedger(
@@ -704,8 +784,13 @@ function attachBalanceSheetDraftFlags(displayRows, approvedRows) {
   }));
 }
 
-async function getBalanceSheet(startDate, endDate) {
-  const ledger = await buildReportLedger(startDate, endDate);
+async function getBalanceSheet(
+  startDate: string,
+  endDate: string,
+  reportPeriod = null,
+  options: ReportLedgerOptions = {}
+) {
+  const ledger = await buildReportLedger(startDate, endDate, reportPeriod, options);
   const openingCtx = buildBalanceContextFromLedger(ledger, 'openingYearBalance');
   const endingCtx = buildBalanceContextFromLedger(ledger, 'endingBalance');
   const openingApprovedCtx = buildBalanceContextFromLedger(
@@ -761,6 +846,8 @@ async function getBalanceSheet(startDate, endDate) {
     startDate: ledger.startDate,
     endDate: ledger.endDate,
     hasDraftInPeriod: ledger.hasDraftInPeriod,
+    virtualClosingApplied: ledger.virtualClosingApplied,
+    includesProjectedTaxExemption: ledger.includesProjectedTaxExemption,
     assets,
     liabilities,
     totalAssetsOpening,

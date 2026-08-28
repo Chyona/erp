@@ -1,7 +1,7 @@
 import { ErpApi } from './erpApi';
 import { Accounts } from './accounts';
 import { Voucher } from './voucher';
-import { TaxExemption } from './taxExemption';
+import { TaxExemption, buildVirtualTaxExemptionEntries } from './taxExemption';
 import { TaxDeclaration } from './taxDeclaration';
 import { getCurrentOperatorName, getCurrentOperatorNickname } from '../context/AuthContext';
 import type { Account, Voucher as VoucherRecord, VoucherEntry } from '../types';
@@ -68,6 +68,93 @@ function findClosingVoucher(vouchers: VoucherRecord[], period: ReportPeriod, per
 export function hasProfitLossClosing(vouchers: VoucherRecord[], period: ReportPeriod) {
   const periodKey = taxExemptionPeriodKey(period);
   return Boolean(findClosingVoucher(vouchers, period, periodKey));
+}
+
+/** 按凭证模拟「普票免税结转 + 损益结转」虚拟凭证（不写入账套，供报表虚拟预览；含草稿） */
+export async function buildVirtualClosingVouchersForReport(
+  accounts: Account[],
+  vouchersForClosing: VoucherRecord[],
+  endDate: string,
+  period: ReportPeriod,
+  periodLabel: string
+): Promise<{ virtualVouchers: VoucherRecord[]; includesProjectedTaxExemption: boolean }> {
+  const profitAccount = accounts.find((a) => a.code === '3103');
+  if (!profitAccount) {
+    return { virtualVouchers: [], includesProjectedTaxExemption: false };
+  }
+
+  const taxSummary = await TaxExemption.getPeriodSummary(period, { includeDrafts: true });
+  const virtualVouchers: VoucherRecord[] = [];
+  let includesProjectedTaxExemption = false;
+
+  if (!taxSummary.exactCarryForwardVoucher && taxSummary.pendingTaxTotal > 0) {
+    const taxEntries = buildVirtualTaxExemptionEntries(
+      accounts,
+      periodLabel,
+      taxSummary.ordinaryPending,
+      taxSummary.pendingTaxTotal
+    );
+    if (taxEntries.length) {
+      virtualVouchers.push(
+        buildSyntheticVirtualVoucher('__virtual_tax_exemption__', endDate, taxEntries, {
+          isTaxExemptionCarryForward: true
+        })
+      );
+      includesProjectedTaxExemption = true;
+    }
+  }
+
+  let endingSums = buildAccountSums(vouchersForClosing, { toDate: endDate });
+  if (includesProjectedTaxExemption) {
+    endingSums = projectPendingTaxExemptionOnSums(
+      endingSums,
+      accounts,
+      taxSummary.pendingTaxTotal
+    );
+  }
+
+  const { entries: profitLossEntries } = buildClosingEntries(
+    accounts,
+    endingSums,
+    profitAccount,
+    periodLabel
+  );
+  if (profitLossEntries.length) {
+    virtualVouchers.push(
+      buildSyntheticVirtualVoucher('__virtual_profit_loss_closing__', endDate, profitLossEntries, {
+        isProfitLossClosing: true
+      })
+    );
+  }
+
+  return { virtualVouchers, includesProjectedTaxExemption };
+}
+
+function buildSyntheticVirtualVoucher(
+  id: string,
+  date: string,
+  entries: VoucherEntry[],
+  extra: Partial<VoucherRecord> = {}
+): VoucherRecord {
+  const totalDebit = roundMoney(
+    entries.reduce((sum, entry) => sum + (parseFloat(String(entry.debit)) || 0), 0)
+  );
+  const totalCredit = roundMoney(
+    entries.reduce((sum, entry) => sum + (parseFloat(String(entry.credit)) || 0), 0)
+  );
+
+  return {
+    id,
+    voucherType: '记',
+    voucherNumber: '0',
+    voucherNo: '虚拟预览',
+    date,
+    entries,
+    status: Voucher.STATUS.APPROVED,
+    totalDebit,
+    totalCredit,
+    ...extra
+  };
 }
 
 function buildAccountSums(

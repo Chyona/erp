@@ -817,6 +817,7 @@ body,
   padding-bottom: 0;
   scrollbar-width: thin;
   position: relative;
+  height: 100%;
 }
 
 .page-tab-bar__scroll::after {
@@ -3168,11 +3169,11 @@ body,
   white-space: nowrap;
 }
 
-.payroll-table .ant-table-thead > tr > th {
+.payroll-table .ant-table-thead>tr>th {
   white-space: nowrap;
 }
 
-.payroll-table .ant-table-thead > tr > th .payroll-table__col-hint {
+.payroll-table .ant-table-thead>tr>th .payroll-table__col-hint {
   flex-shrink: 0;
   margin-left: 2px;
   font-size: 12px;
@@ -5657,6 +5658,22 @@ body,
   flex-shrink: 0;
 }
 
+.report-virtual-closing-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+.report-virtual-closing-toggle:hover {
+  color: rgba(0, 0, 0, 0.88);
+}
+
 .report-trial-imbalance-icon {
   display: inline-flex;
   align-items: center;
@@ -5668,8 +5685,8 @@ body,
   font-size: 22px;
   line-height: 1;
   color: #d46b08;
-  background: #fff7e6;
-  border: 1px solid #ffd591;
+  /* background: #fff7e6;
+  border: 1px solid #ffd591; */
   cursor: help;
   transition:
     color 0.15s,
@@ -5680,9 +5697,9 @@ body,
 
 .report-trial-imbalance-icon:hover {
   color: #ad4e00;
-  background: #ffe7ba;
+  /* background: #ffe7ba;
   border-color: #ffa940;
-  box-shadow: 0 0 0 2px rgba(250, 140, 22, 0.18);
+  box-shadow: 0 0 0 2px rgba(250, 140, 22, 0.18); */
 }
 
 .report-trial-imbalance-icon__svg {

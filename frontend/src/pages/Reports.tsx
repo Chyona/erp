@@ -8,7 +8,8 @@ import {
   Typography,
   App,
   Alert,
-  Tooltip
+  Tooltip,
+  Switch
 } from 'antd';
 import { DownloadOutlined, DownOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
@@ -249,23 +250,35 @@ function TrialBalanceImbalanceTooltip({ data, period }) {
   );
 }
 
-function resolveReportHeaderAlert(data, period) {
+const VIRTUAL_CLOSING_STORAGE_KEY = 'reports.virtualClosingPreview';
+
+function readVirtualClosingPreference() {
+  try {
+    return localStorage.getItem(VIRTUAL_CLOSING_STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function resolveReportHeaderAlert(data, period, virtualClosing) {
   if (!data) return null;
 
   const periodDebit = Number(data.totals?.periodDebit) || 0;
   const periodCredit = Number(data.totals?.periodCredit) || 0;
   const hasPeriodActivity = Math.abs(periodDebit) > 0.005 || Math.abs(periodCredit) > 0.005;
+  const treatAsClosed =
+    data.periodProfitLossClosed || (virtualClosing && data.virtualClosingApplied);
 
   if (!data.periodOccurrenceBalanced || !data.ytdOccurrenceBalanced) {
     return { kind: 'imbalance', data, period };
   }
-  if (!data.periodProfitLossClosed && hasPeriodActivity) {
+  if (!treatAsClosed && hasPeriodActivity) {
     return { kind: 'unclosed', data, period };
   }
   return null;
 }
 
-function TrialBalanceTab({ period, dateRange, refreshToken }) {
+function TrialBalanceTab({ period, dateRange, refreshToken, virtualClosing }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -274,7 +287,7 @@ function TrialBalanceTab({ period, dateRange, refreshToken }) {
     try {
       const start = dateRange[0].format('YYYY-MM-DD');
       const end = dateRange[1].format('YYYY-MM-DD');
-      const result = await ReportsService.getTrialBalance(start, end, period);
+      const result = await ReportsService.getTrialBalance(start, end, period, { virtualClosing });
       setData(result);
     } finally {
       setLoading(false);
@@ -283,7 +296,7 @@ function TrialBalanceTab({ period, dateRange, refreshToken }) {
 
   useEffect(() => {
     handleQuery();
-  }, [dateRange, refreshToken]);
+  }, [dateRange, refreshToken, virtualClosing]);
 
   return (
     <div className="report-tab-panel">
@@ -331,7 +344,7 @@ function TrialBalanceTab({ period, dateRange, refreshToken }) {
   );
 }
 
-function IncomeStatementTab({ dateRange, refreshToken }) {
+function IncomeStatementTab({ dateRange, refreshToken, period, virtualClosing }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -340,7 +353,7 @@ function IncomeStatementTab({ dateRange, refreshToken }) {
     try {
       const start = dateRange[0].format('YYYY-MM-DD');
       const end = dateRange[1].format('YYYY-MM-DD');
-      const result = await ReportsService.getIncomeStatement(start, end);
+      const result = await ReportsService.getIncomeStatement(start, end, period, { virtualClosing });
       setData(result);
     } finally {
       setLoading(false);
@@ -349,7 +362,7 @@ function IncomeStatementTab({ dateRange, refreshToken }) {
 
   useEffect(() => {
     handleQuery();
-  }, [dateRange, refreshToken]);
+  }, [dateRange, refreshToken, virtualClosing]);
 
   return (
     <div className="report-tab-panel">
@@ -360,7 +373,7 @@ function IncomeStatementTab({ dateRange, refreshToken }) {
   );
 }
 
-function BalanceSheetTab({ dateRange, refreshToken }) {
+function BalanceSheetTab({ dateRange, refreshToken, period, virtualClosing }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -369,7 +382,7 @@ function BalanceSheetTab({ dateRange, refreshToken }) {
     try {
       const start = dateRange[0].format('YYYY-MM-DD');
       const end = dateRange[1].format('YYYY-MM-DD');
-      const result = await ReportsService.getBalanceSheet(start, end);
+      const result = await ReportsService.getBalanceSheet(start, end, period, { virtualClosing });
       setData(result);
     } finally {
       setLoading(false);
@@ -378,7 +391,7 @@ function BalanceSheetTab({ dateRange, refreshToken }) {
 
   useEffect(() => {
     handleQuery();
-  }, [dateRange, refreshToken]);
+  }, [dateRange, refreshToken, virtualClosing]);
 
   const mergedRows = useMemo(
     () => mergeBalanceSheetRows(data?.assets?.rows, data?.liabilities?.rows),
@@ -387,7 +400,7 @@ function BalanceSheetTab({ dateRange, refreshToken }) {
 
   return (
     <div className="report-tab-panel">
-      {data && !data.balancedApproved && (
+      {data && !data.balancedApproved && !data.virtualClosingApplied && (
         <Alert
           type="warning"
           showIcon
@@ -413,17 +426,35 @@ export default function Reports() {
   const { can } = useAuth();
   const tabDataRefresh = useTabDataRefresh();
   const [period, setPeriod] = useState(defaultReportsPeriod);
+  const [virtualClosing, setVirtualClosing] = useState(readVirtualClosingPreference);
   const [refreshToken, setRefreshToken] = useState(0);
   const [activeTab, setActiveTab] = useState('trial');
   const [reportHeaderAlert, setReportHeaderAlert] = useState(null);
   const [hasDraftInPeriod, setHasDraftInPeriod] = useState(false);
+  const [virtualClosingApplied, setVirtualClosingApplied] = useState(false);
+  const [includesProjectedTaxExemption, setIncludesProjectedTaxExemption] = useState(false);
+  const [periodAlreadyClosed, setPeriodAlreadyClosed] = useState<boolean | null>(null);
   const [exporting, setExporting] = useState(false);
   const dateRange = useMemo(() => reportPeriodToDateRange(period), [period]);
+  const effectiveVirtualClosing = periodAlreadyClosed ? false : virtualClosing;
+
+  const handleVirtualClosingChange = (checked: boolean) => {
+    setVirtualClosing(checked);
+    try {
+      localStorage.setItem(VIRTUAL_CLOSING_STORAGE_KEY, checked ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
+  };
 
   useEffect(() => {
     if (!tabDataRefresh) return;
     setRefreshToken((token) => token + 1);
   }, [tabDataRefresh]);
+
+  useEffect(() => {
+    setPeriodAlreadyClosed(null);
+  }, [dateRange, period, refreshToken]);
 
   useEffect(() => {
     let cancelled = false;
@@ -432,15 +463,26 @@ export default function Reports() {
       const start = dateRange[0].format('YYYY-MM-DD');
       const end = dateRange[1].format('YYYY-MM-DD');
       try {
-        const data = await ReportsService.getTrialBalance(start, end, period);
+        const data = await ReportsService.getTrialBalance(start, end, period, {
+          virtualClosing: effectiveVirtualClosing
+        });
         if (!cancelled) {
-          setReportHeaderAlert(resolveReportHeaderAlert(data, period));
+          const alreadyClosed = Boolean(data.actualPeriodProfitLossClosed);
+          setPeriodAlreadyClosed(alreadyClosed);
+          setReportHeaderAlert(
+            resolveReportHeaderAlert(data, period, alreadyClosed ? false : virtualClosing)
+          );
           setHasDraftInPeriod(Boolean(data.hasDraftInPeriod));
+          setVirtualClosingApplied(Boolean(data.virtualClosingApplied));
+          setIncludesProjectedTaxExemption(Boolean(data.includesProjectedTaxExemption));
         }
       } catch {
         if (!cancelled) {
           setReportHeaderAlert(null);
           setHasDraftInPeriod(false);
+          setVirtualClosingApplied(false);
+          setIncludesProjectedTaxExemption(false);
+          setPeriodAlreadyClosed(null);
         }
       }
     };
@@ -449,7 +491,7 @@ export default function Reports() {
     return () => {
       cancelled = true;
     };
-  }, [dateRange, period, refreshToken]);
+  }, [dateRange, period, refreshToken, virtualClosing, effectiveVirtualClosing]);
 
   const handleExportAll = async (withAttachments = false) => {
     const start = dateRange[0].format('YYYY-MM-DD');
@@ -523,23 +565,53 @@ export default function Reports() {
           period={period}
           dateRange={dateRange}
           refreshToken={refreshToken}
+          virtualClosing={effectiveVirtualClosing}
         />
       )
     },
     {
       key: 'income',
       label: '利润表',
-      children: <IncomeStatementTab dateRange={dateRange} refreshToken={refreshToken} />
+      children: (
+        <IncomeStatementTab
+          dateRange={dateRange}
+          refreshToken={refreshToken}
+          period={period}
+          virtualClosing={effectiveVirtualClosing}
+        />
+      )
     },
     {
       key: 'balance',
       label: '资产负债表',
-      children: <BalanceSheetTab dateRange={dateRange} refreshToken={refreshToken} />
+      children: (
+        <BalanceSheetTab
+          dateRange={dateRange}
+          refreshToken={refreshToken}
+          period={period}
+          virtualClosing={effectiveVirtualClosing}
+        />
+      )
     }
   ];
 
   const reportToolbar = (
     <div className="report-tabs__toolbar">
+      {periodAlreadyClosed === false ? (
+        <Tooltip
+          title="模拟「普票免税结转 → 损益结转」后的报表（含未审核草稿），不生成凭证；利润表仍按业务发生额展示"
+          placement="bottom"
+        >
+          <label className="report-virtual-closing-toggle">
+            <Switch
+              size="small"
+              checked={virtualClosing}
+              onChange={handleVirtualClosingChange}
+            />
+            <span>虚拟结转预览</span>
+          </label>
+        </Tooltip>
+      ) : null}
       {reportHeaderAlert ? (
         <Tooltip
           title={
@@ -598,17 +670,38 @@ export default function Reports() {
         renderTabBar={(tabBarProps, DefaultTabBar) => (
           <div className="report-page__tab-head">
             <DefaultTabBar {...tabBarProps} />
-            {hasDraftInPeriod ? (
+            {hasDraftInPeriod || virtualClosingApplied ? (
               <div className="report-page-hint">
-                <InfoCircleOutlined className="report-page-hint__icon" aria-hidden />
-                <span>
-                  含未审核凭证预览；<span className="report-page__draft-amount">橙色金额</span>
-                  表示含未审核贡献
-                </span>
-                <span className="report-page-hint__sep" aria-hidden>
-                  ·
-                </span>
-                <span>导出表格与页面一致；凭证清单仍仅含已审核</span>
+                {virtualClosingApplied ? (
+                  <>
+                    <InfoCircleOutlined className="report-page-hint__icon" aria-hidden />
+                    <span>
+                      已开启虚拟结转预览：含草稿凭证模拟结转后展示
+                      {includesProjectedTaxExemption ? '（含待结转普票免税额）' : ''}
+                      ，未写入凭证
+                    </span>
+                  </>
+                ) : null}
+                {virtualClosingApplied && hasDraftInPeriod ? (
+                  <span className="report-page-hint__sep" aria-hidden>
+                    ·
+                  </span>
+                ) : null}
+                {hasDraftInPeriod ? (
+                  <>
+                    {!virtualClosingApplied ? (
+                      <InfoCircleOutlined className="report-page-hint__icon" aria-hidden />
+                    ) : null}
+                    <span>
+                      含未审核凭证预览；<span className="report-page__draft-amount">橙色金额</span>
+                      表示含未审核贡献
+                    </span>
+                    <span className="report-page-hint__sep" aria-hidden>
+                      ·
+                    </span>
+                    <span>导出表格与页面一致；凭证清单仍仅含已审核</span>
+                  </>
+                ) : null}
               </div>
             ) : null}
           </div>
