@@ -5,9 +5,10 @@ import ScrollTable from './ScrollTable';
 import AppTable from './AppTable';
 import EllipsisText from './EllipsisText';
 import SensitiveColumnHeader from './SensitiveColumnHeader';
-import { DeleteOutlined, EyeOutlined, PaperClipOutlined } from '@ant-design/icons';
+import { DeleteOutlined, DownloadOutlined, EyeOutlined, PaperClipOutlined } from '@ant-design/icons';
 import { useVoucherPageNavigation } from '../hooks/useVoucherPageNavigation';
 import { enrichAttachmentDisplayNames, attachmentNameContextFromVoucher } from '../utils/attachmentName';
+import { ExportUtil } from '../services/export';
 import { readInvoiceRecognizeOnUpload } from '../hooks/useInvoiceRecognizeOnUpload';
 import { Voucher } from '../services/voucher';
 import type { Attachment, Voucher as VoucherRecord } from '../types';
@@ -238,6 +239,7 @@ export default function VoucherTable({
   const total = paginationProp?.total ?? vouchers.length;
   const useServerPagination = serverPagination && Boolean(paginationProp && onPaginationChange);
   const [uploadingId, setUploadingId] = useState('');
+  const [downloadingAttachId, setDownloadingAttachId] = useState('');
   const [attachPanelVoucher, setAttachPanelVoucher] = useState<VoucherRecord | null>(null);
   const [attachPanelItems, setAttachPanelItems] = useState<Attachment[]>([]);
   const [attachPanelLoading, setAttachPanelLoading] = useState(false);
@@ -616,6 +618,44 @@ export default function VoucherTable({
     );
   };
 
+  const handleDownloadAttachments = async (voucher: VoucherRecord) => {
+    if (downloadingAttachId === voucher.id) return;
+    setDownloadingAttachId(voucher.id);
+    const loadingKey = `voucher-attach-download-${voucher.id}`;
+    message.loading({ content: '正在下载附件…', key: loadingKey, duration: 0 });
+    try {
+      const latest = (await Voucher.getById(voucher.id)) || voucher;
+      const result = await ExportUtil.downloadVoucherAttachments(latest, {
+        onProgress: (done, total) => {
+          if (total <= 1) return;
+          message.loading({
+            content: `正在下载附件 ${done}/${total}…`,
+            key: loadingKey,
+            duration: 0
+          });
+        }
+      });
+      if (result.failed) {
+        message.warning({
+          content: `已下载 ${result.attachmentCount} 个，${result.failed} 个失败`,
+          key: loadingKey
+        });
+      } else {
+        message.success({
+          content:
+            result.attachmentCount > 1
+              ? `已打包下载 ${result.attachmentCount} 个附件`
+              : '附件下载成功',
+          key: loadingKey
+        });
+      }
+    } catch (err) {
+      message.error({ content: (err as Error).message || '附件下载失败', key: loadingKey });
+    } finally {
+      setDownloadingAttachId((cur) => (cur === voucher.id ? '' : cur));
+    }
+  };
+
   const renderAttachments = (voucher) => {
     const count = (voucher.attachmentIds || []).length;
     const editable =
@@ -657,29 +697,45 @@ export default function VoucherTable({
     return (
       <Space size={4} align="center" wrap={false} className="voucher-grouped-table__attach">
         {count > 0 && (
-          <Popover
-            open={panelOpen}
-            trigger={[]}
-            placement="leftTop"
-            arrow={{ pointAtCenter: true }}
-            getPopupContainer={() => document.body}
-            zIndex={1100}
-            classNames={{ root: 'voucher-list-attach-popover' }}
-            content={renderAttachPanelContent(voucher)}
-          >
+          <>
+            <Popover
+              open={panelOpen}
+              trigger={[]}
+              placement="leftTop"
+              arrow={{ pointAtCenter: true }}
+              getPopupContainer={() => document.body}
+              zIndex={1100}
+              classNames={{ root: 'voucher-list-attach-popover' }}
+              content={renderAttachPanelContent(voucher)}
+            >
+              <Button
+                type="link"
+                size="small"
+                className="voucher-grouped-table__attach-count"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  toggleAttachPanel(voucher);
+                }}
+              >
+                {count} 张
+              </Button>
+            </Popover>
             <Button
               type="link"
               size="small"
-              className="voucher-grouped-table__attach-count"
+              icon={<DownloadOutlined />}
+              loading={downloadingAttachId === voucher.id}
+              className="voucher-grouped-table__download"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                toggleAttachPanel(voucher);
+                void handleDownloadAttachments(voucher);
               }}
             >
-              {count} 张
+              下载附件
             </Button>
-          </Popover>
+          </>
         )}
         {uploadLink}
       </Space>
@@ -810,7 +866,7 @@ export default function VoucherTable({
     {
       title: '附件',
       key: 'attachments',
-      width: 80,
+      width: 100,
       align: 'center',
       className: 'voucher-grouped-table__attach-col',
       onCell: (record) => resolveCellProps(record, 'attachments', true),

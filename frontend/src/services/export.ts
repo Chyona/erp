@@ -1,6 +1,7 @@
 import { Voucher } from './voucher';
 import { ErpApi } from './erpApi';
-import { resolveAttachmentDisplayName } from '../utils/attachmentName';
+import { getCurrentOperatorNickname } from '../context/AuthContext';
+import { resolveAttachmentDisplayName, downloadAttachment } from '../utils/attachmentName';
 import { mergeBalanceSheetRows } from '../utils/balanceSheetRows';
 import { formatStoredTaxExemptionPeriod } from '../utils/reportPeriod';
 import { formatBalanceDirection } from '../utils/ledgerDisplay';
@@ -66,6 +67,34 @@ const VOUCHER_EXPORT_HEADERS = [
 /** Excel 列宽（字符宽度），避免打开后日期变成 ####、摘要被截断 */
 const VOUCHER_EXPORT_COL_WIDTHS = [12, 12, 12, 28, 10, 18, 14, 14, 10, 20, 22, 10, 12, 12, 28];
 
+/** 财务报表导出中的凭证分录表（无业务类型列；日期后含季度；科目名称在编码前） */
+const REPORT_VOUCHER_EXPORT_HEADERS = [
+  '凭证字号',
+  '日期',
+  '季度',
+  '摘要',
+  '科目名称',
+  '科目编码',
+  '借方金额',
+  '贷方金额',
+  '附件数',
+  '发票号',
+  '校验码',
+  '状态',
+  '制表人',
+  '审核人',
+  '备注'
+] as const;
+
+const REPORT_VOUCHER_EXPORT_COL_WIDTHS = [12, 12, 10, 28, 18, 10, 14, 14, 10, 20, 22, 10, 12, 12, 28];
+
+function formatVoucherDateQuarter(dateStr: string) {
+  const text = String(dateStr || '').trim();
+  const month = parseInt(text.slice(5, 7), 10);
+  if (!month || month < 1 || month > 12) return '';
+  return `Q${Math.ceil(month / 3)}`;
+}
+
 function compareVouchersAsc(a, b) {
   const dateCmp = String(a?.date || '').localeCompare(String(b?.date || ''));
   if (dateCmp !== 0) return dateCmp;
@@ -98,6 +127,35 @@ function buildVoucherExportRows(vouchers) {
         Voucher.STATUS_LABEL[v.status] || v.status,
         preparedBy,
         reviewedBy,
+        v.remark || ''
+      ]);
+    }
+  }
+  return rows;
+}
+
+function buildReportVoucherExportRows(vouchers, operatorDisplayName: string) {
+  const rows = [];
+  const sorted = [...(vouchers || [])].sort(compareVouchersAsc);
+  const signer = String(operatorDisplayName || '').trim();
+  for (const v of sorted) {
+    const attachmentCount = v.attachmentCount ?? (v.attachmentIds || []).length;
+    for (const e of v.entries) {
+      rows.push([
+        v.voucherNo,
+        v.date,
+        formatVoucherDateQuarter(v.date),
+        e.summary || '',
+        e.accountName || '',
+        e.accountCode || '',
+        Number(e.debit) || 0,
+        Number(e.credit) || 0,
+        attachmentCount,
+        v.invoiceNumbers || '',
+        v.checksum || '',
+        Voucher.STATUS_LABEL[v.status] || v.status,
+        signer,
+        signer,
         v.remark || ''
       ]);
     }
@@ -257,6 +315,24 @@ function writeTitleAndUnitRows(
   return 3;
 }
 
+/** 报表底部署名：制表人 / 审核人（当前登录用户昵称，无昵称用用户名） */
+function appendReportSignatureFooter(sheet, colCount: number, operatorDisplayName: string) {
+  const signer = String(operatorDisplayName || '').trim() || '______';
+  sheet.addRow([]);
+  const footerRow = sheet.addRow([]);
+  footerRow.height = 22;
+  const preparedCell = sheet.getCell(footerRow.number, 1);
+  preparedCell.value = `制表人：${signer}`;
+  preparedCell.font = { size: 11, color: { argb: 'FF333333' } };
+  preparedCell.alignment = { vertical: 'middle', horizontal: 'left' };
+
+  const reviewCol = Math.min(colCount, Math.max(2, Math.ceil(colCount / 2) + 1));
+  const reviewedCell = sheet.getCell(footerRow.number, reviewCol);
+  reviewedCell.value = `审核人：${signer}`;
+  reviewedCell.font = { size: 11, color: { argb: 'FF333333' } };
+  reviewedCell.alignment = { vertical: 'middle', horizontal: 'left' };
+}
+
 async function createWorkbook() {
   const ExcelJS = (await import('exceljs')).default;
   const workbook = new ExcelJS.Workbook();
@@ -334,16 +410,27 @@ async function workbookToBlob(workbook) {
   });
 }
 
-function addVoucherJournalSheet(workbook, vouchers, companyName, year) {
-  const colCount = VOUCHER_EXPORT_HEADERS.length;
+function addVoucherJournalSheet(
+  workbook,
+  vouchers,
+  companyName,
+  year,
+  {
+    forFinancialReport = false,
+    operatorDisplayName = ''
+  }: { forFinancialReport?: boolean; operatorDisplayName?: string } = {}
+) {
+  const headers = forFinancialReport ? REPORT_VOUCHER_EXPORT_HEADERS : VOUCHER_EXPORT_HEADERS;
+  const colWidths = forFinancialReport ? REPORT_VOUCHER_EXPORT_COL_WIDTHS : VOUCHER_EXPORT_COL_WIDTHS;
+  const colCount = headers.length;
   const sheet = workbook.addWorksheet(
     '凭证分录表',
     sheetCreateOptions([{ state: 'frozen', ySplit: 3 }])
   );
 
-  sheet.columns = VOUCHER_EXPORT_HEADERS.map((_, i) => ({
+  sheet.columns = headers.map((_, i) => ({
     key: `c${i}`,
-    width: VOUCHER_EXPORT_COL_WIDTHS[i]
+    width: colWidths[i]
   }));
 
   const headerRowIndex = writeTitleAndUnitRows(sheet, {
@@ -354,9 +441,16 @@ function addVoucherJournalSheet(workbook, vouchers, companyName, year) {
 
   const headerRow = sheet.getRow(headerRowIndex);
   headerRow.height = 22;
-  setHeaderValues(headerRow, VOUCHER_EXPORT_HEADERS);
+  setHeaderValues(headerRow, headers);
 
-  const dataRows = buildVoucherExportRows(vouchers);
+  const dataRows = forFinancialReport
+    ? buildReportVoucherExportRows(vouchers, operatorDisplayName)
+    : buildVoucherExportRows(vouchers);
+  const debitCol = forFinancialReport ? 7 : 7;
+  const creditCol = forFinancialReport ? 8 : 8;
+  const wrapCols = new Set(forFinancialReport ? [4, 5, 11, 15] : [4, 6, 11, 16]);
+  const centerCols = new Set(forFinancialReport ? [3] : []);
+
   for (let i = 0; i < dataRows.length; i++) {
     const row = dataRows[i];
     const voucherNo = String(row[0] ?? '');
@@ -368,28 +462,48 @@ function addVoucherJournalSheet(workbook, vouchers, companyName, year) {
       applyJournalDataBorder(cell, { isGroupEnd });
       cell.alignment = {
         vertical: 'middle',
-        horizontal: colNumber === 7 || colNumber === 8 || colNumber === 9 ? 'right' : 'left',
-        wrapText: colNumber === 4 || colNumber === 16
+        horizontal:
+          colNumber === debitCol || colNumber === creditCol || colNumber === debitCol + 2
+            ? 'right'
+            : centerCols.has(colNumber)
+              ? 'center'
+              : 'left',
+        wrapText: wrapCols.has(colNumber)
       };
-      if (colNumber === 7 || colNumber === 8) {
+      if (colNumber === debitCol || colNumber === creditCol) {
         cell.numFmt = '#,##0.00';
       }
     });
   }
 
-  applyTableOuterBorder(
-    sheet,
-    headerRowIndex,
-    Math.max(headerRowIndex, sheet.rowCount),
-    1,
-    colCount
-  );
+  if (forFinancialReport) {
+    applyTableOuterBorder(
+      sheet,
+      headerRowIndex,
+      Math.max(headerRowIndex, sheet.rowCount),
+      1,
+      colCount
+    );
+    appendReportSignatureFooter(sheet, colCount, operatorDisplayName);
+  } else {
+    applyTableOuterBorder(
+      sheet,
+      headerRowIndex,
+      Math.max(headerRowIndex, sheet.rowCount),
+      1,
+      colCount
+    );
+  }
   applyPrintPageSetup(sheet);
 
   return sheet;
 }
 
-function addTrialBalanceSheet(workbook, data, meta: { companyName: string; periodLabel: string }) {
+function addTrialBalanceSheet(
+  workbook,
+  data,
+  meta: { companyName: string; periodLabel: string; operatorDisplayName?: string }
+) {
   const headers = [
     '科目编码',
     '科目名称',
@@ -476,13 +590,14 @@ function addTrialBalanceSheet(workbook, data, meta: { companyName: string; perio
   applyTableOuterBorder(sheet, headerRowIndex, endRow, 1, headers.length);
   // 科目信息 | 期初 | 本期 | 本年累计 | 期末
   applyVerticalSectionBorders(sheet, headerRowIndex, endRow, [4, 6, 8, 10]);
+  appendReportSignatureFooter(sheet, headers.length, meta.operatorDisplayName || '');
   applyPrintPageSetup(sheet);
 }
 
 function addIncomeStatementSheet(
   workbook,
   data,
-  meta: { companyName: string; periodLabel: string }
+  meta: { companyName: string; periodLabel: string; operatorDisplayName?: string }
 ) {
   const headers = ['项目', '行次', '本期金额', '本年累计金额'];
   const widths = [36, 8, 14, 14];
@@ -529,13 +644,14 @@ function addIncomeStatementSheet(
     1,
     headers.length
   );
+  appendReportSignatureFooter(sheet, headers.length, meta.operatorDisplayName || '');
   applyPrintPageSetup(sheet);
 }
 
 function addBalanceSheetSheet(
   workbook,
   data,
-  meta: { companyName: string; periodLabel: string }
+  meta: { companyName: string; periodLabel: string; operatorDisplayName?: string }
 ) {
   const headers = [
     '资产',
@@ -608,6 +724,7 @@ function addBalanceSheetSheet(
   applyTableOuterBorder(sheet, headerRowIndex, endRow, 1, headers.length);
   // 资产侧 | 负债和所有者权益侧
   applyVerticalSectionBorders(sheet, headerRowIndex, endRow, [5]);
+  appendReportSignatureFooter(sheet, headers.length, meta.operatorDisplayName || '');
   applyPrintPageSetup(sheet);
 }
 
@@ -648,9 +765,17 @@ async function exportFinancialReportsWorkbook({
   const company = await getCompanyInfo();
   const companyName = String(company?.name || '').trim() || '未设置公司名称';
   const exportYear = year || resolveExportYear(vouchers);
-  const meta = { companyName, periodLabel: periodLabel || String(exportYear) };
+  const operatorDisplayName = getCurrentOperatorNickname();
+  const meta = {
+    companyName,
+    periodLabel: periodLabel || String(exportYear),
+    operatorDisplayName
+  };
 
-  addVoucherJournalSheet(workbook, vouchers, companyName, exportYear);
+  addVoucherJournalSheet(workbook, vouchers, companyName, exportYear, {
+    forFinancialReport: true,
+    operatorDisplayName
+  });
   addTrialBalanceSheet(workbook, trialBalance, meta);
   addIncomeStatementSheet(workbook, incomeStatement, meta);
   addBalanceSheetSheet(workbook, balanceSheet, meta);
@@ -941,6 +1066,40 @@ function downloadBinaryBlob(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
+/** 单凭证附件下载：202607_记-001 形式文件夹，不再套 attachments/年/月 */
+function buildVoucherAttachmentFolderName(voucher: { date?: string; voucherNo?: string }) {
+  const date = String(voucher?.date || '').slice(0, 10);
+  const yyyymm = date.replace(/-/g, '').slice(0, 6) || 'unknown';
+  const voucherNo = String(voucher.voucherNo || '凭证').replace(/[\\/:*?"<>|]/g, '_');
+  return `${yyyymm}_${voucherNo}`;
+}
+
+function singleVoucherAttachmentZipPath(
+  voucher: {
+    date?: string;
+    voucherNo?: string;
+    entries?: Array<{ summary?: string }>;
+    totalDebit?: number;
+    totalCredit?: number;
+  },
+  att: { name?: string },
+  index: number,
+  usedPaths: Set<string>
+) {
+  const folder = buildVoucherAttachmentFolderName(voucher);
+  const displayName = resolveAttachmentDisplayName(
+    {
+      voucherNo: voucher.voucherNo,
+      entries: voucher.entries,
+      totals: { debit: voucher.totalDebit, credit: voucher.totalCredit }
+    },
+    att,
+    index
+  );
+  const safe = displayName.replace(/[\\/:*?"<>|]/g, '_');
+  return uniqueZipPath(usedPaths, `${folder}/${safe}`);
+}
+
 /** ZIP 内附件路径：按当前凭证字号生成展示名，与 COS 对象键解耦 */
 function attachmentZipPath(
   voucher: {
@@ -1033,6 +1192,89 @@ async function appendPeriodAttachmentsToZip(
   return { attachmentCount, failed };
 }
 
+/** 下载单张凭证的全部附件（1 个直接下载，多个打包 ZIP） */
+async function downloadVoucherAttachments(
+  voucher: {
+    voucherNo?: string;
+    date?: string;
+    entries?: Array<{ summary?: string }>;
+    totalDebit?: number;
+    totalCredit?: number;
+    attachmentIds?: string[];
+  },
+  { onProgress }: { onProgress?: (done: number, total: number) => void } = {}
+) {
+  const ids = voucher.attachmentIds || [];
+  if (!ids.length) {
+    throw new Error('该凭证没有附件');
+  }
+
+  const nameCtx = {
+    voucherNo: voucher.voucherNo,
+    entries: voucher.entries,
+    totals: { debit: voucher.totalDebit, credit: voucher.totalCredit }
+  };
+
+  if (ids.length === 1) {
+    onProgress?.(0, 1);
+    const att = await Voucher.getAttachment(ids[0]);
+    if (
+      !att?.url ||
+      String(att.url).startsWith('data:') ||
+      !isAllowedAttachmentFetchUrl(String(att.url))
+    ) {
+      throw new Error('附件无法下载');
+    }
+    const filename = resolveAttachmentDisplayName(nameCtx, att, 0);
+    await downloadAttachment(String(att.url), filename);
+    onProgress?.(1, 1);
+    return { attachmentCount: 1, failed: 0 };
+  }
+
+  const JSZip = (await import('jszip')).default;
+  const zip = new JSZip();
+  const usedPaths = new Set<string>();
+  const folderName = buildVoucherAttachmentFolderName(voucher);
+  let attachmentCount = 0;
+  let failed = 0;
+  const total = ids.length;
+  onProgress?.(0, total);
+
+  for (let index = 0; index < ids.length; index++) {
+    const id = ids[index];
+    try {
+      const att = await Voucher.getAttachment(id);
+      if (
+        !att?.url ||
+        String(att.url).startsWith('data:') ||
+        !isAllowedAttachmentFetchUrl(String(att.url))
+      ) {
+        failed += 1;
+        onProgress?.(index + 1, total);
+        continue;
+      }
+      const res = await fetch(att.url);
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      const buf = await res.arrayBuffer();
+      const path = singleVoucherAttachmentZipPath(voucher, att, index, usedPaths);
+      zip.file(path, buf);
+      attachmentCount += 1;
+    } catch {
+      failed += 1;
+    }
+    onProgress?.(index + 1, total);
+  }
+
+  if (!attachmentCount) {
+    throw new Error(failed ? '附件下载失败' : '没有可下载的附件');
+  }
+  const blob = await zip.generateAsync({ type: 'blob' });
+  downloadBinaryBlob(blob, `${folderName}.zip`);
+  return { attachmentCount, failed };
+}
+
 /**
  * 导出当前列表 Excel；withAttachments 时打包 ZIP：
  * - 凭证导出.xlsx（列宽 + 表头样式）
@@ -1081,6 +1323,7 @@ export const ExportUtil = {
   balanceSheetToCSV,
   exportVouchersPackage,
   exportFinancialReportsWorkbook,
+  downloadVoucherAttachments,
   renderPrintVoucher,
   printVoucher
 };

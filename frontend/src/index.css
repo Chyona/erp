@@ -2524,7 +2524,8 @@ body,
 }
 
 .voucher-grouped-table__attach-count,
-.voucher-grouped-table__upload {
+.voucher-grouped-table__upload,
+.voucher-grouped-table__download {
   height: auto !important;
   padding: 0 !important;
   font-size: 12px;
