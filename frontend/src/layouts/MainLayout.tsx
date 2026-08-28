@@ -11,12 +11,13 @@ import {
   MenuUnfoldOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { PageTabsProvider } from '../context/PageTabsContext';
 import PageTabBar from '../components/PageTabBar';
 import EllipsisText from '../components/EllipsisText';
 import KeepAliveOutlet from '../components/KeepAliveOutlet';
 import AppSidebar from '../components/AppSidebar';
+import AppSpin from '../components/AppSpin';
 import { changePasswordRequest } from '../services/auth';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -163,7 +164,15 @@ export default function MainLayout() {
           </Header>
           <Content className="main-content">
             <PageTabBar />
-            <KeepAliveOutlet />
+            <Suspense
+              fallback={
+                <AppSpin size="large" tip="加载页面…">
+                  <div style={{ minHeight: 160 }} />
+                </AppSpin>
+              }
+            >
+              <KeepAliveOutlet />
+            </Suspense>
           </Content>
         </Layout>
 

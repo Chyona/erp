@@ -41,16 +41,23 @@ func NewAppService(repo repository.ErpRepository) AppService {
 	return &appService{repo: repo}
 }
 
-// Init 应用启动初始化：同步默认科目（去重/补齐）、校正凭证分录科目名、同步已申报季度结账锁定。
+// Init 应用启动初始化：同步默认科目（去重/补齐）、按需校正凭证分录科目名、同步已申报季度结账锁定。
 // 注意：不会自动删除用户自定义科目。
 func (s *appService) Init(ctx context.Context) (*AppInitResult, error) {
-	if err := s.initChartAccounts(ctx); err != nil {
-		return nil, err
-	}
-	repaired, err := s.syncVoucherEntryAccountNames(ctx)
+	accountsChanged, err := s.initChartAccounts(ctx)
 	if err != nil {
 		return nil, err
 	}
+
+	repaired := 0
+	// 科目未变更时跳过全表分录回填，显著缩短日常登录耗时。
+	if accountsChanged {
+		repaired, err = s.syncVoucherEntryAccountNames(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	syncedLocks, err := s.syncDeclaredQuarterVoucherLocks(ctx)
 	if err != nil {
 		return nil, err
@@ -77,17 +84,22 @@ func (s *appService) Init(ctx context.Context) (*AppInitResult, error) {
 	}, nil
 }
 
-// initChartAccounts 去重并补齐默认科目。自定义科目的删除仅通过科目管理接口，启动 init 不再 prune。
-func (s *appService) initChartAccounts(ctx context.Context) error {
+// initChartAccounts 去重并补齐默认科目。返回是否发生过写库变更。
+func (s *appService) initChartAccounts(ctx context.Context) (bool, error) {
 	defaults, err := loadDefaultAccounts()
 	if err != nil {
-		return err
+		return false, err
 	}
 
-	if err := s.dedupeChartAccounts(ctx); err != nil {
-		return err
+	deduped, err := s.dedupeChartAccounts(ctx)
+	if err != nil {
+		return false, err
 	}
-	return s.syncDefaultChartAccounts(ctx, defaults)
+	synced, err := s.syncDefaultChartAccounts(ctx, defaults)
+	if err != nil {
+		return false, err
+	}
+	return deduped || synced, nil
 }
 
 // loadDefaultAccounts 从内嵌 JSON 加载默认会计科目定义。
@@ -99,39 +111,42 @@ func loadDefaultAccounts() ([]defaultAccountDef, error) {
 	return items, nil
 }
 
-// dedupeChartAccounts 按科目编码去重，保留最早创建的一条。
-func (s *appService) dedupeChartAccounts(ctx context.Context) error {
+// dedupeChartAccounts 按科目编码去重，保留最早创建的一条。返回是否删除过重复项。
+func (s *appService) dedupeChartAccounts(ctx context.Context) (bool, error) {
 	items, err := s.repo.ListChartAccounts(ctx)
 	if err != nil {
-		return err
+		return false, err
 	}
 	sort.Slice(items, func(i, j int) bool {
 		return items[i].CreatedAt < items[j].CreatedAt
 	})
 	seen := map[string]bool{}
+	changed := false
 	for _, acc := range items {
 		if seen[acc.Code] {
 			if err := s.repo.DeleteChartAccount(ctx, acc.ID); err != nil {
-				return err
+				return changed, err
 			}
+			changed = true
 			continue
 		}
 		seen[acc.Code] = true
 	}
-	return nil
+	return changed, nil
 }
 
-// syncDefaultChartAccounts 按默认科目表补齐缺失项，并校正名称/类别/余额方向。
-func (s *appService) syncDefaultChartAccounts(ctx context.Context, defaults []defaultAccountDef) error {
+// syncDefaultChartAccounts 按默认科目表补齐缺失项，并校正名称/类别/余额方向。返回是否写库。
+func (s *appService) syncDefaultChartAccounts(ctx context.Context, defaults []defaultAccountDef) (bool, error) {
 	items, err := s.repo.ListChartAccounts(ctx)
 	if err != nil {
-		return err
+		return false, err
 	}
 	byCode := map[string]model.ChartAccount{}
 	for _, acc := range items {
 		byCode[acc.Code] = acc
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
+	changed := false
 	for _, def := range defaults {
 		current, ok := byCode[def.Code]
 		if !ok {
@@ -144,8 +159,9 @@ func (s *appService) syncDefaultChartAccounts(ctx context.Context, defaults []de
 				CreatedAt: now,
 			}
 			if err := s.repo.SaveChartAccount(ctx, &acc); err != nil {
-				return err
+				return changed, err
 			}
+			changed = true
 			continue
 		}
 		if current.Name != def.Name || current.Category != def.Category || current.Direction != def.Direction {
@@ -154,11 +170,12 @@ func (s *appService) syncDefaultChartAccounts(ctx context.Context, defaults []de
 			current.Direction = def.Direction
 			current.UpdatedAt = now
 			if err := s.repo.SaveChartAccount(ctx, &current); err != nil {
-				return err
+				return changed, err
 			}
+			changed = true
 		}
 	}
-	return nil
+	return changed, nil
 }
 
 // syncVoucherEntryAccountNames 用科目主数据回填凭证分录中的 accountCode / accountName。
@@ -241,7 +258,10 @@ func (s *appService) lockVouchersInQuarter(ctx context.Context, year, quarter in
 	startDate := fmt.Sprintf("%04d-%02d-01", year, startMonth)
 	endDate := fmt.Sprintf("%04d-%02d-%02d", year, endMonth, daysInMonth(year, endMonth))
 
-	vouchers, err := s.repo.ListVouchers(ctx)
+	vouchers, err := s.repo.ListVouchersFiltered(ctx, repository.VoucherListFilter{
+		StartDate: startDate,
+		EndDate:   endDate,
+	})
 	if err != nil {
 		return 0, err
 	}
@@ -250,9 +270,6 @@ func (s *appService) lockVouchersInQuarter(ctx context.Context, year, quarter in
 	for i := range vouchers {
 		v := &vouchers[i]
 		if v.Status == "draft" {
-			continue
-		}
-		if v.Date < startDate || v.Date > endDate {
 			continue
 		}
 		if v.Status == "locked" && v.QuarterDeclaredKey == periodKey {

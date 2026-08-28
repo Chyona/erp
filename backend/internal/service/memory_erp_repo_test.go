@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"erp/internal/model"
+	"erp/internal/repository"
 	"gorm.io/gorm"
 )
 
@@ -96,6 +97,30 @@ func (r *memoryErpRepo) ListVouchers(ctx context.Context) ([]model.Voucher, erro
 		items = append(items, v)
 	}
 	return items, nil
+}
+
+func (r *memoryErpRepo) ListVouchersFiltered(ctx context.Context, filter repository.VoucherListFilter) ([]model.Voucher, error) {
+	items, err := r.ListVouchers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]model.Voucher, 0, len(items))
+	for _, item := range items {
+		if filter.StartDate != "" && item.Date < filter.StartDate {
+			continue
+		}
+		if filter.EndDate != "" && item.Date > filter.EndDate {
+			continue
+		}
+		if filter.Status != "" && item.Status != filter.Status {
+			continue
+		}
+		if filter.VoucherType != "" && item.VoucherType != filter.VoucherType {
+			continue
+		}
+		out = append(out, item)
+	}
+	return out, nil
 }
 
 func (r *memoryErpRepo) GetVoucher(ctx context.Context, id string) (*model.Voucher, error) {

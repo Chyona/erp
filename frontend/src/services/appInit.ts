@@ -51,18 +51,14 @@ export async function runAppInit(): Promise<AppInitOutcome> {
 
   try {
     const result = await apiRequest<Omit<AppInitResult, 'localRepaired'>>('POST', '/app/init');
-    let localRepaired = 0;
-    try {
-      localRepaired = await repairFinanceInterestEntries();
-    } catch {
-      // 本地修复失败不阻断进入系统
-    }
+    // 历史利息分录修复不阻塞进入系统，后台尽力执行。
+    void repairFinanceInterestEntries().catch(() => undefined);
     return {
       companyName: result.companyName || '',
       accounts: result.accounts || [],
       repaired: result.repaired || 0,
       syncedLocks: result.syncedLocks || 0,
-      localRepaired,
+      localRepaired: 0,
       degraded: false
     };
   } catch (err) {

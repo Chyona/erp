@@ -18,6 +18,8 @@ type ErpRepository interface {
 	ClearChartAccounts(ctx context.Context) error
 
 	ListVouchers(ctx context.Context) ([]model.Voucher, error)
+	// ListVouchersFiltered 按日期/状态/凭证字在数据库侧过滤，供列表分页与结账锁定使用。
+	ListVouchersFiltered(ctx context.Context, filter VoucherListFilter) ([]model.Voucher, error)
 	GetVoucher(ctx context.Context, id string) (*model.Voucher, error)
 	GetVouchersByIDs(ctx context.Context, ids []string) ([]model.Voucher, error)
 	SaveVoucher(ctx context.Context, voucher *model.Voucher) error
@@ -46,6 +48,14 @@ type ErpRepository interface {
 	ClearSettings(ctx context.Context) error
 
 	ImportAll(ctx context.Context, data *model.ExportData) error
+}
+
+// VoucherListFilter 凭证列表可下推到 SQL 的筛选条件。
+type VoucherListFilter struct {
+	StartDate   string
+	EndDate     string
+	Status      string
+	VoucherType string
 }
 
 type erpRepository struct {
@@ -109,6 +119,25 @@ func (r *erpRepository) ClearChartAccounts(ctx context.Context) error {
 func (r *erpRepository) ListVouchers(ctx context.Context) ([]model.Voucher, error) {
 	var items []model.Voucher
 	err := r.db.WithContext(ctx).Order("date ASC, voucher_no ASC").Find(&items).Error
+	return items, err
+}
+
+func (r *erpRepository) ListVouchersFiltered(ctx context.Context, filter VoucherListFilter) ([]model.Voucher, error) {
+	query := r.db.WithContext(ctx).Model(&model.Voucher{})
+	if filter.StartDate != "" {
+		query = query.Where("date >= ?", filter.StartDate)
+	}
+	if filter.EndDate != "" {
+		query = query.Where("date <= ?", filter.EndDate)
+	}
+	if filter.Status != "" {
+		query = query.Where("status = ?", filter.Status)
+	}
+	if filter.VoucherType != "" {
+		query = query.Where("voucher_type = ?", filter.VoucherType)
+	}
+	var items []model.Voucher
+	err := query.Order("date ASC, voucher_no ASC").Find(&items).Error
 	return items, err
 }
 

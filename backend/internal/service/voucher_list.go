@@ -12,6 +12,7 @@ import (
 
 	"erp/internal/model"
 	"erp/internal/pkg/utils"
+	"erp/internal/repository"
 )
 
 // VoucherListQuery 凭证列表查询（筛选 + 分页）。
@@ -42,10 +43,21 @@ type voucherEntry struct {
 }
 
 func (s *erpService) ListVouchersPage(ctx context.Context, q VoucherListQuery) ([]model.Voucher, int64, error) {
-	items, err := s.repo.ListVouchers(ctx)
+	// 日期/状态/凭证字先下推 SQL，避免每次列表都拉取全库凭证。
+	items, err := s.repo.ListVouchersFiltered(ctx, repository.VoucherListFilter{
+		StartDate:   q.StartDate,
+		EndDate:     q.EndDate,
+		Status:      q.Status,
+		VoucherType: q.VoucherType,
+	})
 	if err != nil {
 		return nil, 0, err
 	}
+	// 已在 SQL 过滤的字段清空，避免二次过滤
+	q.StartDate = ""
+	q.EndDate = ""
+	q.Status = ""
+	q.VoucherType = ""
 	filtered := filterVouchers(items, q)
 	sortVouchersDesc(filtered)
 	total := int64(len(filtered))

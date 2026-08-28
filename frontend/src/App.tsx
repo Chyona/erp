@@ -1,3 +1,4 @@
+import { lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { App as AntApp, ConfigProvider } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
@@ -7,25 +8,26 @@ import RequireAuth from './components/RequireAuth';
 import MainLayout from './layouts/MainLayout';
 import Login from './pages/Login';
 import SetupPassword from './pages/SetupPassword';
-import Dashboard from './pages/Dashboard';
-import VoucherList from './pages/VoucherList';
-import VoucherForm from './pages/VoucherForm';
-import Accounts from './pages/Accounts';
-import Ledger from './pages/Ledger';
-import GeneralLedger from './pages/GeneralLedger';
-import Reports from './pages/Reports';
-import ClosingPeriodEnd from './pages/ClosingPeriodEnd';
-import ClosingReimbursement from './pages/ClosingReimbursement';
-import Payroll from './pages/Payroll';
-import PayrollSheet from './pages/PayrollSheet';
-import PayrollSheetDetail from './pages/PayrollSheetDetail';
-import PayrollStats from './pages/PayrollStats';
-import PayrollStaff from './pages/PayrollStaff';
-import Audit from './pages/Audit';
-import Users from './pages/Users';
-import Settings from './pages/Settings';
-import BackupRestore from './pages/BackupRestore';
 import './utils/dayjsSetup';
+
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const VoucherList = lazy(() => import('./pages/VoucherList'));
+const VoucherForm = lazy(() => import('./pages/VoucherForm'));
+const Accounts = lazy(() => import('./pages/Accounts'));
+const Ledger = lazy(() => import('./pages/Ledger'));
+const GeneralLedger = lazy(() => import('./pages/GeneralLedger'));
+const Reports = lazy(() => import('./pages/Reports'));
+const ClosingPeriodEnd = lazy(() => import('./pages/ClosingPeriodEnd'));
+const ClosingReimbursement = lazy(() => import('./pages/ClosingReimbursement'));
+const Payroll = lazy(() => import('./pages/Payroll'));
+const PayrollSheet = lazy(() => import('./pages/PayrollSheet'));
+const PayrollSheetDetail = lazy(() => import('./pages/PayrollSheetDetail'));
+const PayrollStats = lazy(() => import('./pages/PayrollStats'));
+const PayrollStaff = lazy(() => import('./pages/PayrollStaff'));
+const Audit = lazy(() => import('./pages/Audit'));
+const Users = lazy(() => import('./pages/Users'));
+const Settings = lazy(() => import('./pages/Settings'));
+const BackupRestore = lazy(() => import('./pages/BackupRestore'));
 
 export default function App() {
   return (
