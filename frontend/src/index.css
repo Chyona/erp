@@ -6083,6 +6083,8 @@ body,
   min-height: 0;
   display: flex;
   flex-direction: column;
+  box-shadow: var(--app-table-shadow);
+  border: 1px solid var(--app-table-border);
 }
 
 .voucher-form-page .voucher-form-card>.ant-card-body {
@@ -6168,8 +6170,6 @@ body,
 }
 
 .voucher-form-page--fullscreen {
-  background: #f1f5f9;
-  padding: 16px;
   overflow: hidden;
 }
 
