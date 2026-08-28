@@ -77,8 +77,8 @@ upsert 返回：`{ "action": "upsert", "count": N, "items": [...] }`。
 | POST | `/attachments/batch` | 统一批量：`{ action: "upsert"\|"delete", items?\|ids? }`（upsert 仅元数据） |
 | GET | `/attachments/:id` | 按 ID 查询 |
 | PUT | `/attachments/:id` | 更新元数据（如重命名；不可写文件内容） |
-| DELETE | `/attachments/:id` | 删除 |
-| DELETE | `/attachments` | 清空 |
+| DELETE | `/attachments/:id` | 删除（管理员任意；普通用户仅可删自己可改凭证上的附件；孤儿附件仅管理员） |
+| DELETE | `/attachments` | 清空（管理员 + 二次密码） |
 
 附件字段：`id`、`name`、`type`、`size`、`url`、`uploadedAt`。`url` 为对象存储公开地址，不含签名参数。
 
@@ -108,7 +108,7 @@ upsert 返回：`{ "action": "upsert", "count": N, "items": [...] }`。
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| POST | `/app/init` | 启动初始化：默认科目同步、凭证分录科目名校正、已申报季度凭证结项同步 |
+| POST | `/app/init` | 启动初始化：默认科目去重/补齐、凭证分录科目名校正、已申报季度凭证结账同步（**不再**自动删除自定义科目） |
 
 前端 `AppInit` 会调用此接口。返回：
 

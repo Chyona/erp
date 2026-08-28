@@ -41,7 +41,8 @@ func NewAppService(repo repository.ErpRepository) AppService {
 	return &appService{repo: repo}
 }
 
-// Init 应用启动初始化：同步默认科目、校正凭证分录科目名、同步已申报季度结项锁定。
+// Init 应用启动初始化：同步默认科目（去重/补齐）、校正凭证分录科目名、同步已申报季度结账锁定。
+// 注意：不会自动删除用户自定义科目。
 func (s *appService) Init(ctx context.Context) (*AppInitResult, error) {
 	if err := s.initChartAccounts(ctx); err != nil {
 		return nil, err
@@ -76,24 +77,17 @@ func (s *appService) Init(ctx context.Context) (*AppInitResult, error) {
 	}, nil
 }
 
-// initChartAccounts 去重、补齐默认科目并删除未使用的多余科目。
+// initChartAccounts 去重并补齐默认科目。自定义科目的删除仅通过科目管理接口，启动 init 不再 prune。
 func (s *appService) initChartAccounts(ctx context.Context) error {
 	defaults, err := loadDefaultAccounts()
 	if err != nil {
 		return err
 	}
-	defaultCodes := make(map[string]defaultAccountDef, len(defaults))
-	for _, d := range defaults {
-		defaultCodes[d.Code] = d
-	}
 
 	if err := s.dedupeChartAccounts(ctx); err != nil {
 		return err
 	}
-	if err := s.syncDefaultChartAccounts(ctx, defaults); err != nil {
-		return err
-	}
-	return s.pruneExtraChartAccounts(ctx, defaultCodes)
+	return s.syncDefaultChartAccounts(ctx, defaults)
 }
 
 // loadDefaultAccounts 从内嵌 JSON 加载默认会计科目定义。
@@ -211,42 +205,6 @@ func (s *appService) syncVoucherEntryAccountNames(ctx context.Context) (int, err
 		}
 	}
 	return updated, nil
-}
-
-// pruneExtraChartAccounts 删除非默认且未被任何凭证引用的科目。
-func (s *appService) pruneExtraChartAccounts(ctx context.Context, defaultCodes map[string]defaultAccountDef) error {
-	items, err := s.repo.ListChartAccounts(ctx)
-	if err != nil {
-		return err
-	}
-	vouchers, err := s.repo.ListVouchers(ctx)
-	if err != nil {
-		return err
-	}
-	used := map[string]bool{}
-	for _, v := range vouchers {
-		var entries []map[string]interface{}
-		if json.Unmarshal(v.Entries, &entries) != nil {
-			continue
-		}
-		for _, e := range entries {
-			if id, ok := e["accountId"].(string); ok && id != "" {
-				used[id] = true
-			}
-		}
-	}
-	for _, acc := range items {
-		if _, isDefault := defaultCodes[acc.Code]; isDefault {
-			continue
-		}
-		if used[acc.ID] {
-			continue
-		}
-		if err := s.repo.DeleteChartAccount(ctx, acc.ID); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 type declaredQuarterRecord struct {

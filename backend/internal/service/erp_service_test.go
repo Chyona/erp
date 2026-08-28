@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"erp/internal/model"
@@ -192,6 +193,51 @@ func TestErpService_Attachments(t *testing.T) {
 	}
 	if err := svc.ClearAttachments(ctx); err != nil {
 		t.Fatalf("ClearAttachments() error = %v", err)
+	}
+}
+
+// TestErpService_DeleteAttachment_RBAC 普通用户仅可删自己草稿凭证上的附件。
+func TestErpService_DeleteAttachment_RBAC(t *testing.T) {
+	repo := newMemoryErpRepo()
+	svc := NewErpService(repo, nil, nil)
+	ctx := context.Background()
+
+	_ = repo.SaveAttachment(ctx, &model.Attachment{
+		ID: "att-own", Name: "a.pdf", URL: "https://example.com/a.pdf", UploadedAt: "2026-01-01T00:00:00Z",
+	})
+	_ = repo.SaveAttachment(ctx, &model.Attachment{
+		ID: "att-other", Name: "b.pdf", URL: "https://example.com/b.pdf", UploadedAt: "2026-01-01T00:00:00Z",
+	})
+	_ = repo.SaveAttachment(ctx, &model.Attachment{
+		ID: "att-orphan", Name: "c.pdf", URL: "https://example.com/c.pdf", UploadedAt: "2026-01-01T00:00:00Z",
+	})
+	_ = repo.SaveVoucher(ctx, &model.Voucher{
+		ID: "v-own", Status: "draft", CreatedByAccountID: 2,
+		AttachmentIds: datatypes.JSON(`["att-own"]`), Entries: datatypes.JSON("[]"),
+	})
+	_ = repo.SaveVoucher(ctx, &model.Voucher{
+		ID: "v-other", Status: "draft", CreatedByAccountID: 3,
+		AttachmentIds: datatypes.JSON(`["att-other"]`), Entries: datatypes.JSON("[]"),
+	})
+
+	userCtx := rbac.WithActor(ctx, &rbac.Actor{AccountID: 2, Username: "u2", Role: rbac.RoleUser})
+
+	if err := svc.DeleteAttachment(userCtx, "att-own"); err != nil {
+		t.Fatalf("owner draft attachment should delete: %v", err)
+	}
+	if err := svc.DeleteAttachment(userCtx, "att-other"); !errors.Is(err, ErrAttachmentForbidden) {
+		t.Fatalf("other voucher attachment = %v, want ErrAttachmentForbidden", err)
+	}
+	if err := svc.DeleteAttachment(userCtx, "att-orphan"); !errors.Is(err, ErrAttachmentForbidden) {
+		t.Fatalf("orphan attachment = %v, want ErrAttachmentForbidden", err)
+	}
+
+	adminCtx := rbac.WithActor(ctx, &rbac.Actor{AccountID: 1, Username: "admin", Role: rbac.RoleAdmin})
+	if err := svc.DeleteAttachment(adminCtx, "att-other"); err != nil {
+		t.Fatalf("admin should delete other attachment: %v", err)
+	}
+	if err := svc.DeleteAttachment(adminCtx, "att-orphan"); err != nil {
+		t.Fatalf("admin should delete orphan attachment: %v", err)
 	}
 }
 

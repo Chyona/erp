@@ -101,8 +101,8 @@ func TestAppService_Init_LocksDeclaredQuarter(t *testing.T) {
 	}
 }
 
-// TestAppService_Init_PrunesUnusedCustomAccounts 验证未引用的自定义科目会被清理。
-func TestAppService_Init_PrunesUnusedCustomAccounts(t *testing.T) {
+// TestAppService_Init_KeepsUnusedCustomAccounts 验证启动 init 不再自动删除未引用的自定义科目。
+func TestAppService_Init_KeepsUnusedCustomAccounts(t *testing.T) {
 	repo := newMemoryErpRepo()
 	svc := NewAppService(repo)
 	ctx := context.Background()
@@ -114,8 +114,8 @@ func TestAppService_Init_PrunesUnusedCustomAccounts(t *testing.T) {
 	if _, err := svc.Init(ctx); err != nil {
 		t.Fatalf("Init() error = %v", err)
 	}
-	if _, err := repo.GetChartAccount(ctx, "custom"); err == nil {
-		t.Fatal("unused custom account should be pruned")
+	if _, err := repo.GetChartAccount(ctx, "custom"); err != nil {
+		t.Fatal("unused custom account should be kept after init")
 	}
 }
 

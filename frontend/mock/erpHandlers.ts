@@ -89,6 +89,43 @@ async function parseJSON<T>(req: IncomingMessage): Promise<T | undefined> {
   return JSON.parse(raw) as T;
 }
 
+/** 全表清空 / 全库导入：需管理员 + 二次密码（与后端 requireAdminClearPassword 对齐）。 */
+function requireAdminConfirmPassword(
+  res: ServerResponse,
+  auth: { role: MockRole } | null | undefined,
+  confirmPassword: string | undefined
+): boolean {
+  if (auth?.role !== 'admin') {
+    fail(res, 403, '需要管理员权限');
+    return false;
+  }
+  if (!String(confirmPassword || '').trim()) {
+    fail(res, 400, '请输入当前登录密码以确认操作');
+    return false;
+  }
+  return true;
+}
+
+/** 附件删除权限：管理员任意；普通用户仅可删自己草稿凭证上的附件。 */
+function canDeleteMockAttachment(
+  store: typeof erpMockStore,
+  auth: { accountId: number; role: MockRole } | null | undefined,
+  attachmentId: string
+): boolean {
+  if (!auth || auth.role === 'readonly') return false;
+  if (auth.role === 'admin') return true;
+  for (const voucher of store.vouchers.values()) {
+    const ids = Array.isArray(voucher.attachmentIds)
+      ? (voucher.attachmentIds as string[])
+      : [];
+    if (!ids.includes(attachmentId)) continue;
+    const ownerId = Number(voucher.createdByAccountId || 0);
+    const status = String(voucher.status || '');
+    return ownerId === auth.accountId && (status === 'draft' || status === '');
+  }
+  return false; // 孤儿附件仅管理员
+}
+
 function stripBase(urlPath: string): string {
   const base = '/openapi/erp/v1';
   if (urlPath.startsWith(base)) {
@@ -463,12 +500,16 @@ export async function handleErpMockRequest(
     }
     if (method === 'POST' && path === '/data/import') {
       const body = await parseJSON<{
+        confirmPassword?: string;
         vouchers?: MockVoucher[];
         accounts?: Parameters<typeof store.importAll>[0]['accounts'];
         auditLogs?: Parameters<typeof store.importAll>[0]['auditLogs'];
         settings?: Parameters<typeof store.importAll>[0]['settings'];
         attachments?: MockAttachment[];
       }>(req);
+      if (!requireAdminConfirmPassword(res, auth, body?.confirmPassword)) {
+        return true;
+      }
       store.importAll(body ?? {});
       ok(res, null, '导入成功');
       return true;
@@ -592,6 +633,10 @@ export async function handleErpMockRequest(
         return true;
       }
       if (method === 'DELETE') {
+        const body = (await parseJSON<{ confirmPassword?: string }>(req)) ?? {};
+        if (!requireAdminConfirmPassword(res, auth, body.confirmPassword)) {
+          return true;
+        }
         store.accounts.clear();
         ok(res, null, '已清空科目');
         return true;
@@ -720,6 +765,10 @@ export async function handleErpMockRequest(
         return true;
       }
       if (method === 'DELETE') {
+        const body = (await parseJSON<{ confirmPassword?: string }>(req)) ?? {};
+        if (!requireAdminConfirmPassword(res, auth, body.confirmPassword)) {
+          return true;
+        }
         store.vouchers.clear();
         ok(res, null, '已清空凭证');
         return true;
@@ -987,6 +1036,10 @@ export async function handleErpMockRequest(
         return true;
       }
       if (method === 'DELETE') {
+        const body = (await parseJSON<{ confirmPassword?: string }>(req)) ?? {};
+        if (!requireAdminConfirmPassword(res, auth, body.confirmPassword)) {
+          return true;
+        }
         store.attachments.clear();
         ok(res, null, '已清空附件');
         return true;
@@ -1032,6 +1085,12 @@ export async function handleErpMockRequest(
         return true;
       }
       if (action === 'delete') {
+        for (const id of body.ids ?? []) {
+          if (!canDeleteMockAttachment(store, auth, id)) {
+            fail(res, 403, '无权删除该附件');
+            return true;
+          }
+        }
         for (const id of body.ids ?? []) store.attachments.delete(id);
         ok(res, { action: 'delete', count: (body.ids ?? []).length, ids: body.ids ?? [] });
         return true;
@@ -1041,6 +1100,12 @@ export async function handleErpMockRequest(
     }
     if (method === 'DELETE' && path === '/attachments/batch') {
       const body = (await parseJSON<{ ids?: string[] }>(req)) ?? {};
+      for (const id of body.ids ?? []) {
+        if (!canDeleteMockAttachment(store, auth, id)) {
+          fail(res, 403, '无权删除该附件');
+          return true;
+        }
+      }
       for (const id of body.ids ?? []) store.attachments.delete(id);
       ok(res, { action: 'delete', count: (body.ids ?? []).length, ids: body.ids ?? [] });
       return true;
@@ -1075,6 +1140,10 @@ export async function handleErpMockRequest(
         return true;
       }
       if (method === 'DELETE') {
+        if (!canDeleteMockAttachment(store, auth, id)) {
+          fail(res, 403, '无权删除该附件');
+          return true;
+        }
         store.attachments.delete(id);
         ok(res, null, '删除成功');
         return true;
@@ -1117,6 +1186,10 @@ export async function handleErpMockRequest(
         return true;
       }
       if (method === 'DELETE') {
+        const body = (await parseJSON<{ confirmPassword?: string }>(req)) ?? {};
+        if (!requireAdminConfirmPassword(res, auth, body.confirmPassword)) {
+          return true;
+        }
         store.auditLogs.clear();
         ok(res, null, '已清空操作日志');
         return true;
@@ -1141,6 +1214,10 @@ export async function handleErpMockRequest(
         return true;
       }
       if (method === 'DELETE') {
+        const body = (await parseJSON<{ confirmPassword?: string }>(req)) ?? {};
+        if (!requireAdminConfirmPassword(res, auth, body.confirmPassword)) {
+          return true;
+        }
         store.settings.clear();
         ok(res, null, '已清空设置');
         return true;

@@ -2,6 +2,7 @@ package v1
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -59,7 +60,7 @@ func (h *ErpHandler) requireAdminDeletePassword(c *gin.Context, confirmPassword 
 	}
 	confirmPassword = strings.TrimSpace(confirmPassword)
 	if confirmPassword == "" {
-		response.BadRequest(c, "请输入当前登录密码以确认删除")
+		response.BadRequest(c, "请输入当前登录密码以确认操作")
 		return false
 	}
 	claims := middleware.GetAuthClaims(c)
@@ -72,6 +73,23 @@ func (h *ErpHandler) requireAdminDeletePassword(c *gin.Context, confirmPassword 
 		return false
 	}
 	return true
+}
+
+// bindConfirmPassword 从 JSON body 或 query 读取二次确认密码。
+func bindConfirmPassword(c *gin.Context) string {
+	var req struct {
+		ConfirmPassword string `json:"confirmPassword"`
+	}
+	_ = c.ShouldBindJSON(&req)
+	if strings.TrimSpace(req.ConfirmPassword) == "" {
+		return c.Query("confirmPassword")
+	}
+	return req.ConfirmPassword
+}
+
+// requireAdminClearPassword 全表清空等危险操作：管理员 + 二次验密。
+func (h *ErpHandler) requireAdminClearPassword(c *gin.Context) bool {
+	return h.requireAdminDeletePassword(c, bindConfirmPassword(c))
 }
 
 func (h *ErpHandler) writeAudit(c *gin.Context, action, target, details string) {
@@ -238,7 +256,7 @@ func (h *ErpHandler) DeleteChartAccount(c *gin.Context) {
 
 // ClearChartAccounts DELETE /accounts — 清空全部科目。
 func (h *ErpHandler) ClearChartAccounts(c *gin.Context) {
-	if !requireAdmin(c) {
+	if !h.requireAdminClearPassword(c) {
 		return
 	}
 	if err := h.erpService.ClearChartAccounts(c.Request.Context()); err != nil {
@@ -548,7 +566,7 @@ func (h *ErpHandler) DeleteVoucher(c *gin.Context) {
 
 // ClearVouchers DELETE /vouchers — 清空全部凭证。
 func (h *ErpHandler) ClearVouchers(c *gin.Context) {
-	if !requireAdmin(c) {
+	if !h.requireAdminClearPassword(c) {
 		return
 	}
 	if err := h.erpService.ClearVouchers(c.Request.Context()); err != nil {
@@ -598,6 +616,10 @@ func (h *ErpHandler) AttachmentsBatch(c *gin.Context) {
 		response.Success(c, gin.H{"action": "upsert", "count": len(saved), "items": saved})
 	case "delete":
 		if err := h.erpService.DeleteAttachmentsBatch(c.Request.Context(), req.IDs); err != nil {
+			if errors.Is(err, service.ErrAttachmentForbidden) {
+				response.Forbidden(c, err.Error())
+				return
+			}
 			response.InternalError(c, err.Error())
 			return
 		}
@@ -615,6 +637,10 @@ func (h *ErpHandler) DeleteAttachmentsBatch(c *gin.Context) {
 		return
 	}
 	if err := h.erpService.DeleteAttachmentsBatch(c.Request.Context(), req.IDs); err != nil {
+		if errors.Is(err, service.ErrAttachmentForbidden) {
+			response.Forbidden(c, err.Error())
+			return
+		}
 		response.InternalError(c, err.Error())
 		return
 	}
@@ -698,6 +724,10 @@ func (h *ErpHandler) SaveAttachment(c *gin.Context) {
 // DeleteAttachment DELETE /attachments/:id — 删除单条附件。
 func (h *ErpHandler) DeleteAttachment(c *gin.Context) {
 	if err := h.erpService.DeleteAttachment(c.Request.Context(), c.Param("id")); err != nil {
+		if errors.Is(err, service.ErrAttachmentForbidden) {
+			response.Forbidden(c, err.Error())
+			return
+		}
 		response.InternalError(c, err.Error())
 		return
 	}
@@ -706,7 +736,7 @@ func (h *ErpHandler) DeleteAttachment(c *gin.Context) {
 
 // ClearAttachments DELETE /attachments — 清空全部附件。
 func (h *ErpHandler) ClearAttachments(c *gin.Context) {
-	if !requireAdmin(c) {
+	if !h.requireAdminClearPassword(c) {
 		return
 	}
 	if err := h.erpService.ClearAttachments(c.Request.Context()); err != nil {
@@ -766,7 +796,7 @@ func (h *ErpHandler) AddAuditLog(c *gin.Context) {
 
 // ClearAuditLogs DELETE /audit-logs — 清空审计日志。
 func (h *ErpHandler) ClearAuditLogs(c *gin.Context) {
-	if !requireAdmin(c) {
+	if !h.requireAdminClearPassword(c) {
 		return
 	}
 	if err := h.erpService.ClearAuditLogs(c.Request.Context()); err != nil {
@@ -866,7 +896,7 @@ func (h *ErpHandler) DeleteSetting(c *gin.Context) {
 
 // ClearSettings DELETE /settings — 清空全部设置。
 func (h *ErpHandler) ClearSettings(c *gin.Context) {
-	if !requireAdmin(c) {
+	if !h.requireAdminClearPassword(c) {
 		return
 	}
 	if err := h.erpService.ClearSettings(c.Request.Context()); err != nil {
@@ -898,15 +928,18 @@ func (h *ErpHandler) ExportAll(c *gin.Context) {
 
 // ImportAll POST /data/import — 导入全库（先清空再写入）。
 func (h *ErpHandler) ImportAll(c *gin.Context) {
-	if !requireAdmin(c) {
-		return
+	var req struct {
+		ConfirmPassword string `json:"confirmPassword"`
+		model.ExportData
 	}
-	var data model.ExportData
-	if err := c.ShouldBindJSON(&data); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}
-	if err := h.erpService.ImportAll(c.Request.Context(), &data); err != nil {
+	if !h.requireAdminDeletePassword(c, req.ConfirmPassword) {
+		return
+	}
+	if err := h.erpService.ImportAll(c.Request.Context(), &req.ExportData); err != nil {
 		response.InternalError(c, err.Error())
 		return
 	}

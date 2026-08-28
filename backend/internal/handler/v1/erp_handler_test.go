@@ -350,7 +350,9 @@ func TestErpHandler_ChartAccounts(t *testing.T) {
 	}
 
 	w = httptest.NewRecorder()
-	r.ServeHTTP(w, httptest.NewRequest(http.MethodDelete, "/accounts", nil))
+	clearReq := httptest.NewRequest(http.MethodDelete, "/accounts", bytes.NewReader([]byte(`{"confirmPassword":"Confirm1!"}`)))
+	clearReq.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, clearReq)
 	if w.Code != 200 {
 		t.Fatalf("ClearChartAccounts status = %d", w.Code)
 	}
@@ -442,7 +444,10 @@ func TestErpHandler_Vouchers(t *testing.T) {
 		t.Fatalf("DeleteVoucher status = %d", w.Code)
 	}
 	w = httptest.NewRecorder()
-	r.ServeHTTP(w, httptest.NewRequest(http.MethodDelete, "/vouchers", nil))
+	clearPayload, _ := json.Marshal(map[string]string{"confirmPassword": "Confirm1!"})
+	clearReq := httptest.NewRequest(http.MethodDelete, "/vouchers", bytes.NewReader(clearPayload))
+	clearReq.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, clearReq)
 	if w.Code != 200 {
 		t.Fatalf("ClearVouchers status = %d", w.Code)
 	}
@@ -469,7 +474,7 @@ func TestErpHandler_Attachments(t *testing.T) {
 		{http.MethodGet, "/attachments/att1", nil},
 		{http.MethodPut, "/attachments/att1", []byte(`{"name":"a.pdf","type":"application/pdf","size":1,"url":"https://example.com/a.pdf","uploadedAt":"2026-01-01T00:00:00Z"}`)},
 		{http.MethodDelete, "/attachments/att1", nil},
-		{http.MethodDelete, "/attachments", nil},
+		{http.MethodDelete, "/attachments", []byte(`{"confirmPassword":"Confirm1!"}`)},
 	} {
 		w := httptest.NewRecorder()
 		req := httptest.NewRequest(tc.method, tc.path, bytes.NewReader(tc.body))
@@ -518,7 +523,9 @@ func TestErpHandler_AuditLogs(t *testing.T) {
 	}
 
 	w = httptest.NewRecorder()
-	r.ServeHTTP(w, httptest.NewRequest(http.MethodDelete, "/audit-logs", nil))
+	clearReq := httptest.NewRequest(http.MethodDelete, "/audit-logs", bytes.NewReader([]byte(`{"confirmPassword":"Confirm1!"}`)))
+	clearReq.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, clearReq)
 	if w.Code != 200 {
 		t.Fatalf("ClearAuditLogs status = %d", w.Code)
 	}
@@ -574,7 +581,9 @@ func TestErpHandler_Settings(t *testing.T) {
 		t.Fatalf("DeleteSetting status = %d", w.Code)
 	}
 	w = httptest.NewRecorder()
-	r.ServeHTTP(w, httptest.NewRequest(http.MethodDelete, "/settings", nil))
+	clearReq := httptest.NewRequest(http.MethodDelete, "/settings", bytes.NewReader([]byte(`{"confirmPassword":"Confirm1!"}`)))
+	clearReq.Header.Set("Content-Type", "application/json")
+	r.ServeHTTP(w, clearReq)
 	if w.Code != 200 {
 		t.Fatalf("ClearSettings status = %d", w.Code)
 	}
@@ -599,7 +608,7 @@ func TestErpHandler_ExportImport(t *testing.T) {
 	}
 
 	w = httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/data/import", bytes.NewReader([]byte(`{"version":1,"exportedAt":"2026-01-01T00:00:00Z","vouchers":[],"accounts":[],"auditLogs":[],"settings":[],"attachments":[]}`)))
+	req := httptest.NewRequest(http.MethodPost, "/data/import", bytes.NewReader([]byte(`{"confirmPassword":"Confirm1!","version":1,"exportedAt":"2026-01-01T00:00:00Z","vouchers":[],"accounts":[],"auditLogs":[],"settings":[],"attachments":[]}`)))
 	req.Header.Set("Content-Type", "application/json")
 	r.ServeHTTP(w, req)
 	if w.Code != 200 {

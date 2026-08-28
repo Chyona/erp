@@ -8,6 +8,7 @@ import { formatQuarterLabel } from '../utils/reportPeriod';
 import { useApp } from '../context/AppContext';
 import { useTabDataRefresh } from '../context/PageTabsContext';
 import { useAuth } from '../context/AuthContext';
+import { confirmDeleteWithPassword } from '../utils/confirmDeleteWithPassword';
 import { Navigate } from 'react-router-dom';
 
 const FIELDS = [
@@ -19,10 +20,10 @@ const FIELDS = [
 ];
 
 export default function Settings() {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const { setCompanyName, refresh, refreshKey } = useApp();
   const tabDataRefresh = useTabDataRefresh();
-  const { can } = useAuth();
+  const { can, role } = useAuth();
   const [form] = Form.useForm();
   const [deleteVoucherNo, setDeleteVoucherNo] = useState('');
   const [declaredQuarters, setDeclaredQuarters] = useState<
@@ -110,7 +111,7 @@ export default function Settings() {
 
       <Card title="凭证维护" style={{ maxWidth: 720, marginTop: 24 }}>
         <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
-          按凭证字号删除本地数据（含已结账凭证及附件），删除后不可恢复。
+          按凭证字号删除本地数据（含已结账凭证及附件），删除后不可恢复。需管理员密码确认。
         </Typography.Paragraph>
         <Space.Compact style={{ width: '100%', maxWidth: 420 }}>
           <Input
@@ -119,32 +120,35 @@ export default function Settings() {
             onChange={(e) => setDeleteVoucherNo(e.target.value.trim())}
             onPressEnter={() => document.getElementById('settings-delete-voucher-btn')?.click()}
           />
-          <Popconfirm
-            title="确定删除该凭证？"
-            description={
-              deleteVoucherNo
-                ? `将永久删除凭证 ${deleteVoucherNo} 及其附件。`
-                : '请先输入凭证字号'
-            }
-            okText="确定删除"
-            cancelText="取消"
-            okButtonProps={{ danger: true }}
+          <Button
+            id="settings-delete-voucher-btn"
+            danger
             disabled={!deleteVoucherNo}
-            onConfirm={async () => {
-              try {
-                await Voucher.removeByVoucherNo(deleteVoucherNo);
-                message.success(`凭证 ${deleteVoucherNo} 已删除`);
-                setDeleteVoucherNo('');
-                refresh();
-              } catch (err) {
-                message.error(err.message);
-              }
+            onClick={() => {
+              const voucherNo = deleteVoucherNo;
+              if (!voucherNo) return;
+              confirmDeleteWithPassword({
+                modal,
+                isAdmin: role === 'admin',
+                title: '确定强制删除该凭证？',
+                content: `将永久删除凭证 ${voucherNo} 及其附件（含已结账凭证），删除后不可恢复。`,
+                okText: '强制删除',
+                onConfirm: async (confirmPassword) => {
+                  try {
+                    await Voucher.removeByVoucherNo(voucherNo, { confirmPassword });
+                    message.success(`凭证 ${voucherNo} 已删除`);
+                    setDeleteVoucherNo('');
+                    refresh();
+                  } catch (err) {
+                    message.error((err as Error).message);
+                    throw err;
+                  }
+                }
+              });
             }}
           >
-            <Button id="settings-delete-voucher-btn" danger disabled={!deleteVoucherNo}>
-              删除凭证
-            </Button>
-          </Popconfirm>
+            删除凭证
+          </Button>
         </Space.Compact>
       </Card>
 

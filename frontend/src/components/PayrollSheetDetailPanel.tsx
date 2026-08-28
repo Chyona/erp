@@ -255,7 +255,14 @@ export default function PayrollSheetDetailPanel({ readOnly = false }: { readOnly
         message.warning(PAYROLL_DELETE_BLOCKED_BY_VOUCHER_MESSAGE);
         return;
       }
-      void deletePeriodAndExit({ successMessage: '工资表已删除' });
+      void (async () => {
+        const ok = await confirmDanger(modal, {
+          title: '删除工资表？',
+          content: `删除最后一行后「${periodLabel}」工资表将为空，确定删除整张工资表吗？`
+        });
+        if (!ok) return;
+        await deletePeriodAndExit({ successMessage: '工资表已删除' });
+      })();
       return;
     }
 

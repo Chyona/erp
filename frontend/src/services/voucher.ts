@@ -621,9 +621,7 @@ async function removeVoucherData(voucher, options: VoucherMutationOptions = {}) 
   if (voucher.isTaxExemptionCarryForward) {
     await clearTaxExemptionLinksForCarryForward(voucher.id);
   }
-  if (voucher.attachmentIds?.length) {
-    await ErpApi.removeMany('attachments', voucher.attachmentIds);
-  }
+  // 附件由后端随凭证级联删除（先删凭证 DB，再清附件 DB/对象存储），避免先删存储后 DB 失败丢文件。
   await ErpApi.remove('vouchers', voucher.id, {
     confirmPassword: options.confirmPassword
   });

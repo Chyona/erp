@@ -295,9 +295,16 @@ async function remove(
   touchListCache(storeName);
 }
 
-async function clear(storeName: StoreName): Promise<void> {
+async function clear(
+  storeName: StoreName,
+  options?: { confirmPassword?: string }
+): Promise<void> {
   await open();
-  await apiRequest('DELETE', STORE_PATHS[storeName]);
+  const confirmPassword = options?.confirmPassword?.trim();
+  if (!confirmPassword) {
+    throw new Error('清空数据需输入当前登录密码');
+  }
+  await apiRequest('DELETE', STORE_PATHS[storeName], { confirmPassword });
   touchListCache(storeName);
 }
 
@@ -345,9 +352,17 @@ async function exportAll(): Promise<ExportData> {
   return apiRequest<ExportData>('GET', '/data/export');
 }
 
-async function importAll(data: Partial<ExportData>): Promise<void> {
+async function importAll(
+  data: Partial<ExportData>,
+  options?: { confirmPassword?: string }
+): Promise<void> {
   await open();
+  const confirmPassword = options?.confirmPassword?.trim();
+  if (!confirmPassword) {
+    throw new Error('导入全库需输入当前登录密码');
+  }
   await apiRequest('POST', '/data/import', {
+    confirmPassword,
     version: data.version ?? 1,
     exportedAt: data.exportedAt ?? new Date().toISOString(),
     vouchers: data.vouchers ?? [],

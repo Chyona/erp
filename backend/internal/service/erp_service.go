@@ -447,6 +447,7 @@ func parseAttachmentIDs(raw datatypes.JSON) []string {
 }
 
 // DeleteVouchersBatch 批量删除凭证（附带删除关联附件）；已结账/结转凭证记入 failed。
+// 顺序：先删凭证 DB，再删附件元数据与对象存储，避免存储已删而 DB 失败导致数据丢失。
 func (s *erpService) DeleteVouchersBatch(ctx context.Context, ids []string) (*VoucherBatchOpResult, error) {
 	ids = uniqueIDs(ids)
 	result := &VoucherBatchOpResult{Failed: []VoucherBatchFailItem{}}
@@ -494,15 +495,14 @@ func (s *erpService) DeleteVouchersBatch(ctx context.Context, ids []string) (*Vo
 		attachmentIDs = append(attachmentIDs, parseAttachmentIDs(item.AttachmentIds)...)
 	}
 
-	if len(attachmentIDs) > 0 {
-		if err := s.DeleteAttachmentsBatch(ctx, uniqueIDs(attachmentIDs)); err != nil {
-			return nil, err
-		}
-	}
 	if len(toDelete) > 0 {
 		if err := s.repo.DeleteVouchersByIDs(ctx, toDelete); err != nil {
 			return nil, err
 		}
+	}
+	// 凭证已授权删除，附件清理跳过二次鉴权；对象存储失败仅尽力清理，不回滚凭证删除。
+	if len(attachmentIDs) > 0 {
+		_ = s.deleteAttachmentsBatch(ctx, uniqueIDs(attachmentIDs), false)
 	}
 	result.Deleted = len(toDelete)
 	return result, nil
@@ -687,6 +687,9 @@ func (s *erpService) SaveAttachmentsBatch(ctx context.Context, items []model.Att
 	return items, nil
 }
 
+// ErrAttachmentForbidden 当前用户无权删除该附件。
+var ErrAttachmentForbidden = errors.New("无权删除该附件")
+
 func (s *erpService) deleteAttachmentObject(ctx context.Context, publicURL string) error {
 	if s.store == nil {
 		return nil
@@ -697,36 +700,81 @@ func (s *erpService) deleteAttachmentObject(ctx context.Context, publicURL strin
 	return nil
 }
 
-func (s *erpService) deleteAttachmentObjects(ctx context.Context, items []model.Attachment) error {
+func (s *erpService) deleteAttachmentObjectsBestEffort(ctx context.Context, items []model.Attachment) {
 	for i := range items {
-		if err := s.deleteAttachmentObject(ctx, items[i].URL); err != nil {
-			return err
+		_ = s.deleteAttachmentObject(ctx, items[i].URL)
+	}
+}
+
+// buildAttachmentOwnerMap 建立附件 ID → 引用它的凭证（若多条引用取先遇到的）。
+func (s *erpService) buildAttachmentOwnerMap(ctx context.Context) (map[string]model.Voucher, error) {
+	vouchers, err := s.repo.ListVouchers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	owners := make(map[string]model.Voucher)
+	for _, v := range vouchers {
+		for _, aid := range parseAttachmentIDs(v.AttachmentIds) {
+			if _, exists := owners[aid]; !exists {
+				owners[aid] = v
+			}
 		}
+	}
+	return owners, nil
+}
+
+// assertCanDeleteAttachment 管理员可删任意；普通用户仅可删其可改凭证上的附件；孤儿附件仅管理员可删。
+func (s *erpService) assertCanDeleteAttachment(ctx context.Context, attachmentID string, owners map[string]model.Voucher) error {
+	actor := rbac.ActorFrom(ctx)
+	if actor == nil || actor.IsAdmin() {
+		return nil
+	}
+	if !actor.CanWrite() {
+		return ErrAttachmentForbidden
+	}
+	voucher, ok := owners[attachmentID]
+	if !ok {
+		return ErrAttachmentForbidden
+	}
+	if !actor.CanMutateVoucher(voucher.CreatedByAccountID, voucher.Status) {
+		return ErrAttachmentForbidden
 	}
 	return nil
 }
 
 func (s *erpService) DeleteAttachment(ctx context.Context, id string) error {
-	item, err := s.repo.GetAttachment(ctx, id)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil
-		}
-		return err
-	}
-	if err := s.deleteAttachmentObject(ctx, item.URL); err != nil {
-		return err
-	}
-	return s.repo.DeleteAttachment(ctx, id)
+	return s.deleteAttachmentsBatch(ctx, []string{id}, true)
 }
 
-// DeleteAttachmentsBatch 批量删除附件（含对象存储文件）。
+// DeleteAttachmentsBatch 批量删除附件（先删 DB，再尽力清对象存储）。
 func (s *erpService) DeleteAttachmentsBatch(ctx context.Context, ids []string) error {
+	return s.deleteAttachmentsBatch(ctx, ids, true)
+}
+
+// deleteAttachmentsBatch checkAuth=true 时校验归属；false 用于凭证级联删除（已鉴权）。
+func (s *erpService) deleteAttachmentsBatch(ctx context.Context, ids []string, checkAuth bool) error {
 	ids = uniqueIDs(ids)
 	if len(ids) == 0 {
 		return nil
 	}
+
+	var owners map[string]model.Voucher
+	if checkAuth {
+		var err error
+		owners, err = s.buildAttachmentOwnerMap(ctx)
+		if err != nil {
+			return err
+		}
+	}
+
+	items := make([]model.Attachment, 0, len(ids))
+	existingIDs := make([]string, 0, len(ids))
 	for _, id := range ids {
+		if checkAuth {
+			if err := s.assertCanDeleteAttachment(ctx, id, owners); err != nil {
+				return err
+			}
+		}
 		item, err := s.repo.GetAttachment(ctx, id)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -734,11 +782,17 @@ func (s *erpService) DeleteAttachmentsBatch(ctx context.Context, ids []string) e
 			}
 			return err
 		}
-		if err := s.deleteAttachmentObject(ctx, item.URL); err != nil {
-			return err
-		}
+		items = append(items, *item)
+		existingIDs = append(existingIDs, id)
 	}
-	return s.repo.DeleteAttachmentsByIDs(ctx, ids)
+	if len(existingIDs) == 0 {
+		return nil
+	}
+	if err := s.repo.DeleteAttachmentsByIDs(ctx, existingIDs); err != nil {
+		return err
+	}
+	s.deleteAttachmentObjectsBestEffort(ctx, items)
+	return nil
 }
 
 func (s *erpService) ClearAttachments(ctx context.Context) error {
@@ -746,10 +800,11 @@ func (s *erpService) ClearAttachments(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if err := s.deleteAttachmentObjects(ctx, items); err != nil {
+	if err := s.repo.ClearAttachments(ctx); err != nil {
 		return err
 	}
-	return s.repo.ClearAttachments(ctx)
+	s.deleteAttachmentObjectsBestEffort(ctx, items)
+	return nil
 }
 
 func (s *erpService) ListAuditLogs(ctx context.Context, limit int) ([]model.AuditLog, error) {
