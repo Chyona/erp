@@ -2,11 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ColumnsType } from 'antd/es/table';
 import { Alert, App, Button, Space, Typography } from 'antd';
 import AppTable from './AppTable';
-import {
-  CheckCircleFilled,
-  CloseCircleFilled,
-  ExclamationCircleFilled
-} from '@ant-design/icons';
+import ClosingPrerequisitesList from './ClosingPrerequisitesList';
 import { useVoucherPageNavigation } from '../hooks/useVoucherPageNavigation';
 import { ProfitLossClosing } from '../services/profitLossClosing';
 import { useApp } from '../context/AppContext';
@@ -202,64 +198,64 @@ export default function ProfitLossClosingPanel({
         message="请按顺序操作：① 审核凭证 → ② 普票结转（影响 5301 营业外收入）→ ③ 损益结转。未完成普票结转时无法生成损益结转凭证。"
       />
 
-      <div className="closing-prerequisites" style={{ marginBottom: 16 }}>
-        <Text strong style={{ display: 'block', marginBottom: 8 }}>
-          结转前置检查
-        </Text>
-        <ul className="closing-prerequisites__list">
-          <li className="closing-prerequisites__item">
-            {(summary?.draftCount || 0) === 0 ? (
-              <CheckCircleFilled className="closing-prerequisites__icon closing-prerequisites__icon--ok" />
-            ) : (
-              <ExclamationCircleFilled className="closing-prerequisites__icon closing-prerequisites__icon--warn" />
-            )}
-            <span>
-              凭证已审核
-              {(summary?.draftCount || 0) > 0
-                ? `（还有 ${summary.draftCount} 张草稿）`
-                : '（无草稿）'}
-            </span>
-          </li>
-          <li className="closing-prerequisites__item">
-            {summary?.taxExemption?.isReady !== false ? (
-              <CheckCircleFilled className="closing-prerequisites__icon closing-prerequisites__icon--ok" />
-            ) : (
-              <CloseCircleFilled className="closing-prerequisites__icon closing-prerequisites__icon--error" />
-            )}
-            <span>
-              普票减免结转
-              {summary?.taxExemption?.isReady === false ? (
-                <>
-                  {' '}
-                  （待结转 {summary.taxExemption.pendingCount} 笔，税额 ¥
-                  {summary.taxExemption.pendingTaxTotal.toFixed(2)}）
-                  {onGoTaxExemption ? (
-                    <Button type="link" size="small" onClick={onGoTaxExemption} style={{ padding: 0, height: 'auto' }}>
-                      去普票结转
-                    </Button>
-                  ) : null}
-                </>
-              ) : summary?.taxExemption?.carryForwardVoucherNo ? (
-                `（已完成 ${summary.taxExemption.carryForwardVoucherNo}）`
-              ) : summary?.taxExemption?.carryForwardDoneCount ? (
-                `（${summary.taxExemption.carryForwardDoneCount} 笔已结转）`
-              ) : (
-                '（无待结转普票）'
-              )}
-            </span>
-          </li>
-          <li className="closing-prerequisites__item">
-            {closingVoucher ? (
-              <CheckCircleFilled className="closing-prerequisites__icon closing-prerequisites__icon--ok" />
-            ) : (
-              <ExclamationCircleFilled className="closing-prerequisites__icon closing-prerequisites__icon--warn" />
-            )}
-            <span>
-              损益结转{closingVoucher ? `（已完成 ${closingVoucher.voucherNo}）` : '（待执行）'}
-            </span>
-          </li>
-        </ul>
-      </div>
+      <ClosingPrerequisitesList
+        items={[
+          {
+            key: 'draft',
+            status: (summary?.draftCount || 0) === 0 ? 'ok' : 'warn',
+            content: (
+              <>
+                凭证已审核
+                {(summary?.draftCount || 0) > 0
+                  ? `（还有 ${summary!.draftCount} 张草稿）`
+                  : '（无草稿）'}
+              </>
+            )
+          },
+          {
+            key: 'tax',
+            status: summary?.taxExemption?.isReady !== false ? 'ok' : 'error',
+            content: (
+              <>
+                普票减免结转
+                {summary?.taxExemption?.isReady === false ? (
+                  <>
+                    {' '}
+                    （待结转 {summary.taxExemption.pendingCount} 笔，税额 ¥
+                    {summary.taxExemption.pendingTaxTotal.toFixed(2)}）
+                    {onGoTaxExemption ? (
+                      <Button
+                        type="link"
+                        size="small"
+                        onClick={onGoTaxExemption}
+                        style={{ padding: 0, height: 'auto' }}
+                      >
+                        去普票结转
+                      </Button>
+                    ) : null}
+                  </>
+                ) : summary?.taxExemption?.carryForwardVoucherNo ? (
+                  `（已完成 ${summary.taxExemption.carryForwardVoucherNo}）`
+                ) : summary?.taxExemption?.carryForwardDoneCount ? (
+                  `（${summary.taxExemption.carryForwardDoneCount} 笔已结转）`
+                ) : (
+                  '（无待结转普票）'
+                )}
+              </>
+            )
+          },
+          {
+            key: 'profitLoss',
+            status: closingVoucher ? 'ok' : 'warn',
+            content: (
+              <>
+                损益结转
+                {closingVoucher ? `（已完成 ${closingVoucher.voucherNo}）` : '（待执行）'}
+              </>
+            )
+          }
+        ]}
+      />
 
       <Space wrap style={{ marginBottom: 16 }} align="start">
         <ReportPeriodFilter

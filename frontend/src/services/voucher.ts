@@ -663,6 +663,21 @@ async function removeByVoucherNo(voucherNo, options: VoucherMutationOptions = {}
   await forceRemove(voucher.id, options);
 }
 
+/** 删除结转类凭证：已结账走 forceRemove，否则走 remove（均允许结转 bypass）。 */
+async function removeCarryForwardVoucher(id: string, options: VoucherMutationOptions = {}) {
+  const voucher = await ErpApi.get('vouchers', id);
+  if (!voucher) {
+    throw new Error('凭证不存在');
+  }
+  const opts = { ...options, allowCarryForwardBypass: true };
+  if (voucher.status === STATUS.LOCKED) {
+    await forceRemove(id, opts);
+  } else {
+    await remove(id, opts);
+  }
+  return voucher;
+}
+
 async function getAll(filters: VoucherFilters = {}) {
   const vouchers = await ErpApi.getAll('vouchers');
   return applyVoucherFilters(vouchers, filters);
@@ -1257,6 +1272,7 @@ export const Voucher = {
   remove,
   forceRemove,
   removeByVoucherNo,
+  removeCarryForwardVoucher,
   getAll,
   listPage,
   getById,

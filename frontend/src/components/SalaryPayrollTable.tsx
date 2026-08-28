@@ -490,6 +490,7 @@ export default function SalaryPayrollTable({
               <Table.Summary.Cell
                 index={summaryCells.length + 2}
                 align="right"
+                className="payroll-table__col-highlight"
               >
                 {Salary.formatMoneyDisplay(totals.withheldTax)}
               </Table.Summary.Cell>

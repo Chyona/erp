@@ -5,10 +5,10 @@ import { LinkOutlined, ReloadOutlined } from '@ant-design/icons';
 import { type Dayjs } from 'dayjs';
 import ScrollTable from './ScrollTable';
 import PayrollVoucherPickerModal from './PayrollVoucherPickerModal';
+import PayrollVoucherLinkRow from './PayrollVoucherLinkRow';
 import {
   Salary,
   calcEmployerCostSummary,
-  formatPayrollVoucherLinkNo,
   type EmployerCostMonthlyRow,
   type EmployerCostRangeResult,
   type EmployerCostSummary,
@@ -257,21 +257,14 @@ function EmployerCostTable({
             />
             <div className="payroll-cost-employer-table__vouchers">
               {row.links.map((link) => (
-                <div key={link.id} className="payroll-cost-employer-table__voucher">
-                  <Button
-                    type="link"
-                    size="small"
-                    disabled={link.missing}
-                    onClick={() => (link.missing ? undefined : onOpenVoucher(link.voucherId))}
-                  >
-                    {formatPayrollVoucherLinkNo(link)}
-                  </Button>
-                  {!readOnly ? (
-                    <Button type="link" size="small" danger onClick={() => onRemoveLink(link.id)}>
-                      删除
-                    </Button>
-                  ) : null}
-                </div>
+                <PayrollVoucherLinkRow
+                  key={link.id}
+                  link={link}
+                  showTag={false}
+                  readOnly={readOnly}
+                  onOpen={onOpenVoucher}
+                  onRemove={onRemoveLink}
+                />
               ))}
               {!readOnly ? (
                 <Button size="small" icon={<LinkOutlined />} onClick={() => onLink(row.linkType)}>

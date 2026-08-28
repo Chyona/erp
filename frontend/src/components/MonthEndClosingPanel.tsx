@@ -2,11 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { ColumnsType } from 'antd/es/table';
 import { Alert, App, Button, Space, Typography } from 'antd';
 import AppTable from './AppTable';
-import {
-  CheckCircleFilled,
-  CloseCircleFilled,
-  ExclamationCircleFilled
-} from '@ant-design/icons';
+import ClosingPrerequisitesList from './ClosingPrerequisitesList';
 import { MonthEndClosing } from '../services/monthEndClosing';
 import { TaxDeclaration } from '../services/taxDeclaration';
 import VoucherDetailModal from './VoucherDetailModal';
@@ -288,53 +284,49 @@ export default function MonthEndClosingPanel({ readOnly = false }: { readOnly?: 
         }
       />
 
-      <div className="closing-prerequisites" style={{ marginBottom: 16 }}>
-        <Text strong style={{ display: 'block', marginBottom: 8 }}>
-          结转前置检查
-        </Text>
-        <ul className="closing-prerequisites__list">
-          <li className="closing-prerequisites__item">
-            {draftCount === 0 ? (
-              <CheckCircleFilled className="closing-prerequisites__icon closing-prerequisites__icon--ok" />
-            ) : (
-              <ExclamationCircleFilled className="closing-prerequisites__icon closing-prerequisites__icon--warn" />
-            )}
-            <span>凭证已审核{draftCount === 0 ? '（无草稿）' : `（还有 ${draftCount} 张草稿）`}</span>
-          </li>
-          <li className="closing-prerequisites__item">
-            {taxReady || fullyClosed ? (
-              <CheckCircleFilled className="closing-prerequisites__icon closing-prerequisites__icon--ok" />
-            ) : (
-              <CloseCircleFilled className="closing-prerequisites__icon closing-prerequisites__icon--error" />
-            )}
-            <span>
-              普票减免结转
-              {(summary?.taxPendingCount || 0) > 0
-                ? `（待结转 ${summary.taxPendingCount} 条，¥${summary.taxPendingTotal.toFixed(2)}，将随一键结转处理）`
-                : summary?.taxVoucher
-                  ? `（已完成 ${summary.taxVoucher.voucherNo}）`
-                  : '（无待结转普票）'}
-            </span>
-          </li>
-          <li className="closing-prerequisites__item">
-            {profitLossDone ? (
-              <CheckCircleFilled className="closing-prerequisites__icon closing-prerequisites__icon--ok" />
-            ) : (summary?.profitLossPendingCount || 0) > 0 ? (
-              <ExclamationCircleFilled className="closing-prerequisites__icon closing-prerequisites__icon--warn" />
-            ) : (
-              <CheckCircleFilled className="closing-prerequisites__icon closing-prerequisites__icon--ok" />
-            )}
-            <span>
-              损益结转
-              {profitLossDone
-                ? `（已完成 ${summary.profitLossVoucher.voucherNo}）`
-                : (summary?.profitLossPendingCount || 0) > 0
-                  ? `（待结转 ${summary.profitLossPendingCount} 个科目）`
-                  : '（无需处理）'}
-            </span>
-          </li>
-        </ul>
-      </div>
+      <ClosingPrerequisitesList
+        items={[
+          {
+            key: 'draft',
+            status: draftCount === 0 ? 'ok' : 'warn',
+            content: (
+              <>
+                凭证已审核
+                {draftCount === 0 ? '（无草稿）' : `（还有 ${draftCount} 张草稿）`}
+              </>
+            )
+          },
+          {
+            key: 'tax',
+            status: taxReady || fullyClosed ? 'ok' : 'error',
+            content: (
+              <>
+                普票减免结转
+                {(summary?.taxPendingCount || 0) > 0
+                  ? `（待结转 ${summary!.taxPendingCount} 条，¥${summary!.taxPendingTotal.toFixed(2)}，将随一键结转处理）`
+                  : summary?.taxVoucher
+                    ? `（已完成 ${summary.taxVoucher.voucherNo}）`
+                    : '（无待结转普票）'}
+              </>
+            )
+          },
+          {
+            key: 'profitLoss',
+            status:
+              profitLossDone || (summary?.profitLossPendingCount || 0) === 0 ? 'ok' : 'warn',
+            content: (
+              <>
+                损益结转
+                {profitLossDone
+                  ? `（已完成 ${summary!.profitLossVoucher!.voucherNo}）`
+                  : (summary?.profitLossPendingCount || 0) > 0
+                    ? `（待结转 ${summary!.profitLossPendingCount} 个科目）`
+                    : '（无需处理）'}
+              </>
+            )
+          }
+        ]}
+      />
 
       <Space wrap style={{ marginBottom: 16 }} align="start">
         <ReportPeriodFilter

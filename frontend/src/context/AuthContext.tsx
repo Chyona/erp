@@ -130,7 +130,7 @@ export function getStoredToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
 }
 
-/** 当前登录用户昵称（无昵称时回退用户名），用于审核人等字段 */
+/** 当前登录用户昵称（无昵称时回退用户名），用于审核人/制表人等展示字段 */
 export function getCurrentOperatorNickname(): string {
   try {
     const raw = localStorage.getItem(USER_KEY);
@@ -144,8 +144,13 @@ export function getCurrentOperatorNickname(): string {
   }
 }
 
-/** 当前登录操作人展示名（昵称优先，否则用户名） */
+/** 当前登录操作人展示名（与 getCurrentOperatorNickname 相同） */
 export function getCurrentOperatorName(): string {
+  return getCurrentOperatorNickname();
+}
+
+/** 当前登录操作人展示名（与 getCurrentOperatorNickname 相同） */
+export function getCurrentOperatorDisplay(): string {
   return getCurrentOperatorNickname();
 }
 

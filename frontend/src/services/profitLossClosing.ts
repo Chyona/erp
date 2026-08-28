@@ -516,11 +516,7 @@ export async function reverseClosing(period: ReportPeriod, closingId?: string) {
     throw new Error(`${periodLabel} 不存在损益结转凭证，无法反结转`);
   }
 
-  if (cf.status === Voucher.STATUS.LOCKED) {
-    await Voucher.forceRemove(cf.id, { allowCarryForwardBypass: true });
-  } else {
-    await Voucher.remove(cf.id, { allowCarryForwardBypass: true });
-  }
+  await Voucher.removeCarryForwardVoucher(cf.id);
 
   await ErpApi.addAuditLog('反结转', '损益结转', `删除 ${cf.voucherNo}（${periodLabel}）`);
 

@@ -1,0 +1,77 @@
+.payroll-sheet-list__voucher-links {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.payroll-sheet-list__voucher-link-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 6px;
+  line-height: 1.4;
+}
+
+.payroll-sheet-list__voucher-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  justify-self: start;
+  max-width: 100%;
+}
+
+.payroll-sheet-list__voucher-badge-tag {
+  position: relative;
+  margin: 0;
+  padding-inline: 3px;
+  font-size: 10px;
+  line-height: 13px;
+  border-radius: 3px;
+  pointer-events: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: -8px;
+}
+
+.payroll-sheet-list__voucher-badge-tag--wage {
+  color: #389e0d;
+  background: #f6ffed;
+}
+
+.payroll-sheet-list__voucher-badge-tag--labor {
+  color: #531dab;
+  background: #f9f0ff;
+}
+
+.payroll-sheet-list__voucher-badge-tag--social-security {
+  color: #ad6800;
+  background: #fffbe6;
+}
+
+.payroll-sheet-list__voucher-badge-tag--housing-fund {
+  color: #cf1322;
+  background: #fff1f0;
+}
+
+.payroll-sheet-list__voucher-badge-tag--tax {
+  color: #d46b08;
+  background: #fff7e6;
+}
+
+.payroll-sheet-list__voucher-badge-tag--other {
+  color: #64748b;
+  background: #f1f5f9;
+}
+
+.payroll-sheet-list__voucher-remove,
+.payroll-sheet-list__voucher-remove-placeholder {
+  justify-self: end;
+}
+
+.payroll-sheet-list__voucher-remove {
+  padding-inline: 0;
+}
+
+.payroll-sheet-list__voucher-link-row:not(:has(.payroll-sheet-list__voucher-remove)) {
+  grid-template-columns: minmax(0, 1fr);
+}

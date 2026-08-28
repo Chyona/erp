@@ -418,11 +418,7 @@ export async function reverseCarryForward(period, carryForwardId) {
   }
   await ErpApi.putMany('vouchers', linked);
 
-  if (cf.status === Voucher.STATUS.LOCKED) {
-    await Voucher.forceRemove(cf.id, { allowCarryForwardBypass: true });
-  } else {
-    await Voucher.remove(cf.id, { allowCarryForwardBypass: true });
-  }
+  await Voucher.removeCarryForwardVoucher(cf.id);
 
   await ErpApi.addAuditLog(
     '反结转',
