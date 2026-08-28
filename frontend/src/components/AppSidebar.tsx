@@ -44,7 +44,7 @@ const SECTION_ICONS: Record<string, React.ReactNode> = {
   凭证处理: <FileTextOutlined />,
   账簿查询: <AccountBookOutlined />,
   日常业务: <MoneyCollectOutlined />,
-  结项处理: <ClosingNavIcon />,
+  结账处理: <ClosingNavIcon />,
   基础资料: <BookOutlined />,
   操作记录: <AuditOutlined />,
   系统管理: <SettingOutlined />

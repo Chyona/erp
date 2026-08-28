@@ -207,7 +207,7 @@ func (s *erpService) SaveVoucher(ctx context.Context, voucher *model.Voucher) (*
 	return voucher, nil
 }
 
-// SaveVouchersBatch 批量 upsert 凭证（单事务），用于导入、重编号、季度结项等。
+// SaveVouchersBatch 批量 upsert 凭证（单事务），用于导入、重编号、季度结账等。
 func (s *erpService) SaveVouchersBatch(ctx context.Context, vouchers []model.Voucher) ([]model.Voucher, error) {
 	if len(vouchers) == 0 {
 		return []model.Voucher{}, nil
@@ -376,7 +376,7 @@ func (s *erpService) ApproveVouchersBatch(ctx context.Context, ids []string) (*V
 	return result, nil
 }
 
-// UnapproveVouchersBatch 批量已审核→草稿；已结项/结转凭证记入 failed。
+// UnapproveVouchersBatch 批量已审核→草稿；已结账/结转凭证记入 failed。
 func (s *erpService) UnapproveVouchersBatch(ctx context.Context, ids []string) (*VoucherBatchOpResult, error) {
 	if actor := rbac.ActorFrom(ctx); actor != nil && !actor.CanApprove() {
 		return nil, errors.New("无权反审核凭证")
@@ -406,7 +406,7 @@ func (s *erpService) UnapproveVouchersBatch(ctx context.Context, ids []string) (
 		}
 		if item.Status == "locked" {
 			result.Failed = append(result.Failed, VoucherBatchFailItem{
-				ID: id, VoucherNo: item.VoucherNo, Message: "已结项，不可反审核",
+				ID: id, VoucherNo: item.VoucherNo, Message: "已结账，不可反审核",
 			})
 			continue
 		}
@@ -446,7 +446,7 @@ func parseAttachmentIDs(raw datatypes.JSON) []string {
 	return uniqueIDs(ids)
 }
 
-// DeleteVouchersBatch 批量删除凭证（附带删除关联附件）；已结项/结转凭证记入 failed。
+// DeleteVouchersBatch 批量删除凭证（附带删除关联附件）；已结账/结转凭证记入 failed。
 func (s *erpService) DeleteVouchersBatch(ctx context.Context, ids []string) (*VoucherBatchOpResult, error) {
 	ids = uniqueIDs(ids)
 	result := &VoucherBatchOpResult{Failed: []VoucherBatchFailItem{}}
@@ -480,7 +480,7 @@ func (s *erpService) DeleteVouchersBatch(ctx context.Context, ids []string) (*Vo
 		}
 		if item.Status == "locked" {
 			result.Failed = append(result.Failed, VoucherBatchFailItem{
-				ID: id, VoucherNo: item.VoucherNo, Message: "已结项，不可删除",
+				ID: id, VoucherNo: item.VoucherNo, Message: "已结账，不可删除",
 			})
 			continue
 		}

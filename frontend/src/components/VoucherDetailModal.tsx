@@ -193,7 +193,7 @@ export default function VoucherDetailModal({
     confirmDeleteWithPassword({
       modal,
       isAdmin: role === 'admin',
-      title: '确定强制删除已结项凭证？',
+      title: '确定强制删除已结账凭证？',
       content: `凭证 ${voucher.voucherNo} 及关联附件删除后不可恢复。`,
       okText: '强制删除',
       onConfirm: async (confirmPassword) => {
@@ -209,14 +209,14 @@ export default function VoucherDetailModal({
   const handleLock = async () => {
     if (!voucher) return;
     const ok = await confirmWarning(modal, {
-      title: '确定结项？',
-      content: `凭证 ${voucher.voucherNo} 结项后将不可修改和删除，仅可查看和打印。`,
-      okText: '确定结项'
+      title: '确定结账？',
+      content: `凭证 ${voucher.voucherNo} 结账后将不可修改和删除，仅可查看和打印。`,
+      okText: '确定结账'
     });
     if (!ok) return;
     try {
       await Voucher.lock(voucher.id);
-      message.success('凭证已结项');
+      message.success('凭证已结账');
       onLocked?.();
       onClose();
     } catch (err) {
@@ -284,7 +284,7 @@ export default function VoucherDetailModal({
                     </Button>
                   ) : null}
                   <Button onClick={handleLock} disabled={!voucher}>
-                    凭证结项
+                    凭证结账
                   </Button>
                 </>
               ))}

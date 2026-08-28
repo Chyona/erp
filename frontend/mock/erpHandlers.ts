@@ -800,7 +800,7 @@ export async function handleErpMockRequest(
             continue;
           }
           if (item.status === 'locked') {
-            failed.push({ id, voucherNo: String(item.voucherNo || ''), message: '已结项，不可反审核' });
+            failed.push({ id, voucherNo: String(item.voucherNo || ''), message: '已结账，不可反审核' });
             continue;
           }
           if (item.status !== 'approved') {
@@ -835,7 +835,7 @@ export async function handleErpMockRequest(
             continue;
           }
           if (item.status === 'locked') {
-            failed.push({ id, voucherNo: String(item.voucherNo || ''), message: '已结项，不可删除' });
+            failed.push({ id, voucherNo: String(item.voucherNo || ''), message: '已结账，不可删除' });
             continue;
           }
           if (item.isTaxExemptionCarryForward || item.isProfitLossClosing) {
@@ -870,7 +870,7 @@ export async function handleErpMockRequest(
           continue;
         }
         if (item.status === 'locked') {
-          failed.push({ id, voucherNo: String(item.voucherNo || ''), message: '已结项，不可删除' });
+          failed.push({ id, voucherNo: String(item.voucherNo || ''), message: '已结账，不可删除' });
           continue;
         }
         if (item.isTaxExemptionCarryForward || item.isProfitLossClosing) {
@@ -933,7 +933,7 @@ export async function handleErpMockRequest(
           continue;
         }
         if (item.status === 'locked') {
-          failed.push({ id, voucherNo: item.voucherNo as string, message: '已结项，不可反审核' });
+          failed.push({ id, voucherNo: item.voucherNo as string, message: '已结账，不可反审核' });
           continue;
         }
         if (item.status !== 'approved') {

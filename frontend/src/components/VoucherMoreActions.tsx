@@ -144,7 +144,7 @@ export default function VoucherMoreActions({ voucher }) {
       label: (
         <Space size={4}>
           插入凭证
-          <Tooltip title="在指定凭证号之前插入一张新凭证，其后字号顺次后移。已审核凭证前可以插入；已申报结项凭证前不可插入。">
+          <Tooltip title="在指定凭证号之前插入一张新凭证，其后字号顺次后移。已审核凭证前可以插入；已申报结账凭证前不可插入。">
             <QuestionCircleOutlined className="voucher-more-actions__help" />
           </Tooltip>
         </Space>
@@ -220,7 +220,7 @@ export default function VoucherMoreActions({ voucher }) {
         />
         <Text>
           {' '}
-          号之前插入一张新凭证，原凭证及其之后的凭证将被顺次后移一个凭证号。已审核凭证前可以插入；已申报结项凭证前不可插入。
+          号之前插入一张新凭证，原凭证及其之后的凭证将被顺次后移一个凭证号。已审核凭证前可以插入；已申报结账凭证前不可插入。
         </Text>
       </Modal>
     </>

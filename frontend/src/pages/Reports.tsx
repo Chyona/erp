@@ -189,7 +189,7 @@ function TrialBalanceUnclosedTooltip({ period }) {
         <div className="report-trial-imbalance-tooltip__action-title">如何处理</div>
         <ol className="report-trial-imbalance-tooltip__steps">
           <li>
-            前往 <strong>「结项 → 季末结转」</strong>，完成 <strong>{periodLabel}</strong>{' '}
+            前往 <strong>「结账 → 季末结转」</strong>，完成 <strong>{periodLabel}</strong>{' '}
             损益结转
           </li>
           <li>

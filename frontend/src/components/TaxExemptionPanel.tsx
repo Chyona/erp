@@ -208,7 +208,7 @@ export default function TaxExemptionPanel({
             <strong>{cf.voucherNo}</strong>
           </p>
           <p style={{ marginBottom: 0, color: '#64748b', fontSize: 12 }}>
-            关联的销售凭证将恢复为待结转；若结转凭证已结项也会一并删除。
+            关联的销售凭证将恢复为待结转；若结转凭证已结账也会一并删除。
           </p>
         </div>
       ),

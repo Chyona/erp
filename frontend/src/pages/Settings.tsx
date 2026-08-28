@@ -110,7 +110,7 @@ export default function Settings() {
 
       <Card title="凭证维护" style={{ maxWidth: 720, marginTop: 24 }}>
         <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
-          按凭证字号删除本地数据（含已结项凭证及附件），删除后不可恢复。
+          按凭证字号删除本地数据（含已结账凭证及附件），删除后不可恢复。
         </Typography.Paragraph>
         <Space.Compact style={{ width: '100%', maxWidth: 420 }}>
           <Input

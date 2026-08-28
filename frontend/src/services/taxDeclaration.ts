@@ -124,7 +124,7 @@ async function unmarkQuarterDeclared(period: QuarterPeriod): Promise<void> {
   await ErpApi.addAuditLog('取消申报', '税务', formatQuarterLabel(period.year, period.quarter));
 }
 
-/** 启动时补齐：已结项季度内凭证状态同步为已结项 */
+/** 启动时补齐：已结账季度内凭证状态同步为已结账 */
 async function syncDeclaredQuarterVoucherLocks(): Promise<number> {
   const list = await getDeclaredQuarters();
   let total = 0;

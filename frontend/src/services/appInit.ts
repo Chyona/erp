@@ -10,7 +10,7 @@ export type AppInitOutcome = AppInitResult & {
   initWarning?: string;
 };
 
-const DEGRADED_SYNC_MSG = '后台同步暂不可用，已跳过后台维护；部分科目或结项状态可能不是最新。';
+const DEGRADED_SYNC_MSG = '后台同步暂不可用，已跳过后台维护；部分科目或结账状态可能不是最新。';
 const DEGRADED_OFFLINE_MSG = '暂时无法连接服务器，已进入离线浏览模式；数据同步将在服务恢复后自动完成。';
 
 async function loadFallbackContext(warning: string): Promise<AppInitOutcome> {
@@ -38,7 +38,7 @@ async function loadFallbackContext(warning: string): Promise<AppInitOutcome> {
   };
 }
 
-/** 应用启动初始化：先验登录态，再同步科目/分录/结项；服务端不可用时降级进入系统。 */
+/** 应用启动初始化：先验登录态，再同步科目/分录/结账；服务端不可用时降级进入系统。 */
 export async function runAppInit(): Promise<AppInitOutcome> {
   await ErpApi.open();
 

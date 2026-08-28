@@ -357,7 +357,7 @@ export default function VoucherTable({
     confirmDeleteWithPassword({
       modal,
       isAdmin: role === 'admin',
-      title: force ? '确定强制删除已结项凭证？' : '确定删除该凭证？',
+      title: force ? '确定强制删除已结账凭证？' : '确定删除该凭证？',
       content: `凭证 ${voucher.voucherNo} 及关联附件删除后不可恢复。`,
       okText: force ? '强制删除' : '确定删除',
       onConfirm: async (confirmPassword) => {
@@ -373,7 +373,7 @@ export default function VoucherTable({
   };
   const openVoucherPage = (voucher) => {
     if (!canAccessOwnVoucher(voucher)) return;
-    // 已结项只能看详情弹窗（编辑页会拦截）
+    // 已结账只能看详情弹窗（编辑页会拦截）
     if (voucher.status === Voucher.STATUS.LOCKED || isCarryForwardVoucher(voucher)) {
       onView?.(voucher.id);
       return;

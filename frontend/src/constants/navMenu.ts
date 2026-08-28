@@ -75,6 +75,23 @@ export function buildNavMenu(can: CanFn): NavMenuEntry[] {
     ]
   });
 
+  if (can('closing.view')) {
+    entries.push({
+      type: 'group',
+      key: 'closing',
+      label: '结账',
+      sections: [
+        {
+          title: '结账处理',
+          items: [
+            { key: '/closing/period-end', label: '季末结转', path: '/closing/period-end' },
+            { key: '/closing/reimbursement', label: '月底报销', path: '/closing/reimbursement' }
+          ]
+        }
+      ]
+    });
+  }
+
   entries.push({ type: 'link', key: 'reports', label: '报表', path: '/reports' });
 
   if (can('closing.view')) {
@@ -93,23 +110,6 @@ export function buildNavMenu(can: CanFn): NavMenuEntry[] {
         {
           title: '基础资料',
           items: [{ key: '/payroll/staff', label: '部门职员', path: '/payroll/staff' }]
-        }
-      ]
-    });
-  }
-
-  if (can('closing.view')) {
-    entries.push({
-      type: 'group',
-      key: 'closing',
-      label: '结项',
-      sections: [
-        {
-          title: '结项处理',
-          items: [
-            { key: '/closing/period-end', label: '季末结转', path: '/closing/period-end' },
-            { key: '/closing/reimbursement', label: '月底报销', path: '/closing/reimbursement' }
-          ]
         }
       ]
     });

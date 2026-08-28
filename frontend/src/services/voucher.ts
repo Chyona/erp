@@ -47,7 +47,7 @@ import type {
 } from '../types';
 
 const STATUS = { DRAFT: 'draft', APPROVED: 'approved', LOCKED: 'locked' } as const;
-const STATUS_LABEL: Record<VoucherStatus, string> = { draft: '草稿', approved: '已审核', locked: '已结项' };
+const STATUS_LABEL: Record<VoucherStatus, string> = { draft: '草稿', approved: '已审核', locked: '已结账' };
 const ATTACHMENT_READONLY_TIP = '已结账或已审核的凭证不支持上传、删除、修改附件';
 
 function canModifyAttachments(status: VoucherStatus) {
@@ -180,7 +180,7 @@ async function compactPeriodNumbers(voucherType, yearMonth) {
 function assertVouchersUnlocked(vouchers) {
   const locked = vouchers.filter((v) => v.status === STATUS.LOCKED);
   if (locked.length) {
-    throw new Error(`凭证 ${locked.map((v) => v.voucherNo).join('、')} 已结项，无法调整`);
+    throw new Error(`凭证 ${locked.map((v) => v.voucherNo).join('、')} 已结账，无法调整`);
   }
 }
 
@@ -282,7 +282,7 @@ async function save(voucherData: VoucherInput, approve = false): Promise<Voucher
       await assertVoucherDateMutable(existing.date);
     }
     if (existing && existing.status === STATUS.LOCKED) {
-      throw new Error('凭证已结项，不可修改');
+      throw new Error('凭证已结账，不可修改');
     }
     if (existing && existing.status === STATUS.APPROVED) {
       throw new Error('凭证已审核，不可修改');
@@ -359,15 +359,15 @@ async function save(voucherData: VoucherInput, approve = false): Promise<Voucher
 async function lock(id) {
   const voucher = await ErpApi.get('vouchers', id);
   if (!voucher) throw new Error('凭证不存在');
-  if (voucher.status === STATUS.DRAFT) throw new Error('草稿凭证需先审核才能结项');
+  if (voucher.status === STATUS.DRAFT) throw new Error('草稿凭证需先审核才能结账');
   voucher.status = STATUS.LOCKED;
   voucher.lockedAt = new Date().toISOString();
   await ErpApi.put('vouchers', voucher);
-  await ErpApi.addAuditLog('结项', '凭证', formatVoucherAuditDetail(voucher));
+  await ErpApi.addAuditLog('结账', '凭证', formatVoucherAuditDetail(voucher));
   return voucher;
 }
 
-/** 季度结项：将该季所有已审核凭证标记为已结项 */
+/** 季度结账：将该季所有已审核凭证标记为已结账 */
 async function lockManyInQuarter(period: { type: 'quarter'; year: number; quarter: number }) {
   const [start, end] = reportPeriodToDateRange(period);
   const startDate = start.format('YYYY-MM-DD');
@@ -378,7 +378,7 @@ async function lockManyInQuarter(period: { type: 'quarter'; year: number; quarte
 
   const drafts = inQuarter.filter((v) => v.status === STATUS.DRAFT);
   if (drafts.length) {
-    throw new Error(`该季度还有 ${drafts.length} 张草稿凭证，请先审核后再结项`);
+    throw new Error(`该季度还有 ${drafts.length} 张草稿凭证，请先审核后再结账`);
   }
 
   const now = new Date().toISOString();
@@ -406,11 +406,11 @@ async function lockManyInQuarter(period: { type: 'quarter'; year: number; quarte
 
   if (locked > 0) {
     await ErpApi.addAuditLog(
-      '批量结项',
+      '批量结账',
       '凭证',
       formatVoucherBatchAuditDetail(
         newlyLocked,
-        `${formatQuarterLabel(period.year, period.quarter)} 结项`
+        `${formatQuarterLabel(period.year, period.quarter)} 结账`
       )
     );
   }
@@ -418,7 +418,7 @@ async function lockManyInQuarter(period: { type: 'quarter'; year: number; quarte
   return { locked, total: inQuarter.length };
 }
 
-/** 取消季度结项：恢复该季因结项标记而结项的凭证为已审核 */
+/** 取消季度结账：恢复该季因结账标记而结账的凭证为已审核 */
 async function unlockManyInQuarter(period: { type: 'quarter'; year: number; quarter: number }) {
   const [start, end] = reportPeriodToDateRange(period);
   const startDate = start.format('YYYY-MM-DD');
@@ -443,7 +443,7 @@ async function unlockManyInQuarter(period: { type: 'quarter'; year: number; quar
 
   if (unlocked > 0) {
     await ErpApi.addAuditLog(
-      '取消结项',
+      '取消结账',
       '凭证',
       formatVoucherBatchAuditDetail(
         toSave,
@@ -509,7 +509,7 @@ async function approveMany(ids: string[]) {
   return result;
 }
 
-/** 批量反审核：已审核 → 草稿（已结项不可反审核） */
+/** 批量反审核：已审核 → 草稿（已结账不可反审核） */
 async function unapproveMany(ids: string[]) {
   const uniqueIds = [...new Set(ids)];
   const result = {
@@ -535,7 +535,7 @@ async function unapproveMany(ids: string[]) {
       result.failed.push({
         id,
         voucherNo: voucher.voucherNo,
-        message: '已结项，不可反审核'
+        message: '已结账，不可反审核'
       });
       continue;
     }
@@ -590,7 +590,7 @@ async function unapprove(id) {
   assertCarryForwardMutable(voucher);
   await assertVoucherDateMutable(voucher.date);
   if (voucher.status === STATUS.LOCKED) {
-    throw new Error('已结项的凭证不可反审核');
+    throw new Error('已结账的凭证不可反审核');
   }
   if (voucher.status !== STATUS.APPROVED) {
     throw new Error('仅已审核凭证可反审核');
@@ -635,7 +635,7 @@ async function remove(id, options: VoucherMutationOptions = {}) {
   assertCarryForwardMutable(voucher, options);
   await assertVoucherDateMutable(voucher.date);
   if (voucher.status === STATUS.LOCKED) {
-    throw new Error('已结项的凭证不可删除');
+    throw new Error('已结账的凭证不可删除');
   }
   const yearMonth = getYearMonth(voucher.date);
   const voucherType = voucher.voucherType;
@@ -966,7 +966,7 @@ async function reverse(id) {
   assertCarryForwardMutable(source);
   await assertVoucherDateMutable(source.date);
   if (source.status === STATUS.LOCKED) {
-    throw new Error('已结项的凭证不可冲销');
+    throw new Error('已结账的凭证不可冲销');
   }
 
   const entries = (source.entries || []).map((entry) => ({
@@ -1016,7 +1016,7 @@ async function reorder(voucherId, beforeNumber) {
   assertCarryForwardMutable(source);
   await assertVoucherDateMutable(source.date);
   if (source.status === STATUS.LOCKED) {
-    throw new Error('已结项的凭证不可调整顺序');
+    throw new Error('已结账的凭证不可调整顺序');
   }
 
   const targetNum = parseVoucherNum(beforeNumber);
@@ -1057,7 +1057,7 @@ async function reorder(voucherId, beforeNumber) {
 }
 
 /** 插入凭证：在指定字号前腾出空位（其后凭证顺次后移）
- * 规则：已审核/草稿前可插入；已申报结项（locked）凭证前不可插入，且其后结项凭证不可被后移。
+ * 规则：已审核/草稿前可插入；已申报结账（locked）凭证前不可插入，且其后结账凭证不可被后移。
  */
 async function prepareInsertSlot(voucherType, date, beforeNumber) {
   const targetNum = parseVoucherNum(beforeNumber);
@@ -1070,10 +1070,10 @@ async function prepareInsertSlot(voucherType, date, beforeNumber) {
 
   const pad = getNumberPad(periodVouchers);
   const anchor = periodVouchers.find((v) => parseVoucherNum(v.voucherNumber) === targetNum);
-  // 锚点为已结项（含已申报结项）时禁止在其前插入；已审核允许
+  // 锚点为已结账（含已申报结账）时禁止在其前插入；已审核允许
   if (anchor && anchor.status === STATUS.LOCKED) {
     throw new Error(
-      `凭证 ${anchor.voucherNo} 已申报结项，不能在其前面插入新凭证；已审核凭证前可以插入`
+      `凭证 ${anchor.voucherNo} 已申报结账，不能在其前面插入新凭证；已审核凭证前可以插入`
     );
   }
 
@@ -1084,7 +1084,7 @@ async function prepareInsertSlot(voucherType, date, beforeNumber) {
   const lockedShift = toShift.filter((v) => v.status === STATUS.LOCKED);
   if (lockedShift.length) {
     throw new Error(
-      `其后凭证 ${lockedShift.map((v) => v.voucherNo).join('、')} 已申报结项，无法顺次后移，不能在此插入`
+      `其后凭证 ${lockedShift.map((v) => v.voucherNo).join('、')} 已申报结账，无法顺次后移，不能在此插入`
     );
   }
 

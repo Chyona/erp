@@ -553,7 +553,7 @@ export default function VoucherForm() {
         return;
       }
       if (target.status === Voucher.STATUS.LOCKED) {
-        message.info('已结项凭证请在凭证列表中查看');
+        message.info('已结账凭证请在凭证列表中查看');
         return;
       }
       if (!(await confirmDiscardIfDirty())) return;
