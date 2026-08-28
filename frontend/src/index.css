@@ -1,6 +1,8 @@
 @import './styles/reportView.css';
 @import './styles/payrollVoucherLinks.css';
 @import './styles/closingPrerequisites.css';
+@import './styles/pageTableLayout.css';
+@import './styles/payrollTable.css';
 
 body {
   margin: 0;
@@ -1006,25 +1008,6 @@ body,
   padding-right: 4px;
 }
 
-.page-table-layout {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.page-table-layout__table {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.page-table-toolbar {
-  flex-shrink: 0;
-  margin-bottom: 12px;
-}
 
 .voucher-list-toolbar {
   display: flex;
@@ -1795,13 +1778,6 @@ body,
   margin-bottom: 12px;
 }
 
-.page-table-toolbar--split {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
 
 .field-hint-icon {
   margin-left: 6px;
@@ -3134,58 +3110,6 @@ body,
   border-bottom: 1px solid var(--app-table-border);
 }
 
-.payroll-table__toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-
-.payroll-table__required {
-  color: #ef4444;
-  margin-left: 2px;
-}
-
-.payroll-table__input-number {
-  width: 100%;
-}
-
-.payroll-table__money {
-  display: inline-block;
-  min-width: 100%;
-  text-align: right;
-}
-
-.payroll-table__col-title {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 2px;
-  max-width: 100%;
-  vertical-align: top;
-  white-space: nowrap;
-}
-
-.payroll-table__col-title-text {
-  line-height: 1.3;
-  white-space: nowrap;
-}
-
-.payroll-table .ant-table-thead>tr>th {
-  white-space: nowrap;
-}
-
-.payroll-table .ant-table-thead>tr>th .payroll-table__col-hint {
-  flex-shrink: 0;
-  margin-left: 2px;
-  font-size: 12px;
-}
-
-.payroll-table__summary-row .ant-table-cell {
-  font-weight: 600;
-  background: #f8fafc;
-}
 
 .payroll-sheet-tabs .ant-tabs-nav {
   margin-bottom: 12px;

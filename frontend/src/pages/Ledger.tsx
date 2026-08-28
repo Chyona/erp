@@ -12,6 +12,7 @@ import { useTabDataRefresh } from '../context/PageTabsContext';
 import { useAuth } from '../context/AuthContext';
 import { useAsyncLoading } from '../hooks/useAsyncLoading';
 import ScrollTable from '../components/ScrollTable';
+import PageTableLayout from '../components/PageTableLayout';
 import EllipsisText from '../components/EllipsisText';
 import VoucherTimeFilter from '../components/VoucherTimeFilter';
 import LedgerAccountTree from '../components/LedgerAccountTree';
@@ -281,7 +282,7 @@ export default function Ledger() {
   const selectedAccount = ledger?.account || accountList.find((item) => item.id === accountId) || null;
 
   return (
-    <div className="page-table-layout ledger-page">
+    <PageTableLayout className="ledger-page">
       <div className="ledger-page__top">
         <div className="ledger-page__toolbar-main">
           <VoucherTimeFilter
@@ -366,6 +367,6 @@ export default function Ledger() {
           onCollapsedChange={setSidebarCollapsed}
         />
       </div>
-    </div>
+    </PageTableLayout>
   );
 }

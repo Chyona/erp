@@ -9,6 +9,7 @@ import { useTabDataRefresh } from '../context/PageTabsContext';
 import { useAuth } from '../context/AuthContext';
 import { useAsyncLoading } from '../hooks/useAsyncLoading';
 import ScrollTable from '../components/ScrollTable';
+import PageTableLayout from '../components/PageTableLayout';
 import ReportPeriodFilter from '../components/ReportPeriodFilter';
 import {
   defaultReportPeriod,
@@ -175,8 +176,10 @@ export default function GeneralLedger() {
   };
 
   return (
-    <div className="page-table-layout general-ledger-page">
-      <div className="page-table-toolbar general-ledger-page__toolbar">
+    <PageTableLayout
+      className="general-ledger-page"
+      toolbarClassName="general-ledger-page__toolbar"
+      toolbar={
         <ReportPeriodFilter
           value={period}
           onChange={setPeriod}
@@ -190,8 +193,8 @@ export default function GeneralLedger() {
             ) : null
           }
         />
-      </div>
-
+      }
+    >
       <ScrollTable
         fillPage
         autoHeight
@@ -211,6 +214,6 @@ export default function GeneralLedger() {
           ) : null
         }
       />
-    </div>
+    </PageTableLayout>
   );
 }

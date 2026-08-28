@@ -16,6 +16,7 @@ import VoucherImportModal from '../components/VoucherImportModal';
 import VoucherFilterPanel, { EMPTY_VOUCHER_FILTERS } from '../components/VoucherFilterPanel';
 import InvoiceRecognizeSwitch from '../components/InvoiceRecognizeSwitch';
 import VoucherTimeFilter from '../components/VoucherTimeFilter';
+import PageTableLayout from '../components/PageTableLayout';
 import { loadStoredTimeFilter, saveStoredTimeFilter } from '../utils/voucherTimeFilter';
 import type { VoucherTimeFilterState } from '../utils/voucherTimeFilter';
 import { useTabDataRefresh } from '../context/PageTabsContext';
@@ -271,8 +272,8 @@ export default function VoucherList() {
   };
 
   return (
-    <div className="page-table-layout">
-      <div className="page-table-toolbar voucher-list-toolbar">
+    <PageTableLayout toolbarClassName="voucher-list-toolbar" toolbar={
+      <>
         <div className="voucher-list-toolbar__main">
           <VoucherTimeFilter
             value={timeFilter}
@@ -356,8 +357,8 @@ export default function VoucherList() {
             </Button>
           </Space>
         </div>
-      </div>
-
+      </>
+    }>
       <div className="page-table-layout__table">
         <VoucherTable
           scrollable
@@ -390,6 +391,6 @@ export default function VoucherList() {
           refresh();
         }}
       />
-    </div>
+    </PageTableLayout>
   );
 }

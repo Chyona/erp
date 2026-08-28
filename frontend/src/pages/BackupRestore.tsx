@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTabDataRefresh } from '../context/PageTabsContext';
 import { useAsyncLoading } from '../hooks/useAsyncLoading';
 import ScrollTable from '../components/ScrollTable';
+import PageTableLayout from '../components/PageTableLayout';
 import { confirmWarning } from '../utils/confirmAction';
 import { confirmDeleteWithPassword } from '../utils/confirmDeleteWithPassword';
 import { toUserMessage } from '../utils/userMessage';
@@ -264,7 +265,7 @@ export default function BackupRestore() {
   }
 
   return (
-    <div className="page-table-layout backup-restore-page">
+    <PageTableLayout className="backup-restore-page">
       <div className="backup-restore-page__toolbar">
         <Space wrap>
           {canBackup ? (
@@ -350,6 +351,6 @@ export default function BackupRestore() {
           onChange={(event) => setRenameValue(event.target.value)}
         />
       </Modal>
-    </div>
+    </PageTableLayout>
   );
 }

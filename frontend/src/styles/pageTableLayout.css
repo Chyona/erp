@@ -1,0 +1,27 @@
+.page-table-layout {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.page-table-layout__table {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.page-table-toolbar {
+  flex-shrink: 0;
+  margin-bottom: 12px;
+}
+
+.page-table-toolbar--split {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}

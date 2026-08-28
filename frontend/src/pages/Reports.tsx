@@ -17,6 +17,7 @@ import { Reports as ReportsService } from '../services/reports';
 import { ExportUtil } from '../services/export';
 import { Voucher } from '../services/voucher';
 import ScrollTable from '../components/ScrollTable';
+import PageTableLayout from '../components/PageTableLayout';
 import BalanceSheetView from '../components/BalanceSheetView';
 import IncomeStatementView from '../components/IncomeStatementView';
 import CopyableReportAmount from '../components/CopyableReportAmount';
@@ -660,7 +661,7 @@ export default function Reports() {
   );
 
   return (
-    <div className="page-table-layout report-page">
+    <PageTableLayout className="report-page">
       <Tabs
         className="report-tabs"
         destroyOnHidden
@@ -708,6 +709,6 @@ export default function Reports() {
         )}
         items={items}
       />
-    </div>
+    </PageTableLayout>
   );
 }

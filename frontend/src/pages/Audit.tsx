@@ -5,6 +5,7 @@ import { useApp } from '../context/AppContext';
 import { useTabDataRefresh } from '../context/PageTabsContext';
 import { useAsyncLoading } from '../hooks/useAsyncLoading';
 import ScrollTable from '../components/ScrollTable';
+import PageTableLayout from '../components/PageTableLayout';
 import SensitiveColumnHeader from '../components/SensitiveColumnHeader';
 import { formatSensitiveText } from '../utils/maskSensitiveText';
 import type { AuditLog } from '../types';
@@ -64,13 +65,13 @@ export default function Audit() {
   );
 
   return (
-    <div className="page-table-layout">
-      <div className="page-table-toolbar">
+    <PageTableLayout
+      toolbar={
         <Paragraph type="secondary" style={{ margin: 0 }}>
           所有操作均自动记录操作人，便于税务查账时追溯数据来源与变更历史
         </Paragraph>
-      </div>
-
+      }
+    >
       <ScrollTable
         rowKey="id"
         columns={columns}
@@ -84,6 +85,6 @@ export default function Audit() {
         }}
         locale={{ emptyText: '暂无日志' }}
       />
-    </div>
+    </PageTableLayout>
   );
 }

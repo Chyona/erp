@@ -1,13 +1,9 @@
 import { useMemo, type CSSProperties } from 'react';
-import { Button, DatePicker, Input, InputNumber, Select, Space, Table } from 'antd';
+import { DatePicker, Input, Select, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import {
-  DeleteOutlined,
-  EditOutlined,
-  PlusOutlined
-} from '@ant-design/icons';
 import dayjs from '../utils/dayjsSetup';
 import ScrollTable from './ScrollTable';
+import { PayrollMoneyCell, PayrollRowActions } from './payrollTableShared';
 import {
   Salary,
   type LaborLedgerRow,
@@ -16,7 +12,7 @@ import {
 } from '../services/salary';
 import type { PayrollStaffMember } from '../services/payrollStaff';
 
-const LABOR_BASIC_ACTION_WIDTH = 88;
+const LABOR_BASIC_ACTION_WIDTH = 64;
 const LABOR_BASIC_NAME_WIDTH = 120;
 
 function tableScrollX(columns: ColumnsType<LaborLedgerRowCalculated>): number {
@@ -36,31 +32,6 @@ type LaborLedgerTableProps = {
   onRemoveRow: (id: string) => void;
 };
 
-function MoneyCell({
-  value,
-  readOnly,
-  onChange
-}: {
-  value: number;
-  readOnly?: boolean;
-  onChange: (value: number) => void;
-}) {
-  if (readOnly) {
-    return <span className="payroll-table__money">{Salary.formatMoneyDisplay(value)}</span>;
-  }
-  return (
-    <InputNumber
-      size="small"
-      className="payroll-table__input-number"
-      value={value || undefined}
-      min={0}
-      precision={2}
-      controls={false}
-      onChange={(next) => onChange(Number(next) || 0)}
-    />
-  );
-}
-
 function moneyColumn(
   title: string,
   dataIndex: keyof LaborLedgerRow,
@@ -74,7 +45,7 @@ function moneyColumn(
     width,
     align: 'right' as const,
     render: (value: number, record: LaborLedgerRowCalculated) => (
-      <MoneyCell
+      <PayrollMoneyCell
         value={value}
         readOnly={readOnly}
         onChange={(next) => patchRow(record.id, { [dataIndex]: next } as Partial<LaborLedgerRow>)}
@@ -140,24 +111,7 @@ export default function LaborLedgerTable({
       align: 'center',
       render: (_, record) =>
         readOnly ? null : (
-          <Space size={4}>
-            <Button type="text" size="small" icon={<PlusOutlined />} aria-label="新增" onClick={onAddRow} />
-            <Button
-              type="text"
-              size="small"
-              icon={<EditOutlined />}
-              aria-label="编辑"
-              onClick={() => undefined}
-            />
-            <Button
-              type="text"
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-              aria-label="删除"
-              onClick={() => onRemoveRow(record.id)}
-            />
-          </Space>
+          <PayrollRowActions onAddRow={onAddRow} onRemoveRow={() => onRemoveRow(record.id)} />
         )
     },
     {

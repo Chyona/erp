@@ -1,14 +1,10 @@
 import { useMemo, type CSSProperties, type ReactNode } from 'react';
-import { Button, DatePicker, InputNumber, Select, Space, Table, Tooltip } from 'antd';
+import { DatePicker, Select, Table, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import {
-  DeleteOutlined,
-  EditOutlined,
-  InfoCircleOutlined,
-  PlusOutlined
-} from '@ant-design/icons';
+import { InfoCircleOutlined } from '@ant-design/icons';
 import dayjs from '../utils/dayjsSetup';
 import ScrollTable from './ScrollTable';
+import { PayrollMoneyCell, PayrollRowActions } from './payrollTableShared';
 import {
   Salary,
   type PayrollPeriodView,
@@ -21,7 +17,7 @@ import {
   type PayrollStaffType
 } from '../services/payrollStaff';
 
-const PAYROLL_BASIC_ACTION_WIDTH = 88;
+const PAYROLL_BASIC_ACTION_WIDTH = 64;
 const PAYROLL_BASIC_STAFF_WIDTH = 120;
 const PAYROLL_PAYMENT_DATE_WIDTH = 128;
 const PAYROLL_WITHHELD_TAX_WIDTH = 128;
@@ -104,31 +100,6 @@ type SalaryPayrollTableProps = {
   onRemoveRow: (id: string) => void;
 };
 
-function MoneyCell({
-  value,
-  readOnly,
-  onChange
-}: {
-  value: number;
-  readOnly?: boolean;
-  onChange: (value: number) => void;
-}) {
-  if (readOnly) {
-    return <span className="payroll-table__money">{Salary.formatMoneyDisplay(value)}</span>;
-  }
-  return (
-    <InputNumber
-      size="small"
-      className="payroll-table__input-number"
-      value={value || undefined}
-      min={0}
-      precision={2}
-      controls={false}
-      onChange={(next) => onChange(Number(next) || 0)}
-    />
-  );
-}
-
 function moneyColumn(
   title: string,
   dataIndex: keyof SalaryPayrollRow,
@@ -143,7 +114,7 @@ function moneyColumn(
     width,
     align: 'right' as const,
     render: (value: number, record: SalaryPayrollRowCalculated) => (
-      <MoneyCell
+      <PayrollMoneyCell
         value={value}
         readOnly={readOnly}
         onChange={(next) => patchRow(record.id, { [dataIndex]: next } as Partial<SalaryPayrollRow>)}
@@ -226,24 +197,7 @@ export default function SalaryPayrollTable({
       align: 'center',
       render: (_, record) =>
         readOnly ? null : (
-          <Space size={4}>
-            <Button type="text" size="small" icon={<PlusOutlined />} aria-label="新增" onClick={onAddRow} />
-            <Button
-              type="text"
-              size="small"
-              icon={<EditOutlined />}
-              aria-label="编辑"
-              onClick={() => undefined}
-            />
-            <Button
-              type="text"
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-              aria-label="删除"
-              onClick={() => onRemoveRow(record.id)}
-            />
-          </Space>
+          <PayrollRowActions onAddRow={onAddRow} onRemoveRow={() => onRemoveRow(record.id)} />
         )
     },
     {
