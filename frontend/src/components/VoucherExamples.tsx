@@ -98,6 +98,11 @@ export default function VoucherExamples({ accounts, onApply, getSnapshot }) {
   const [userTemplates, setUserTemplates] = useState([]);
 
   const loadUserTemplates = useCallback(async () => {
+    try {
+      await VoucherTemplates.scrubStoredTemplatesIfNeeded();
+    } catch {
+      // 无写权限时仅使用读取时的内存清洗
+    }
     setUserTemplates(await VoucherTemplates.getAll());
   }, []);
 
@@ -146,8 +151,23 @@ export default function VoucherExamples({ accounts, onApply, getSnapshot }) {
 
     setSaving(true);
     try {
-      const snapshot = getSnapshot();
-      await VoucherTemplates.save({ name, ...snapshot });
+      const snapshot = getSnapshot() || {};
+      // 白名单字段保存，绝不传入 invoiceNumbers / 附件
+      await VoucherTemplates.save({
+        name,
+        businessType: snapshot.businessType,
+        invoiceType: snapshot.invoiceType,
+        taxAmount: snapshot.taxAmount,
+        remark: snapshot.remark || '',
+        entries: (snapshot.entries || []).map((entry) => ({
+          summary: entry.summary || '',
+          accountCode: entry.accountCode || '',
+          accountName: entry.accountName || '',
+          accountId: entry.accountId || '',
+          debit: entry.debit || '',
+          credit: entry.credit || ''
+        }))
+      });
       message.success(`模板「${name}」已保存`);
       setSaveOpen(false);
       await loadUserTemplates();

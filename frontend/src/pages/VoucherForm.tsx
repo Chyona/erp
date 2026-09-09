@@ -1166,15 +1166,21 @@ export default function VoucherForm() {
   };
 
   const applyExample = (example) => {
+    // 套用模板/示例：不带入发票号与附件
     form.setFieldsValue({
       businessType: example.businessType,
       invoiceType: example.invoiceType || INVOICE_TYPE.NONE,
-      taxAmount: undefined,
+      taxAmount: null,
       remark: '',
-      invoiceNumbers: example.invoiceNumbers || ''
+      invoiceNumbers: ''
     });
+    form.setFieldValue('invoiceNumbers', '');
+    setAttachments([]);
+    attachmentsRef.current = [];
+    setAttachmentPanelOpen(false);
+    form.setFieldValue('attachmentCount', 0);
     setEntries(
-      example.entries.map((e, i) => {
+      (example.entries || []).map((e, i) => {
         const acc = accounts.find((a) => a.code === e.accountCode);
         return {
           key: `${example.key || example.id}-${i}-${Date.now()}`,
@@ -1191,12 +1197,12 @@ export default function VoucherForm() {
 
   const getTemplateSnapshot = () => {
     const values = form.getFieldsValue();
+    // 仅快照填单结构；发票号/附件绝不进入模板
     return {
       businessType: values.businessType,
       invoiceType: values.invoiceType,
       taxAmount: values.taxAmount,
       remark: values.remark || '',
-      invoiceNumbers: values.invoiceNumbers || '',
       entries: entries.map((e) => ({
         summary: e.summary || '',
         accountCode: e.accountCode || '',
