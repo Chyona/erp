@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState, type DependencyList } from 'react';
 
+function isLayoutReady(wrap: HTMLElement) {
+  if (wrap.clientHeight < 80) return false;
+  const style = getComputedStyle(wrap);
+  if (style.display === 'none' || style.visibility === 'hidden') return false;
+  return true;
+}
+
 export function useTableScrollY(deps: DependencyList = [], enabled = true) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [scrollY, setScrollY] = useState<number | undefined>(undefined);
@@ -10,12 +17,17 @@ export function useTableScrollY(deps: DependencyList = [], enabled = true) {
 
     const observed = new Set<Element>();
     let ro: ResizeObserver;
+    let raf = 0;
 
     const update = () => {
       if (!enabled) {
         setScrollY((prev) => (prev === undefined ? prev : undefined));
         return;
       }
+
+      // Tab 切换/destroy 后父级高度可能尚未约束；此时写入 scrollY 会形成
+      // 「表体自撑高度」死锁，导致滚动条消失。
+      if (!isLayoutReady(wrap)) return;
 
       const header = wrap.querySelector('.ant-table-header') as HTMLElement | null;
       const theadRows = wrap.querySelectorAll('.ant-table-thead tr');
@@ -55,18 +67,28 @@ export function useTableScrollY(deps: DependencyList = [], enabled = true) {
       }
     };
 
-    ro = new ResizeObserver(update);
+    const scheduleUpdate = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        update();
+        // 再测一次，等待 ant-tabs 完成布局
+        raf = requestAnimationFrame(update);
+      });
+    };
+
+    ro = new ResizeObserver(scheduleUpdate);
     ro.observe(wrap);
-    update();
-    const timer = setTimeout(update, 100);
-    const timer2 = setTimeout(update, 300);
-    window.addEventListener('resize', update);
+    scheduleUpdate();
+    const timer = setTimeout(scheduleUpdate, 100);
+    const timer2 = setTimeout(scheduleUpdate, 300);
+    window.addEventListener('resize', scheduleUpdate);
 
     return () => {
+      cancelAnimationFrame(raf);
       clearTimeout(timer);
       clearTimeout(timer2);
       ro.disconnect();
-      window.removeEventListener('resize', update);
+      window.removeEventListener('resize', scheduleUpdate);
     };
   }, [enabled, ...deps]);
 

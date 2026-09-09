@@ -19,6 +19,7 @@ import {
   createSalaryRow,
   hasPayrollVoucherLinks,
   PAYROLL_DELETE_BLOCKED_BY_VOUCHER_MESSAGE,
+  PAYROLL_EDIT_BLOCKED_BY_VOUCHER_MESSAGE,
   seedPayrollPeriodRows,
   type PayrollPeriodData,
   type PayrollPeriodView,
@@ -125,7 +126,8 @@ export default function PayrollSheetDetailPanel({ readOnly = false }: { readOnly
       ]);
       setPayrollStore(calcContext.store);
       setYtdPriorMap(calcContext.ytdPriorMap);
-      if (!readOnly) {
+      // 已关联凭证时仅查看：不自动补空白行，避免误改结构
+      if (!readOnly && !hasPayrollVoucherLinks(sheet)) {
         const seeded = seedPayrollPeriodRows(sheet);
         const needsSeed =
           seeded.salaryRows.length !== sheet.salaryRows.length ||
@@ -188,8 +190,15 @@ export default function PayrollSheetDetailPanel({ readOnly = false }: { readOnly
     return rows.filter((row) => row.name.toLowerCase().includes(text));
   }, [data, keyword]);
 
+  const lockedByVoucher = Boolean(data && hasPayrollVoucherLinks(data));
+  const effectiveReadOnly = readOnly || lockedByVoucher;
+
   const persist = useCallback(
     async (nextData: PayrollPeriodData, options: { silent?: boolean } = {}) => {
+      if (hasPayrollVoucherLinks(nextData) || (data && hasPayrollVoucherLinks(data))) {
+        message.warning(PAYROLL_EDIT_BLOCKED_BY_VOUCHER_MESSAGE);
+        return;
+      }
       setSaving(true);
       try {
         await Salary.savePeriod({
@@ -212,11 +221,11 @@ export default function PayrollSheetDetailPanel({ readOnly = false }: { readOnly
         setSaving(false);
       }
     },
-    [periodKey, data?.creationMethod, message, refresh, user?.nickname, user?.username]
+    [periodKey, data, message, refresh, user?.nickname, user?.username]
   );
 
   const updateSalaryRows = (salaryRows: PayrollPeriodData['salaryRows']) => {
-    if (!data) return;
+    if (!data || effectiveReadOnly) return;
     const salaryRowsCalculated = calcSalaryRows(salaryRows);
     setData((prev) =>
       prev
@@ -231,7 +240,7 @@ export default function PayrollSheetDetailPanel({ readOnly = false }: { readOnly
   };
 
   const updateLaborRows = (laborRows: PayrollPeriodData['laborRows']) => {
-    if (!data) return;
+    if (!data || effectiveReadOnly) return;
     const laborRowsCalculated = laborRows.map(calcLaborRow);
     setData((prev) =>
       prev
@@ -249,7 +258,7 @@ export default function PayrollSheetDetailPanel({ readOnly = false }: { readOnly
     nextSalaryRows: PayrollPeriodData['salaryRows'],
     nextLaborRows: PayrollPeriodData['laborRows']
   ) => {
-    if (readOnly || !data) return;
+    if (effectiveReadOnly || !data) return;
     if (isPeriodEmpty({ salaryRows: nextSalaryRows, laborRows: nextLaborRows })) {
       if (hasPayrollVoucherLinks(data)) {
         message.warning(PAYROLL_DELETE_BLOCKED_BY_VOUCHER_MESSAGE);
@@ -303,13 +312,17 @@ export default function PayrollSheetDetailPanel({ readOnly = false }: { readOnly
   };
 
   const tableLoading = loading || saving;
-  const deleteBlockedByVoucher = Boolean(data && hasPayrollVoucherLinks(data));
 
   return (
     <div className="payroll-sheet-detail-panel">
       <div className="payroll-sheet-detail-panel__toolbar">
         <Space wrap size={12} align="center">
           <span className="payroll-sheet-detail-panel__period">{periodLabel}</span>
+          {lockedByVoucher ? (
+            <Tooltip title={PAYROLL_EDIT_BLOCKED_BY_VOUCHER_MESSAGE}>
+              <span className="payroll-sheet-detail-panel__readonly-hint">已关联凭证 · 仅可查看</span>
+            </Tooltip>
+          ) : null}
           <Input
             allowClear
             prefix={<SearchOutlined />}
@@ -322,7 +335,7 @@ export default function PayrollSheetDetailPanel({ readOnly = false }: { readOnly
             刷新
           </Button>
         </Space>
-        {!readOnly ? (
+        {!effectiveReadOnly ? (
           <Space wrap size={8} className="payroll-sheet-detail-panel__actions">
             <Button type="primary" loading={saving} onClick={() => void handleSave()}>
               保存
@@ -330,16 +343,9 @@ export default function PayrollSheetDetailPanel({ readOnly = false }: { readOnly
             <Button icon={<DownloadOutlined />} disabled>
               导出
             </Button>
-            <Tooltip title={deleteBlockedByVoucher ? PAYROLL_DELETE_BLOCKED_BY_VOUCHER_MESSAGE : undefined}>
-              <Button
-                danger
-                icon={<DeleteOutlined />}
-                disabled={deleteBlockedByVoucher}
-                onClick={() => void handleDeleteSheet()}
-              >
-                删除
-              </Button>
-            </Tooltip>
+            <Button danger icon={<DeleteOutlined />} onClick={() => void handleDeleteSheet()}>
+              删除
+            </Button>
           </Space>
         ) : null}
       </div>
@@ -349,6 +355,7 @@ export default function PayrollSheetDetailPanel({ readOnly = false }: { readOnly
           activeKey={activeTab}
           onChange={setActiveTab}
           destroyOnHidden
+          animated={{ inkBar: true, tabPane: false }}
           className="payroll-sheet-tabs payroll-sheet-tabs--fill"
           items={[
             {
@@ -361,15 +368,15 @@ export default function PayrollSheetDetailPanel({ readOnly = false }: { readOnly
                   rows={filteredSalaryRows}
                   totals={data?.salaryTotals ?? EMPTY_SALARY_TOTALS}
                   staffMembers={staffMembers}
-                  readOnly={readOnly}
+                  readOnly={effectiveReadOnly}
                   loading={tableLoading}
                   onChange={(rows) => updateSalaryRows(rows)}
                   onAddRow={() => {
-                    if (!data) return;
+                    if (!data || effectiveReadOnly) return;
                     updateSalaryRows([...data.salaryRows, createSalaryRow(periodKey)]);
                   }}
                   onRemoveRow={(id) => {
-                    if (!data) return;
+                    if (!data || effectiveReadOnly) return;
                     handleRemoveRow(
                       data.salaryRows.filter((row) => row.id !== id),
                       data.laborRows
@@ -398,15 +405,15 @@ export default function PayrollSheetDetailPanel({ readOnly = false }: { readOnly
                     netAmount: 0
                   }}
                   staffMembers={staffMembers}
-                  readOnly={readOnly}
+                  readOnly={effectiveReadOnly}
                   loading={tableLoading}
                   onChange={(rows) => updateLaborRows(rows)}
                   onAddRow={() => {
-                    if (!data) return;
+                    if (!data || effectiveReadOnly) return;
                     updateLaborRows([...data.laborRows, createLaborRow(periodKey)]);
                   }}
                   onRemoveRow={(id) => {
-                    if (!data) return;
+                    if (!data || effectiveReadOnly) return;
                     handleRemoveRow(
                       data.salaryRows,
                       data.laborRows.filter((row) => row.id !== id)

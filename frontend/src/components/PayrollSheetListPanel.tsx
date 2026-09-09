@@ -3,6 +3,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { Button, DatePicker, Dropdown, Modal, Pagination, Space, App, Tooltip } from 'antd';
 import {
   EditOutlined,
+  EyeOutlined,
   DeleteOutlined,
   LinkOutlined,
   ReloadOutlined,
@@ -223,8 +224,9 @@ export default function PayrollSheetListPanel({ readOnly = false }: { readOnly?:
           <Button
             type="text"
             size="small"
-            icon={<EditOutlined />}
-            aria-label="编辑"
+            icon={hasPayrollVoucherLinks(record) ? <EyeOutlined /> : <EditOutlined />}
+            aria-label={hasPayrollVoucherLinks(record) ? '查看' : '编辑'}
+            title={hasPayrollVoucherLinks(record) ? '已关联凭证，仅可查看' : '编辑'}
             onClick={() => openDetail(record.periodKey)}
           />
           {!readOnly ? (

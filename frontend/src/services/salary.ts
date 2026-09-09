@@ -133,6 +133,9 @@ export function splitPayrollVoucherLinks(links: PayrollVoucherLinkView[]) {
 export const PAYROLL_DELETE_BLOCKED_BY_VOUCHER_MESSAGE =
   '已关联凭证的工资表不允许删除，请先解除凭证关联';
 
+export const PAYROLL_EDIT_BLOCKED_BY_VOUCHER_MESSAGE =
+  '已关联凭证的工资表仅可查看，请先解除凭证关联后再编辑';
+
 export function hasPayrollVoucherLinks(
   source:
     | Pick<PayrollPeriodData, 'voucherLinks'>
@@ -1153,6 +1156,17 @@ export const Salary = {
   async savePeriod(data: PayrollPeriodData) {
     const store = await readStore();
     const existing = store[data.periodKey];
+    if (existing && hasPayrollVoucherLinks(existing)) {
+      const existingSalary = JSON.stringify(existing.salaryRows.map(normalizeSalaryRow));
+      const nextSalary = JSON.stringify(data.salaryRows.map(normalizeSalaryRow));
+      const existingLabor = JSON.stringify(
+        (existing.laborRows || []).map((row) => normalizeLaborRow(row))
+      );
+      const nextLabor = JSON.stringify((data.laborRows || []).map((row) => normalizeLaborRow(row)));
+      if (existingSalary !== nextSalary || existingLabor !== nextLabor) {
+        throw new Error(PAYROLL_EDIT_BLOCKED_BY_VOUCHER_MESSAGE);
+      }
+    }
     const calculatedRows = calcSalaryRowsForPeriod(store, data.periodKey, data.salaryRows);
     const salaryRows = data.salaryRows.map((row, index) => ({
       ...normalizeSalaryRow(row),

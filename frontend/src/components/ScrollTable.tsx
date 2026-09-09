@@ -70,7 +70,8 @@ export default function ScrollTable<T extends object = Record<string, unknown>>(
   useTableHorizontalScrollBar(wrapRef, xScrollRef, scrollBarBelowSummary, [
     rowCount,
     props.summary,
-    scroll?.x
+    scroll?.x,
+    scrollY
   ]);
 
   useTableHeaderGutter(
