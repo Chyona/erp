@@ -281,10 +281,9 @@ export function applyEstimateRates(
 
   const totalProfit = roundMoney(data.cit.bookedTotalProfit - periodTotal);
   const ytdTotalProfit = roundMoney(data.cit.bookedYtdTotalProfit - ytdTotal);
-  const periodProfit = roundMoney(totalProfit - data.cit.priorPeriodCitPaid);
 
   const rate = citRatePercent / 100;
-  const estimatedTax = roundMoney(Math.max(0, periodProfit) * rate);
+  const estimatedTax = roundMoney(Math.max(0, totalProfit) * rate);
   const ytdEstimatedTax = roundMoney(Math.max(0, ytdTotalProfit) * rate);
   const ytdPaid = roundMoney(data.cit.ytdIncomeTaxExpense);
   const remainingToAccrue = roundMoney(Math.max(0, ytdEstimatedTax - ytdPaid));

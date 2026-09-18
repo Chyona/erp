@@ -134,7 +134,7 @@ export default function TaxEstimateView({
         showIcon
         className="tax-estimate-view__alert"
         message="预估说明"
-        description="增值税按本期销售收入凭证销项拆分；附加税按预估应交增值税匡算；企业所得税按「账面利润 − 未入账人力成本」×税率匡算。未入账人力成本可按上月默认，也可手工调整。"
+        description="增值税按本期销售收入凭证销项拆分；附加税按预估应交增值税匡算；企业所得税按「账面利润 − 未入账成本」×税率匡算。未入账成本可按上月默认，也可手工调整。"
       />
 
       <div className="tax-estimate-view__grid">
@@ -270,13 +270,13 @@ export default function TaxEstimateView({
           <MetricRow
             label="账面利润总额"
             value={cit?.bookedTotalProfit || 0}
-            hint="利润表本期数，未扣未入账人力成本"
+            hint="利润表本期数，未扣未入账成本"
           />
 
           <div className="tax-estimate-payroll">
             <div className="tax-estimate-payroll__head">
               <Text strong className="tax-estimate-view__subtitle">
-                未入账人力成本（可改）
+                未入账成本（可改）
               </Text>
               <span className="tax-estimate-payroll__total">
                 <CopyableReportAmount value={payrollTotal} format="plain" showZero strong />
@@ -325,46 +325,56 @@ export default function TaxEstimateView({
           </div>
 
           <MetricRow
-            label="调整后利润总额"
+            label="调整后利润总额（本期税基）"
             value={cit?.totalProfit || 0}
             hint={
               (cit?.payrollAdjustment?.total || 0) > 0.005
-                ? `账面利润 − 未入账人力成本`
-                : '本期工资/社保公积金均已关联凭证或暂无数据'
+                ? '账面利润总额 − 未入账成本'
+                : '本期工资、社保、公积金均已入账或暂无数据'
             }
             emphasize
           />
           <MetricRow
             label="本期缴纳上期所得税"
             value={cit?.priorPeriodCitPaid || 0}
-            hint="利润表本期 5801"
+            hint="利润表本期 5801，缴纳的是上期税款，不从本期税基扣除"
           />
           <MetricRow
-            label="调整后本期利润（本期预估税基）"
+            label="本期净利润"
             value={
-              Math.round(
-                ((cit?.totalProfit || 0) - (cit?.priorPeriodCitPaid || 0)) * 100
-              ) / 100
+              Math.round(((cit?.totalProfit || 0) - (cit?.priorPeriodCitPaid || 0)) * 100) / 100
             }
             hint="调整后利润总额 − 本期缴纳上期所得税"
             emphasize
           />
-          <MetricRow
-            label="预估本期所得税"
-            value={cit?.estimatedTax || 0}
-            hint={`max(调整后本期利润, 0) × ${citRatePercent}%`}
-            emphasize
-          />
 
-          {/* <MetricRow label="本年累计账面利润总额" value={cit?.bookedYtdTotalProfit || 0} />
+          <div className="tax-estimate-view__subtitle-row">
+            <Text strong className="tax-estimate-view__subtitle">
+              本年累计（预缴口径）
+            </Text>
+          </div>
+          <MetricRow label="本年累计账面利润总额" value={cit?.bookedYtdTotalProfit || 0} />
           <MetricRow
             label="本年累计调整后利润总额"
-            value={((cit?.bookedYtdTotalProfit || 0) - payrollTotal) || 0}
-            hint={`本年累计账面利润 − 未入账人力成本`} />
+            value={cit?.ytdTotalProfit || 0}
+            hint="本年累计账面利润 − 未入账成本"
+          />
           <MetricRow
             label="本年累计预估所得税"
             value={cit?.ytdEstimatedTax || 0}
-            hint={`max(本年累计调整后利润总额, 0) × ${citRatePercent}%`} /> */}
+            hint={`max(本年累计调整后利润总额, 0) × ${citRatePercent}%`}
+          />
+          <MetricRow
+            label="本年度已缴纳企业所得税"
+            value={cit?.ytdIncomeTaxExpense || 0}
+            hint="利润表本年累计 5801"
+          />
+          <MetricRow
+            label="本期应补提所得税"
+            value={cit?.remainingToAccrue || 0}
+            hint={citAccrualHint(cit)}
+            emphasize
+          />
         </section>
       </div>
     </div>
