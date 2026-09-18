@@ -578,6 +578,7 @@ export default function PayrollStatsPanel() {
 
       <Tabs
         className="payroll-stats-panel__tabs"
+        animated={{ inkBar: true, tabPane: false }}
         items={[
           {
             key: 'salary',

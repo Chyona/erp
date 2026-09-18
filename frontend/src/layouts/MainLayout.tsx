@@ -1,4 +1,4 @@
-import { Layout, Typography, App, Space, Modal, Form, Input, Dropdown, Avatar } from 'antd';
+import { Layout, Typography, App, Space, Modal, Form, Input, Dropdown, Avatar, Tooltip } from 'antd';
 import type { MenuProps } from 'antd';
 import {
   LogoutOutlined,
@@ -8,7 +8,9 @@ import {
   SunOutlined,
   MoonOutlined,
   MenuFoldOutlined,
-  MenuUnfoldOutlined
+  MenuUnfoldOutlined,
+  EyeInvisibleOutlined,
+  EyeOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { Suspense, useState } from 'react';
@@ -23,6 +25,7 @@ import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { APP_CONFIG } from '../config/app';
 import { toUserMessage } from '../utils/userMessage';
+import { formatSensitiveText } from '../utils/maskSensitiveText';
 
 const { Sider, Header, Content } = Layout;
 const SIDER_COLLAPSED_KEY = 'erp_sider_collapsed';
@@ -37,6 +40,7 @@ export default function MainLayout() {
   const [pwdOpen, setPwdOpen] = useState(false);
   const [pwdForm] = Form.useForm();
   const [pwdSaving, setPwdSaving] = useState(false);
+  const [identityVisible, setIdentityVisible] = useState(false);
   const [collapsed, setCollapsed] = useState(
     () => localStorage.getItem(SIDER_COLLAPSED_KEY) === '1'
   );
@@ -73,7 +77,10 @@ export default function MainLayout() {
     }
   };
 
+  const companyLabel = companyName || '请先在设置中填写企业信息';
   const displayName = user?.nickname || user?.username || '';
+  const visibleCompany = formatSensitiveText(companyLabel, identityVisible || !companyName);
+  const visibleUserName = formatSensitiveText(displayName, identityVisible);
   const userMenuItems: MenuProps['items'] = [
     {
       key: 'password',
@@ -137,9 +144,22 @@ export default function MainLayout() {
         </Sider>
         <Layout className="app-main">
           <Header className="topbar">
-            <Typography.Text strong>
-              {companyName || '请先在设置中填写企业信息'}
-            </Typography.Text>
+            <div className="topbar__identity">
+              <Typography.Text strong className="topbar__company">
+                {visibleCompany}
+              </Typography.Text>
+              <Tooltip title={identityVisible ? '隐藏公司与用户明文' : '显示公司与用户明文'}>
+                <button
+                  type="button"
+                  className="topbar__privacy-toggle"
+                  aria-label={identityVisible ? '隐藏明文' : '显示明文'}
+                  aria-pressed={identityVisible}
+                  onClick={() => setIdentityVisible((prev) => !prev)}
+                >
+                  {identityVisible ? <EyeOutlined /> : <EyeInvisibleOutlined />}
+                </button>
+              </Tooltip>
+            </div>
             <Space size={12} className="topbar__actions">
               <Dropdown
                 menu={{ items: userMenuItems }}
@@ -154,8 +174,11 @@ export default function MainLayout() {
                   aria-haspopup="menu"
                 >
                   <Avatar size={28} icon={<UserOutlined />} className="topbar-user__avatar" />
-                  <EllipsisText className="topbar-user__name" tooltip={displayName}>
-                    {displayName}
+                  <EllipsisText
+                    className="topbar-user__name"
+                    tooltip={identityVisible ? displayName : false}
+                  >
+                    {visibleUserName}
                   </EllipsisText>
                   <DownOutlined className="topbar-user__caret" aria-hidden="true" />
                 </button>

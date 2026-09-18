@@ -14,12 +14,22 @@ import {
 import { DownloadOutlined, DownOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { Reports as ReportsService } from '../services/reports';
+import {
+  DEFAULT_CIT_RATE_PERCENT,
+  DEFAULT_SURCHARGE_RATES,
+  TaxEstimate,
+  applyEstimateRates,
+  type CitPayrollAdjustmentValues,
+  type SurchargeRatePercents,
+  type TaxEstimateResult
+} from '../services/taxEstimate';
 import { ExportUtil } from '../services/export';
 import { Voucher } from '../services/voucher';
 import ScrollTable from '../components/ScrollTable';
 import PageTableLayout from '../components/PageTableLayout';
 import BalanceSheetView from '../components/BalanceSheetView';
 import IncomeStatementView from '../components/IncomeStatementView';
+import TaxEstimateView from '../components/TaxEstimateView';
 import CopyableReportAmount from '../components/CopyableReportAmount';
 import ReportPeriodFilter from '../components/ReportPeriodFilter';
 import {
@@ -422,6 +432,84 @@ function BalanceSheetTab({ dateRange, refreshToken, period, virtualClosing }) {
   );
 }
 
+function TaxEstimateTab({ dateRange, refreshToken, period, virtualClosing }) {
+  const [baseData, setBaseData] = useState<TaxEstimateResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [citRatePercent, setCitRatePercent] = useState(DEFAULT_CIT_RATE_PERCENT);
+  const [surchargeRates, setSurchargeRates] = useState<SurchargeRatePercents>({
+    ...DEFAULT_SURCHARGE_RATES
+  });
+  const [payrollAdjustment, setPayrollAdjustment] = useState<CitPayrollAdjustmentValues>({
+    unbookedSalaryGross: 0,
+    unbookedLaborGross: 0,
+    unbookedCompanySocialSecurity: 0,
+    unbookedCompanyHousingFund: 0
+  });
+
+  const syncPayrollFromResult = (result: TaxEstimateResult) => {
+    const adj = result.cit.payrollAdjustment;
+    setPayrollAdjustment({
+      unbookedSalaryGross: adj.unbookedSalaryGross,
+      unbookedLaborGross: adj.unbookedLaborGross,
+      unbookedCompanySocialSecurity: adj.unbookedCompanySocialSecurity,
+      unbookedCompanyHousingFund: adj.unbookedCompanyHousingFund
+    });
+  };
+
+  const handleQuery = async () => {
+    setLoading(true);
+    try {
+      const start = dateRange[0].format('YYYY-MM-DD');
+      const end = dateRange[1].format('YYYY-MM-DD');
+      const result = await TaxEstimate.getTaxEstimate(period, start, end, {
+        virtualClosing,
+        citRatePercent,
+        surchargeRates
+      });
+      setBaseData(result);
+      syncPayrollFromResult(result);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    handleQuery();
+    // 税率/手工金额变更只做本地重算，不重复请求
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateRange, refreshToken, virtualClosing, period]);
+
+  const data = useMemo(
+    () =>
+      baseData
+        ? applyEstimateRates(baseData, {
+            citRatePercent,
+            surchargeRates,
+            payrollAdjustment
+          })
+        : null,
+    [baseData, citRatePercent, surchargeRates, payrollAdjustment]
+  );
+
+  return (
+    <div className="report-tab-panel">
+      <TaxEstimateView
+        data={data}
+        loading={loading}
+        citRatePercent={citRatePercent}
+        onCitRateChange={setCitRatePercent}
+        surchargeRates={surchargeRates}
+        onSurchargeRatesChange={setSurchargeRates}
+        payrollAdjustment={payrollAdjustment}
+        onPayrollAdjustmentChange={setPayrollAdjustment}
+        onResetPayrollAdjustment={
+          baseData ? () => syncPayrollFromResult(baseData) : undefined
+        }
+      />
+    </div>
+  );
+}
+
 export default function Reports() {
   const { message } = App.useApp();
   const { can } = useAuth();
@@ -587,6 +675,18 @@ export default function Reports() {
       label: '资产负债表',
       children: (
         <BalanceSheetTab
+          dateRange={dateRange}
+          refreshToken={refreshToken}
+          period={period}
+          virtualClosing={effectiveVirtualClosing}
+        />
+      )
+    },
+    {
+      key: 'taxEstimate',
+      label: '税费预估',
+      children: (
+        <TaxEstimateTab
           dateRange={dateRange}
           refreshToken={refreshToken}
           period={period}

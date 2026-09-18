@@ -319,3 +319,162 @@
 .copyable-report-amount-tooltip__action:hover {
   color: #1d4ed8;
 }
+
+/* --- 税费预估 --- */
+.tax-estimate-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 2px 16px;
+}
+
+.tax-estimate-view--loading {
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.tax-estimate-view__alert {
+  flex-shrink: 0;
+}
+
+.tax-estimate-view__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.tax-estimate-view__card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  padding: 16px 18px 12px;
+}
+
+.tax-estimate-view__title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.tax-estimate-view__title {
+  margin: 0 0 8px !important;
+  color: #0f172a;
+}
+
+.tax-estimate-view__title-row .tax-estimate-view__title {
+  margin-bottom: 0 !important;
+}
+
+.tax-estimate-view__rate {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.tax-estimate-view__rate-input {
+  width: 120px;
+}
+
+.tax-estimate-view__rate-input--sm {
+  width: 108px;
+}
+
+.tax-estimate-view__subtitle-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0 4px;
+  padding-top: 8px;
+  border-top: 1px dashed #e2e8f0;
+}
+
+.tax-estimate-view__subtitle-row--inline {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tax-estimate-view__subtitle {
+  color: #0f172a;
+  font-size: 13px;
+}
+
+.tax-estimate-view__rate-group {
+  row-gap: 6px;
+}
+
+.tax-estimate-view__amount-input {
+  width: 132px;
+}
+
+.tax-estimate-view__row--editable .tax-estimate-view__value {
+  min-width: 132px;
+}
+
+.tax-estimate-view__row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.tax-estimate-view__row:last-child {
+  border-bottom: none;
+}
+
+.tax-estimate-view__row--emphasize {
+  background: #f8fafc;
+  margin: 0 -10px;
+  padding: 12px 10px;
+  border-radius: 8px;
+  border-bottom: none;
+}
+
+.tax-estimate-view__label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  color: #334155;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.tax-estimate-view__hint {
+  font-size: 12px !important;
+  line-height: 1.35;
+}
+
+.tax-estimate-view__value {
+  flex-shrink: 0;
+  min-width: 108px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #0f172a;
+  font-size: 15px;
+}
+
+.tax-estimate-view__row--emphasize .tax-estimate-view__value {
+  font-size: 16px;
+  color: #1d4ed8;
+}
+
+.tax-estimate-view__note {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+@media (max-width: 960px) {
+  .tax-estimate-view__grid {
+    grid-template-columns: 1fr;
+  }
+}

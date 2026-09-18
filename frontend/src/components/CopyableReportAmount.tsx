@@ -7,21 +7,26 @@ type CopyableReportAmountProps = {
   format?: 'report' | 'plain';
   strong?: boolean;
   className?: string;
+  showZero?: boolean;
 };
 
-function getAmountText(value: unknown, format: 'report' | 'plain') {
-  if (value == null || Math.abs(Number(value)) < 0.005) return '';
-  return format === 'plain' ? Number(value).toFixed(2) : formatReportAmount(value);
+function getAmountText(value: unknown, format: 'report' | 'plain', showZero = false) {
+  if (value == null) return '';
+  const amount = Number(value);
+  if (!showZero && Math.abs(amount) < 0.005) return '';
+  if (Number.isNaN(amount)) return '';
+  return format === 'plain' ? amount.toFixed(2) : formatReportAmount(showZero ? amount : value);
 }
 
 export default function CopyableReportAmount({
   value,
   format = 'report',
   strong = false,
-  className
+  className,
+  showZero = false
 }: CopyableReportAmountProps) {
   const { message } = App.useApp();
-  const text = getAmountText(value, format);
+  const text = getAmountText(value, format, showZero);
 
   if (!text) return null;
 

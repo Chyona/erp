@@ -1389,6 +1389,125 @@ export const Salary = {
 
   formatPeriodLabel,
 
+  /** 单月工资表人力成本快照（不论是否已关联凭证），供上月默认值参考 */
+  async getMonthCostSnapshot(periodKey: string): Promise<{
+    periodKey: string;
+    salaryGross: number;
+    laborGross: number;
+    companySocialSecurity: number;
+    companyHousingFund: number;
+  } | null> {
+    if (!periodKey) return null;
+    const store = await readStore();
+    const raw = store[periodKey];
+    if (!raw) return null;
+    const data = normalizePeriod(raw);
+    const salaryRows = calcSalaryRowsForPeriod(store, data.periodKey, data.salaryRows);
+    const laborRows = data.laborRows.map(calcLaborRow);
+    const employerCosts = normalizeEmployerCosts(data.employerCosts);
+    return {
+      periodKey: data.periodKey,
+      salaryGross: sumSalaryRows(salaryRows).preTaxSalary,
+      laborGross: sumLaborRows(laborRows).grossAmount,
+      companySocialSecurity: employerCosts.socialSecurity,
+      companyHousingFund: employerCosts.housingFund
+    };
+  },
+
+  /**
+   * 汇总区间内「工资表已有、但尚未关联对应凭证」的人力成本，供税费预估扣减利润。
+   * - 无计提工资凭证 → 计入应发工资
+   * - 无劳务计提凭证 → 计入劳务应发
+   * - 无社保/公积金关联凭证 → 计入单位部分
+   */
+  async getUnbookedPayrollCostSummary(startKey: string, endKey: string): Promise<{
+    startKey: string;
+    endKey: string;
+    unbookedSalaryGross: number;
+    unbookedLaborGross: number;
+    unbookedCompanySocialSecurity: number;
+    unbookedCompanyHousingFund: number;
+    /** 区间内存在「有金额且已关联对应凭证」的月份 */
+    salaryLinked: boolean;
+    laborLinked: boolean;
+    socialSecurityLinked: boolean;
+    housingFundLinked: boolean;
+    total: number;
+    monthCount: number;
+  }> {
+    const store = await readStore();
+    const vouchers = await Voucher.getAll();
+    const voucherIds = new Set(vouchers.map((item) => item.id));
+    const periods = Object.values(store)
+      .filter((item) => item.periodKey >= startKey && item.periodKey <= endKey)
+      .sort((a, b) => a.periodKey.localeCompare(b.periodKey));
+
+    let unbookedSalaryGross = 0;
+    let unbookedLaborGross = 0;
+    let unbookedCompanySocialSecurity = 0;
+    let unbookedCompanyHousingFund = 0;
+    let salaryLinked = false;
+    let laborLinked = false;
+    let socialSecurityLinked = false;
+    let housingFundLinked = false;
+    let monthCount = 0;
+
+    for (const raw of periods) {
+      const data = normalizePeriod(raw);
+      const links = (data.voucherLinks || []).filter((link) => voucherIds.has(link.voucherId));
+      const hasLink = (linkType: PayrollVoucherLinkType) =>
+        links.some((link) => link.linkType === linkType);
+
+      const salaryRows = calcSalaryRowsForPeriod(store, data.periodKey, data.salaryRows);
+      const laborRows = data.laborRows.map(calcLaborRow);
+      const salaryGross = sumSalaryRows(salaryRows).preTaxSalary;
+      const laborGross = sumLaborRows(laborRows).grossAmount;
+      const employerCosts = normalizeEmployerCosts(data.employerCosts);
+
+      const accrualLinked = hasLink('accrual');
+      const laborAccrualLinked = hasLink('laborAccrual');
+      const ssLinked = hasLink('socialSecurity');
+      const hfLinked = hasLink('housingFund');
+      if (accrualLinked && salaryGross > 0.005) salaryLinked = true;
+      if (laborAccrualLinked && laborGross > 0.005) laborLinked = true;
+      if (ssLinked && employerCosts.socialSecurity > 0.005) socialSecurityLinked = true;
+      if (hfLinked && employerCosts.housingFund > 0.005) housingFundLinked = true;
+
+      const monthSalary = accrualLinked ? 0 : salaryGross;
+      const monthLabor = laborAccrualLinked ? 0 : laborGross;
+      const monthSs = ssLinked ? 0 : employerCosts.socialSecurity;
+      const monthHf = hfLinked ? 0 : employerCosts.housingFund;
+      const monthTotal = roundMoney(monthSalary + monthLabor + monthSs + monthHf);
+      if (monthTotal <= 0.005) continue;
+
+      monthCount += 1;
+      unbookedSalaryGross = roundMoney(unbookedSalaryGross + monthSalary);
+      unbookedLaborGross = roundMoney(unbookedLaborGross + monthLabor);
+      unbookedCompanySocialSecurity = roundMoney(unbookedCompanySocialSecurity + monthSs);
+      unbookedCompanyHousingFund = roundMoney(unbookedCompanyHousingFund + monthHf);
+    }
+
+    return {
+      startKey,
+      endKey,
+      unbookedSalaryGross,
+      unbookedLaborGross,
+      unbookedCompanySocialSecurity,
+      unbookedCompanyHousingFund,
+      salaryLinked,
+      laborLinked,
+      socialSecurityLinked,
+      housingFundLinked,
+      total: roundMoney(
+        unbookedSalaryGross +
+          unbookedLaborGross +
+          unbookedCompanySocialSecurity +
+          unbookedCompanyHousingFund
+      ),
+      monthCount
+    };
+  },
+
   async getPeriodStats(year: number) {
     const store = await readStore();
     const prefix = `${year}-`;

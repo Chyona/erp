@@ -726,6 +726,47 @@ body,
   flex-shrink: 0;
 }
 
+.topbar__identity {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: min(52vw, 520px);
+}
+
+.topbar__company {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar__privacy-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.topbar__privacy-toggle:hover,
+.topbar__privacy-toggle:focus-visible {
+  color: #1677ff;
+  background: rgba(22, 119, 255, 0.08);
+  outline: none;
+}
+
 .topbar__actions {
   display: flex;
   align-items: center;
@@ -3548,25 +3589,48 @@ body,
 }
 
 .payroll-stats-panel__tabs {
-  flex: 1;
+  flex: 1 1 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+}
+
+.payroll-stats-panel__tabs > .ant-tabs-nav {
+  flex-shrink: 0;
 }
 
 .payroll-stats-panel__tabs .ant-tabs-content-holder {
-  flex: 1;
+  flex: 1 1 0;
   min-height: 0;
+  height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
-.payroll-stats-panel__tabs .ant-tabs-content,
-.payroll-stats-panel__tabs .ant-tabs-tabpane {
+.payroll-stats-panel__tabs .ant-tabs-content {
+  flex: 1 1 0;
+  min-height: 0;
   height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.payroll-stats-panel__tabs .ant-tabs-tabpane-active {
+  display: flex !important;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .payroll-stats-panel__table {
-  flex: 1;
+  flex: 1 1 0;
   min-height: 0;
+  height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
