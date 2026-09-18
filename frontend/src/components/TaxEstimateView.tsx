@@ -108,6 +108,7 @@ export default function TaxEstimateView({
   const previousLabel = cit?.payrollAdjustment?.previousPeriodKey
     ? cit.payrollAdjustment.previousPeriodKey.replace('-', '年') + '月'
     : '';
+  const payrollHint = previousLabel ? `默认取自${previousLabel}` : '非当前月份或季度，不计未入账';
   const surchargeTotalPercent = roundDisplayPercent(
     surchargeRates.cityPercent +
     surchargeRates.educationPercent +
@@ -117,6 +118,14 @@ export default function TaxEstimateView({
   const patchPayroll = (patch: Partial<CitPayrollAdjustmentValues>) => {
     onPayrollAdjustmentChange({ ...payrollAdjustment, ...patch });
   };
+  const payrollTotal =
+    Math.round(
+      ((Number(payrollAdjustment.unbookedSalaryGross) || 0) +
+        (Number(payrollAdjustment.unbookedLaborGross) || 0) +
+        (Number(payrollAdjustment.unbookedCompanySocialSecurity) || 0) +
+        (Number(payrollAdjustment.unbookedCompanyHousingFund) || 0)) *
+      100
+    ) / 100;
 
   return (
     <div className={`tax-estimate-view${loading ? ' tax-estimate-view--loading' : ''}`}>
@@ -273,85 +282,95 @@ export default function TaxEstimateView({
             hint="利润表本期数，未扣未入账人力成本"
           />
 
-          <div className="tax-estimate-view__subtitle-row tax-estimate-view__subtitle-row--inline">
-            <Text strong className="tax-estimate-view__subtitle">
-              未入账人力成本（可改）
-            </Text>
-            {onResetPayrollAdjustment ? (
-              <Button type="link" size="small" onClick={onResetPayrollAdjustment}>
-                恢复默认
-              </Button>
-            ) : null}
+          <div className="tax-estimate-payroll">
+            <div className="tax-estimate-payroll__head">
+              <Text strong className="tax-estimate-view__subtitle">
+                未入账人力成本（可改）
+              </Text>
+              <span className="tax-estimate-payroll__total">
+                <CopyableReportAmount value={payrollTotal} format="plain" showZero strong />
+              </span>
+              {onResetPayrollAdjustment ? (
+                <Button
+                  type="link"
+                  size="small"
+                  className="tax-estimate-payroll__reset"
+                  onClick={onResetPayrollAdjustment}
+                >
+                  恢复默认
+                </Button>
+              ) : null}
+            </div>
+            <div className="tax-estimate-payroll__list">
+              <EditableDeductionRow
+                label="减：未入账应发工资"
+                hint={payrollHint}
+                value={payrollAdjustment.unbookedSalaryGross}
+                onChange={(unbookedSalaryGross) => patchPayroll({ unbookedSalaryGross })}
+              />
+              <EditableDeductionRow
+                label="减：未入账劳务应发"
+                hint={payrollHint}
+                value={payrollAdjustment.unbookedLaborGross}
+                onChange={(unbookedLaborGross) => patchPayroll({ unbookedLaborGross })}
+              />
+              <EditableDeductionRow
+                label="减：未入账公司社保"
+                hint={payrollHint}
+                value={payrollAdjustment.unbookedCompanySocialSecurity}
+                onChange={(unbookedCompanySocialSecurity) =>
+                  patchPayroll({ unbookedCompanySocialSecurity })
+                }
+              />
+              <EditableDeductionRow
+                label="减：未入账公司公积金"
+                hint={payrollHint}
+                value={payrollAdjustment.unbookedCompanyHousingFund}
+                onChange={(unbookedCompanyHousingFund) =>
+                  patchPayroll({ unbookedCompanyHousingFund })
+                }
+              />
+            </div>
           </div>
 
-          <EditableDeductionRow
-            label="减：未入账应发工资"
-            hint={previousLabel ? `默认取自${previousLabel}` : '暂无上月工资表'}
-            value={payrollAdjustment.unbookedSalaryGross}
-            onChange={(unbookedSalaryGross) => patchPayroll({ unbookedSalaryGross })}
-          />
-          <EditableDeductionRow
-            label="减：未入账劳务应发"
-            hint={previousLabel ? `默认取自${previousLabel}` : '暂无上月工资表'}
-            value={payrollAdjustment.unbookedLaborGross}
-            onChange={(unbookedLaborGross) => patchPayroll({ unbookedLaborGross })}
-          />
-          <EditableDeductionRow
-            label="减：未入账公司社保"
-            hint={previousLabel ? `默认取自${previousLabel}` : '暂无上月工资表'}
-            value={payrollAdjustment.unbookedCompanySocialSecurity}
-            onChange={(unbookedCompanySocialSecurity) =>
-              patchPayroll({ unbookedCompanySocialSecurity })
-            }
-          />
-          <EditableDeductionRow
-            label="减：未入账公司公积金"
-            hint={previousLabel ? `默认取自${previousLabel}` : '暂无上月工资表'}
-            value={payrollAdjustment.unbookedCompanyHousingFund}
-            onChange={(unbookedCompanyHousingFund) =>
-              patchPayroll({ unbookedCompanyHousingFund })
-            }
-          />
-
           <MetricRow
-            label="调整后利润总额（预估税基）"
+            label="调整后利润总额"
             value={cit?.totalProfit || 0}
             hint={
               (cit?.payrollAdjustment?.total || 0) > 0.005
-                ? `账面利润 − 未入账人力成本 ${Number(cit?.payrollAdjustment?.total || 0).toFixed(2)}`
+                ? `账面利润 − 未入账人力成本`
                 : '本期工资/社保公积金均已关联凭证或暂无数据'
             }
             emphasize
           />
-          <MetricRow label="本年累计账面利润总额" value={cit?.bookedYtdTotalProfit || 0} />
+          {/* <MetricRow label="本年累计账面利润总额" value={cit?.bookedYtdTotalProfit || 0} />
           <MetricRow
             label="本年累计调整后利润总额"
-            value={cit?.ytdTotalProfit || 0}
-            hint={
-              (cit?.payrollAdjustment?.ytdTotal || 0) > 0.005
-                ? `已扣减本年未入账人力 ${Number(cit?.payrollAdjustment?.ytdTotal || 0).toFixed(2)}`
-                : undefined
-            }
-          />
+            value={((cit?.bookedYtdTotalProfit || 0) - payrollTotal) || 0}
+            hint={`本年累计账面利润 − 未入账人力成本`} />
           <MetricRow
             label="本年累计预估所得税"
             value={cit?.ytdEstimatedTax || 0}
-            hint={`max(本年累计调整后利润总额, 0) × ${citRatePercent}%`} />
+            hint={`max(本年累计调整后利润总额, 0) × ${citRatePercent}%`} /> */}
           <MetricRow
-            label="预估本期所得税"
-            value={cit?.estimatedTax || 0}
-            hint={`max(调整后利润总额, 0) × ${citRatePercent}%`}
+            label="本期缴纳上期所得税"
+            value={cit?.priorPeriodCitPaid || 0}
+            hint="利润表本期 5801"
+          />
+          <MetricRow
+            label="调整后本期利润（本期预估税基）"
+            value={
+              Math.round(
+                ((cit?.totalProfit || 0) - (cit?.priorPeriodCitPaid || 0)) * 100
+              ) / 100
+            }
+            hint="调整后利润总额 − 本期缴纳上期所得税"
             emphasize
           />
           <MetricRow
-            label="本年度已缴纳企业所得税（5801）"
-            value={cit?.ytdIncomeTaxExpense || 0}
-            hint="利润表本年累计 5801"
-          />
-          <MetricRow
-            label="建议补提金额"
-            value={cit?.remainingToAccrue || 0}
-            hint={citAccrualHint(cit)}
+            label="预估本期所得税"
+            value={cit?.estimatedTax || 0}
+            hint={`max(调整后本期利润, 0) × ${citRatePercent}%`}
             emphasize
           />
         </section>

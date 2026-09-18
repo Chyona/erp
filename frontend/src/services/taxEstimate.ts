@@ -34,9 +34,8 @@ function shiftPayrollMonth(year: number, month: number, delta: number) {
 }
 
 /**
- * 人力成本默认取值月份：
- * - 按月：查询月的上月
- * - 按季：本季「当月」的上月（当月=今天落在本季则取今天所在月，否则取季度末月）
+ * 未入账人力只在查询当月或当前季度时预填，取「当月」的上月工资表。
+ * 历史期间和未来期间视为已入账，不再带出未入账金额。
  */
 function resolvePayrollReferenceKey(period: {
   type: string;
@@ -44,22 +43,18 @@ function resolvePayrollReferenceKey(period: {
   month?: number;
   quarter?: number;
 }) {
+  const now = new Date();
+  const nowYear = now.getFullYear();
+  const nowMonth = now.getMonth() + 1;
+  const nowQuarter = Math.ceil(nowMonth / 3);
+
   if (period.type === 'quarter' && period.quarter) {
-    const startMonth = (period.quarter - 1) * 3 + 1;
-    const endMonth = period.quarter * 3;
-    const now = new Date();
-    const nowYear = now.getFullYear();
-    const nowMonth = now.getMonth() + 1;
-    let anchorMonth = endMonth;
-    if (period.year === nowYear && nowMonth >= startMonth && nowMonth <= endMonth) {
-      anchorMonth = nowMonth;
-    } else if (period.year > nowYear || (period.year === nowYear && startMonth > nowMonth)) {
-      return null;
-    }
-    return shiftPayrollMonth(period.year, anchorMonth, -1);
+    if (period.year !== nowYear || period.quarter !== nowQuarter) return null;
+    return shiftPayrollMonth(period.year, nowMonth, -1);
   }
 
   if (period.month) {
+    if (period.year !== nowYear || period.month !== nowMonth) return null;
     return shiftPayrollMonth(period.year, period.month, -1);
   }
   return null;
@@ -142,7 +137,7 @@ export type TaxEstimateResult = {
     totalProfit: number;
     ytdTotalProfit: number;
     incomeTaxExpense: number;
-    /** 查询期间 5801，保留供对照；界面展示用本年累计 */
+    /** 查询期间 5801，即本期已交所得税 */
     priorPeriodCitPaid: number;
     /** 年初至查询截止日的 5801，即本年度已缴纳企业所得税 */
     ytdIncomeTaxExpense: number;
@@ -162,9 +157,9 @@ function normalizeRate(value: unknown, fallback: number) {
 function sumPayrollValues(values: CitPayrollAdjustmentValues) {
   return roundMoney(
     Number(values.unbookedSalaryGross || 0) +
-      Number(values.unbookedLaborGross || 0) +
-      Number(values.unbookedCompanySocialSecurity || 0) +
-      Number(values.unbookedCompanyHousingFund || 0)
+    Number(values.unbookedLaborGross || 0) +
+    Number(values.unbookedCompanySocialSecurity || 0) +
+    Number(values.unbookedCompanyHousingFund || 0)
   );
 }
 
@@ -269,14 +264,14 @@ export function applyEstimateRates(
     ),
     unbookedCompanySocialSecurity: roundMoney(
       options.payrollAdjustment?.unbookedCompanySocialSecurity ??
-        baseAdj.unbookedCompanySocialSecurity
+      baseAdj.unbookedCompanySocialSecurity
     ),
     unbookedCompanyHousingFund: roundMoney(
       options.payrollAdjustment?.unbookedCompanyHousingFund ?? baseAdj.unbookedCompanyHousingFund
     )
   };
   const periodTotal = sumPayrollValues(payrollValues);
-  const ytdTotal = roundMoney(baseAdj.ytdAutoTotal - baseAdj.autoTotal + periodTotal);
+  const ytdTotal = periodTotal;
   const payrollAdjustment: CitPayrollAdjustment = {
     ...baseAdj,
     ...payrollValues,
@@ -286,9 +281,10 @@ export function applyEstimateRates(
 
   const totalProfit = roundMoney(data.cit.bookedTotalProfit - periodTotal);
   const ytdTotalProfit = roundMoney(data.cit.bookedYtdTotalProfit - ytdTotal);
+  const periodProfit = roundMoney(totalProfit - data.cit.priorPeriodCitPaid);
 
   const rate = citRatePercent / 100;
-  const estimatedTax = roundMoney(Math.max(0, totalProfit) * rate);
+  const estimatedTax = roundMoney(Math.max(0, periodProfit) * rate);
   const ytdEstimatedTax = roundMoney(Math.max(0, ytdTotalProfit) * rate);
   const ytdPaid = roundMoney(data.cit.ytdIncomeTaxExpense);
   const remainingToAccrue = roundMoney(Math.max(0, ytdEstimatedTax - ytdPaid));
@@ -335,24 +331,19 @@ export async function getTaxEstimate(
     surchargeRates?: Partial<SurchargeRatePercents>;
   } = {}
 ): Promise<TaxEstimateResult> {
-  const periodStartKey = toPayrollPeriodKey(startDate);
   const periodEndKey = toPayrollPeriodKey(endDate);
-  const ytdStartKey = `${periodEndKey.slice(0, 4)}-01`;
   const previousKey = resolvePayrollReferenceKey(period);
 
-  const [income, taxSummary, trial, periodPayroll, ytdPayroll, previousSnapshot] =
-    await Promise.all([
-      Reports.getIncomeStatement(startDate, endDate, period, {
-        virtualClosing: options.virtualClosing
-      }),
-      TaxExemption.getPeriodSummary(period, { includeDrafts: true }),
-      Reports.getTrialBalance(startDate, endDate, period, {
-        virtualClosing: options.virtualClosing
-      }),
-      Salary.getUnbookedPayrollCostSummary(periodStartKey, periodEndKey),
-      Salary.getUnbookedPayrollCostSummary(ytdStartKey, periodEndKey),
-      previousKey ? Salary.getMonthCostSnapshot(previousKey) : Promise.resolve(null)
-    ]);
+  const [income, taxSummary, trial, previousSnapshot] = await Promise.all([
+    Reports.getIncomeStatement(startDate, endDate, period, {
+      virtualClosing: options.virtualClosing
+    }),
+    TaxExemption.getPeriodSummary(period, { includeDrafts: true }),
+    Reports.getTrialBalance(startDate, endDate, period, {
+      virtualClosing: options.virtualClosing
+    }),
+    previousKey ? Salary.getMonthCostSnapshot(previousKey) : Promise.resolve(null)
+  ]);
 
   const ordinaryPendingTax = roundMoney(taxSummary.pendingTaxTotal || 0);
   const ordinaryDoneTax = roundMoney(
@@ -381,7 +372,7 @@ export async function getTaxEstimate(
     unbookedCompanyHousingFund: hfDefault.value
   };
   const autoTotal = sumPayrollValues(autoValues);
-  const ytdAutoTotal = roundMoney(ytdPayroll.total - periodPayroll.total + autoTotal);
+  const ytdAutoTotal = autoTotal;
 
   const payrollAdjustment: CitPayrollAdjustment = {
     ...autoValues,
@@ -389,8 +380,8 @@ export async function getTaxEstimate(
     ytdTotal: ytdAutoTotal,
     autoTotal,
     ytdAutoTotal,
-    monthCount: periodPayroll.monthCount,
-    ytdMonthCount: ytdPayroll.monthCount,
+    monthCount: previousSnapshot ? 1 : 0,
+    ytdMonthCount: previousSnapshot ? 1 : 0,
     previousPeriodKey: previousKey,
     fromPreviousMonth: {
       unbookedSalaryGross: salaryDefault.fromPreviousMonth,

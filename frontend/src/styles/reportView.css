@@ -400,6 +400,97 @@
   justify-content: space-between;
 }
 
+.tax-estimate-payroll {
+  container-type: inline-size;
+  margin: 10px 0 6px;
+  padding: 8px 12px 2px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+.tax-estimate-payroll__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 28px;
+}
+
+.tax-estimate-payroll__total {
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  color: #1d4ed8;
+}
+
+.tax-estimate-payroll__reset {
+  margin-left: auto;
+  height: auto;
+  padding-inline: 0;
+}
+
+.tax-estimate-payroll__list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.tax-estimate-payroll .tax-estimate-view__row {
+  align-items: center;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom-color: #e8eef5;
+}
+
+.tax-estimate-payroll .tax-estimate-view__label {
+  font-size: 13px;
+}
+
+.tax-estimate-payroll .tax-estimate-view__amount-input,
+.tax-estimate-payroll .tax-estimate-view__row--editable .tax-estimate-view__value {
+  width: 120px;
+  min-width: 120px;
+}
+
+.tax-estimate-payroll .ant-input-number {
+  width: 120px;
+  background: #fff;
+}
+
+.tax-estimate-payroll .ant-input-number-input {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+@container (min-width: 640px) {
+  .tax-estimate-payroll__list {
+    position: relative;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 0;
+  }
+
+  .tax-estimate-payroll__list::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    bottom: 8px;
+    left: 50%;
+    width: 1px;
+    background: #dbe3ee;
+    transform: translateX(-0.5px);
+  }
+
+  .tax-estimate-payroll .tax-estimate-view__row:nth-child(odd) {
+    padding-right: 16px;
+  }
+
+  .tax-estimate-payroll .tax-estimate-view__row:nth-child(even) {
+    padding-left: 16px;
+  }
+
+  .tax-estimate-payroll .tax-estimate-view__row:nth-last-child(-n + 2) {
+    border-bottom: none;
+  }
+}
+
 .tax-estimate-view__subtitle {
   color: #0f172a;
   font-size: 13px;
