@@ -146,11 +146,11 @@ export default function TaxEstimateView({
           </div>
           <MetricRow label="销项税额合计" value={vat?.outputTaxTotal || 0} />
           <MetricRow
-            label="其中：普票销项（待减免）"
-            value={vat?.ordinaryPendingTax || 0}
-            hint="尚未做普票免税结转"
+            label="其中：普票销项"
+            value={
+              Math.round(((vat?.ordinaryPendingTax || 0) + (vat?.ordinaryDoneTax || 0)) * 100) / 100
+            }
           />
-          <MetricRow label="其中：普票销项（已减免）" value={vat?.ordinaryDoneTax || 0} />
           <MetricRow label="其中：专票销项" value={vat?.specialTax || 0} />
           <MetricRow
             label="预估应交增值税（假设普票按期减免）"
@@ -235,15 +235,6 @@ export default function TaxEstimateView({
             value={surcharge?.localEducationTax || 0}
           />
           <MetricRow label="预估附加税合计" value={surcharge?.total || 0} emphasize />
-          <MetricRow
-            label="本期已计提税金及附加（5403）"
-            value={surcharge?.bookedTaxSurcharge || 0}
-          />
-          <MetricRow
-            label="建议补提附加税"
-            value={surcharge?.remainingToAccrue || 0}
-            hint="预估附加税 − 已计提（不小于 0）"
-          />
           <MetricRow
             label="预估增值税+附加合计（减免后）"
             value={vat?.estimatedPayableWithSurcharge || 0}
@@ -343,15 +334,6 @@ export default function TaxEstimateView({
             }
             emphasize
           />
-          {/* <MetricRow label="本年累计账面利润总额" value={cit?.bookedYtdTotalProfit || 0} />
-          <MetricRow
-            label="本年累计调整后利润总额"
-            value={((cit?.bookedYtdTotalProfit || 0) - payrollTotal) || 0}
-            hint={`本年累计账面利润 − 未入账人力成本`} />
-          <MetricRow
-            label="本年累计预估所得税"
-            value={cit?.ytdEstimatedTax || 0}
-            hint={`max(本年累计调整后利润总额, 0) × ${citRatePercent}%`} /> */}
           <MetricRow
             label="本期缴纳上期所得税"
             value={cit?.priorPeriodCitPaid || 0}
@@ -373,6 +355,16 @@ export default function TaxEstimateView({
             hint={`max(调整后本期利润, 0) × ${citRatePercent}%`}
             emphasize
           />
+
+          {/* <MetricRow label="本年累计账面利润总额" value={cit?.bookedYtdTotalProfit || 0} />
+          <MetricRow
+            label="本年累计调整后利润总额"
+            value={((cit?.bookedYtdTotalProfit || 0) - payrollTotal) || 0}
+            hint={`本年累计账面利润 − 未入账人力成本`} />
+          <MetricRow
+            label="本年累计预估所得税"
+            value={cit?.ytdEstimatedTax || 0}
+            hint={`max(本年累计调整后利润总额, 0) × ${citRatePercent}%`} /> */}
         </section>
       </div>
     </div>
