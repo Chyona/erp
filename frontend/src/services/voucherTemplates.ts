@@ -117,7 +117,7 @@ export async function save(template: Partial<VoucherTemplate> & { name?: string 
   );
   if (duplicate) throw new Error('已存在同名模板，请换一个名称');
 
-  const item = sanitizeVoucherTemplate({
+  const persisted = sanitizeVoucherTemplate({
     id: template.id,
     name,
     createdAt: template.createdAt || new Date().toISOString(),
@@ -129,13 +129,6 @@ export async function save(template: Partial<VoucherTemplate> & { name?: string 
     entries: template.entries || []
   });
 
-  // 二次保险：序列化后再解析，杜绝隐藏可枚举脏字段
-  const persisted = JSON.parse(JSON.stringify(item)) as VoucherTemplate;
-  delete (persisted as Record<string, unknown>).invoiceNumbers;
-  delete (persisted as Record<string, unknown>).attachmentIds;
-  delete (persisted as Record<string, unknown>).attachments;
-  delete (persisted as Record<string, unknown>).attachmentCount;
-
   const idx = list.findIndex((t) => t.id === persisted.id);
   if (idx >= 0) {
     list[idx] = persisted;
@@ -143,14 +136,10 @@ export async function save(template: Partial<VoucherTemplate> & { name?: string 
     list.unshift(persisted);
   }
 
-  const payload = list.map((row) => {
-    const clean = sanitizeVoucherTemplate(row as Partial<VoucherTemplate> & Record<string, unknown>);
-    delete (clean as Record<string, unknown>).invoiceNumbers;
-    delete (clean as Record<string, unknown>).attachmentIds;
-    delete (clean as Record<string, unknown>).attachments;
-    delete (clean as Record<string, unknown>).attachmentCount;
-    return clean;
-  });
+  // 全量再走一遍白名单，避免历史脏字段（发票号/附件）被写回
+  const payload = list.map((row) =>
+    sanitizeVoucherTemplate(row as Partial<VoucherTemplate> & Record<string, unknown>)
+  );
 
   await ErpApi.setSetting(SETTING_KEY, payload);
   await ErpApi.addAuditLog('保存', '凭证模板', persisted.name);
