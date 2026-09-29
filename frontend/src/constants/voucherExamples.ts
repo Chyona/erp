@@ -8,7 +8,7 @@ export const VOUCHER_EXAMPLES = [
     remark:
       '摘要末尾标注垫付人姓名，格式如“（姓名垫付）”，便于月底按垫付人汇总统计。',
     entries: [
-      { summary: '【办公费】腾讯云代码助手（thm垫付）', accountCode: '5401', debit: 140, credit: 0 },
+      { summary: '【办公费】腾讯云代码助手（thm垫付）', accountCode: '5602', debit: 140, credit: 0 },
       { summary: '【办公费】腾讯云代码助手（thm垫付）', accountCode: '2241', debit: 0, credit: 140 }
     ]
   },
