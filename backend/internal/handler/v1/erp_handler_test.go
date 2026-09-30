@@ -183,8 +183,10 @@ func (s *stubErpService) UnapproveVouchersBatch(ctx context.Context, ids []strin
 	}
 	return &service.VoucherBatchOpResult{Unapproved: len(ids), Failed: []service.VoucherBatchFailItem{}}, nil
 }
-func (s *stubErpService) DeleteVoucher(ctx context.Context, id string) error { return s.err }
-func (s *stubErpService) DeleteVouchersBatch(ctx context.Context, ids []string) (*service.VoucherBatchOpResult, error) {
+func (s *stubErpService) DeleteVoucher(ctx context.Context, id string, opts service.DeleteVoucherOptions) error {
+	return s.err
+}
+func (s *stubErpService) DeleteVouchersBatch(ctx context.Context, ids []string, opts service.DeleteVoucherOptions) (*service.VoucherBatchOpResult, error) {
 	if s.err != nil {
 		return nil, s.err
 	}

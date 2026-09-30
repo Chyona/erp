@@ -92,7 +92,7 @@ func TestErpService_Vouchers(t *testing.T) {
 		t.Fatalf("ListVouchers() = %v, %v", list, err)
 	}
 
-	if err := svc.DeleteVoucher(ctx, "v1"); err != nil {
+	if err := svc.DeleteVoucher(ctx, "v1", DeleteVoucherOptions{}); err != nil {
 		t.Fatalf("DeleteVoucher() error = %v", err)
 	}
 	if err := svc.ClearVouchers(ctx); err != nil {
@@ -147,7 +147,7 @@ func TestErpService_VoucherBatch(t *testing.T) {
 		t.Fatalf("d1 after unapprove = %+v, want reviewedBy cleared", got)
 	}
 
-	del, err := svc.DeleteVouchersBatch(ctx, []string{"d2", "l1", "c1", "missing"})
+	del, err := svc.DeleteVouchersBatch(ctx, []string{"d2", "l1", "c1", "missing"}, DeleteVoucherOptions{})
 	if err != nil {
 		t.Fatalf("DeleteVouchersBatch() error = %v", err)
 	}
@@ -156,6 +156,16 @@ func TestErpService_VoucherBatch(t *testing.T) {
 	// l1 locked fail, c1 CF fail, missing skipped
 	if del.Deleted != 1 || del.Skipped != 1 || len(del.Failed) != 2 {
 		t.Fatalf("DeleteVouchersBatch() = %+v, want deleted=1 skipped=1 failed=2", del)
+	}
+
+	bypass, err := svc.DeleteVouchersBatch(ctx, []string{"c1"}, DeleteVoucherOptions{
+		AllowCarryForwardBypass: true,
+	})
+	if err != nil {
+		t.Fatalf("DeleteVouchersBatch bypass error = %v", err)
+	}
+	if bypass.Deleted != 1 || len(bypass.Failed) != 0 {
+		t.Fatalf("DeleteVouchersBatch bypass = %+v, want deleted=1", bypass)
 	}
 }
 

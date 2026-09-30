@@ -279,15 +279,18 @@ async function unapproveVouchersBatch(ids: string | string[]): Promise<VoucherBa
 async function remove(
   storeName: StoreName,
   key: string,
-  options?: { confirmPassword?: string }
+  options?: { confirmPassword?: string; allowCarryForwardBypass?: boolean }
 ): Promise<void> {
   await open();
   const path =
     storeName === 'settings'
       ? `${STORE_PATHS.settings}/${encodeURIComponent(key)}`
       : `${STORE_PATHS[storeName]}/${encodeURIComponent(key)}`;
-  if (storeName === 'vouchers' && options?.confirmPassword) {
-    await apiRequest('DELETE', path, { confirmPassword: options.confirmPassword });
+  if (storeName === 'vouchers' && (options?.confirmPassword || options?.allowCarryForwardBypass)) {
+    await apiRequest('DELETE', path, {
+      confirmPassword: options?.confirmPassword,
+      allowCarryForwardBypass: options?.allowCarryForwardBypass || undefined
+    });
     touchListCache(storeName);
     return;
   }

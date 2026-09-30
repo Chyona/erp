@@ -16,6 +16,7 @@ import { INVOICE_TYPE_LABEL } from '../constants/invoice';
 import { useApp } from '../context/AppContext';
 import { useTabDataRefresh } from '../context/PageTabsContext';
 import { confirmDanger } from '../utils/confirmAction';
+import { confirmDeleteWithPassword } from '../utils/confirmDeleteWithPassword';
 import ReportPeriodFilter from './ReportPeriodFilter';
 import {
   defaultTaxExemptionPeriod,
@@ -23,6 +24,7 @@ import {
   formatTaxExemptionPeriod,
   taxExemptionPeriodKey
 } from '../utils/reportPeriod';
+import { useAuth } from '../context/AuthContext';
 
 const { Text } = Typography;
 
@@ -97,6 +99,7 @@ export default function TaxExemptionPanel({
   onGoProfitLossClosing?: () => void;
 }) {
   const { message, modal } = App.useApp();
+  const { role } = useAuth();
   const { refreshKey, refresh } = useApp();
   const tabDataRefresh = useTabDataRefresh();
   const { openVoucherEdit } = useVoucherPageNavigation();
@@ -193,7 +196,9 @@ export default function TaxExemptionPanel({
 
     const cfPeriodLabel = formatStoredTaxExemptionPeriod(cf) || periodLabel;
 
-    const ok = await confirmDanger(modal, {
+    confirmDeleteWithPassword({
+      modal,
+      isAdmin: role === 'admin',
       title: '反结转',
       content: (
         <div>
@@ -212,23 +217,26 @@ export default function TaxExemptionPanel({
           </p>
         </div>
       ),
-      okText: '确认反结转'
+      okText: '确认反结转',
+      onConfirm: async (confirmPassword) => {
+        setReversing(carryForwardId);
+        try {
+          const result = await TaxExemption.reverseCarryForward(period, carryForwardId, {
+            confirmPassword
+          });
+          message.success(
+            `已反结转，删除 ${result.voucher.voucherNo}，恢复 ${result.restoredCount} 笔销售凭证`
+          );
+          refresh();
+          loadSummary();
+        } catch (err) {
+          message.error(err.message || '反结转失败');
+          throw err;
+        } finally {
+          setReversing('');
+        }
+      }
     });
-    if (!ok) return;
-
-    setReversing(carryForwardId);
-    try {
-      const result = await TaxExemption.reverseCarryForward(period, carryForwardId);
-      message.success(
-        `已反结转，删除 ${result.voucher.voucherNo}，恢复 ${result.restoredCount} 笔销售凭证`
-      );
-      refresh();
-      loadSummary();
-    } catch (err) {
-      message.error(err.message || '反结转失败');
-    } finally {
-      setReversing('');
-    }
   };
 
   const relatedCarryForwardVouchers = summary?.relatedCarryForwardVouchers || [];

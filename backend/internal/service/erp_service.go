@@ -37,8 +37,8 @@ type ErpService interface {
 	SaveVouchersBatch(ctx context.Context, vouchers []model.Voucher) ([]model.Voucher, error)
 	ApproveVouchersBatch(ctx context.Context, ids []string) (*VoucherBatchOpResult, error)
 	UnapproveVouchersBatch(ctx context.Context, ids []string) (*VoucherBatchOpResult, error)
-	DeleteVoucher(ctx context.Context, id string) error
-	DeleteVouchersBatch(ctx context.Context, ids []string) (*VoucherBatchOpResult, error)
+	DeleteVoucher(ctx context.Context, id string, opts DeleteVoucherOptions) error
+	DeleteVouchersBatch(ctx context.Context, ids []string, opts DeleteVoucherOptions) (*VoucherBatchOpResult, error)
 	ClearVouchers(ctx context.Context) error
 
 	ListAttachments(ctx context.Context) ([]model.Attachment, error)
@@ -446,9 +446,16 @@ func parseAttachmentIDs(raw datatypes.JSON) []string {
 	return uniqueIDs(ids)
 }
 
+// DeleteVoucherOptions 删除凭证选项（反结转等场景需放行系统结转凭证）。
+type DeleteVoucherOptions struct {
+	// AllowCarryForwardBypass 为 true 时允许删除损益/普票结转凭证；
+	// 若该凭证已结账，也一并放行（仅结转凭证，普通已结账凭证仍不可删）。
+	AllowCarryForwardBypass bool
+}
+
 // DeleteVouchersBatch 批量删除凭证（附带删除关联附件）；已结账/结转凭证记入 failed。
 // 顺序：先删凭证 DB，再删附件元数据与对象存储，避免存储已删而 DB 失败导致数据丢失。
-func (s *erpService) DeleteVouchersBatch(ctx context.Context, ids []string) (*VoucherBatchOpResult, error) {
+func (s *erpService) DeleteVouchersBatch(ctx context.Context, ids []string, opts DeleteVoucherOptions) (*VoucherBatchOpResult, error) {
 	ids = uniqueIDs(ids)
 	result := &VoucherBatchOpResult{Failed: []VoucherBatchFailItem{}}
 	if len(ids) == 0 {
@@ -479,13 +486,16 @@ func (s *erpService) DeleteVouchersBatch(ctx context.Context, ids []string) (*Vo
 			})
 			continue
 		}
+		carryForward := isCarryForwardVoucher(&item)
 		if item.Status == "locked" {
-			result.Failed = append(result.Failed, VoucherBatchFailItem{
-				ID: id, VoucherNo: item.VoucherNo, Message: "已结账，不可删除",
-			})
-			continue
+			if !(opts.AllowCarryForwardBypass && carryForward) {
+				result.Failed = append(result.Failed, VoucherBatchFailItem{
+					ID: id, VoucherNo: item.VoucherNo, Message: "已结账，不可删除",
+				})
+				continue
+			}
 		}
-		if isCarryForwardVoucher(&item) {
+		if carryForward && !opts.AllowCarryForwardBypass {
 			result.Failed = append(result.Failed, VoucherBatchFailItem{
 				ID: id, VoucherNo: item.VoucherNo, Message: "系统结转凭证不可删除",
 			})
@@ -508,8 +518,8 @@ func (s *erpService) DeleteVouchersBatch(ctx context.Context, ids []string) (*Vo
 	return result, nil
 }
 
-func (s *erpService) DeleteVoucher(ctx context.Context, id string) error {
-	result, err := s.DeleteVouchersBatch(ctx, []string{id})
+func (s *erpService) DeleteVoucher(ctx context.Context, id string, opts DeleteVoucherOptions) error {
+	result, err := s.DeleteVouchersBatch(ctx, []string{id}, opts)
 	if err != nil {
 		return err
 	}

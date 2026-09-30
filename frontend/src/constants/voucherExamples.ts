@@ -96,17 +96,6 @@ export const VOUCHER_EXAMPLES = [
     ]
   },
   {
-    key: 'income',
-    category: '主营收入',
-    title: '收到项目款（不开票）',
-    businessType: '销售收入',
-    remark: '未开票收款，价税合一记收入',
-    entries: [
-      { summary: '收到XX项目开发款', accountCode: '1002', debit: 1000, credit: 0 },
-      { summary: '确认主营业务收入', accountCode: '5001', debit: 0, credit: 1000 }
-    ]
-  },
-  {
     key: 'income-ordinary',
     category: '主营收入',
     title: '收到项目款（开具普票）',
@@ -118,6 +107,17 @@ export const VOUCHER_EXAMPLES = [
       { summary: '收到XX项目开发款（含税）', accountCode: '1002', debit: 1030, credit: 0 },
       { summary: '确认主营业务收入', accountCode: '5001', debit: 0, credit: 1000 },
       { summary: '销项税额（普票）', accountCode: '2221', debit: 0, credit: 30 }
+    ]
+  },
+  {
+    key: 'income',
+    category: '主营收入',
+    title: '收到项目款（不开票）',
+    businessType: '销售收入',
+    remark: '未开票收款，价税合一记收入',
+    entries: [
+      { summary: '收到XX项目开发款', accountCode: '1002', debit: 1000, credit: 0 },
+      { summary: '确认主营业务收入', accountCode: '5001', debit: 0, credit: 1000 }
     ]
   },
   {

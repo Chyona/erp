@@ -9,9 +9,11 @@ import VoucherDetailModal from './VoucherDetailModal';
 import { useApp } from '../context/AppContext';
 import { useTabDataRefresh } from '../context/PageTabsContext';
 import { confirmDanger } from '../utils/confirmAction';
+import { confirmDeleteWithPassword } from '../utils/confirmDeleteWithPassword';
 import ReportPeriodFilter from './ReportPeriodFilter';
 import WorkbenchPanelIntro from './WorkbenchPanelIntro';
 import { defaultProfitLossClosingPeriod, taxExemptionPeriodKey } from '../utils/reportPeriod';
+import { useAuth } from '../context/AuthContext';
 
 const { Text } = Typography;
 
@@ -65,6 +67,7 @@ const previewColumns: ColumnsType<any> = [
 
 export default function MonthEndClosingPanel({ readOnly = false }: { readOnly?: boolean }) {
   const { message, modal } = App.useApp();
+  const { role } = useAuth();
   const { refreshKey, refresh } = useApp();
   const tabDataRefresh = useTabDataRefresh();
   const [period, setPeriod] = useState(defaultProfitLossClosingPeriod);
@@ -184,7 +187,9 @@ export default function MonthEndClosingPanel({ readOnly = false }: { readOnly?: 
       return;
     }
 
-    const ok = await confirmDanger(modal, {
+    confirmDeleteWithPassword({
+      modal,
+      isAdmin: role === 'admin',
       title: '反结转',
       content: (
         <div>
@@ -201,21 +206,22 @@ export default function MonthEndClosingPanel({ readOnly = false }: { readOnly?: 
           </p>
         </div>
       ),
-      okText: '确认反结转'
+      okText: '确认反结转',
+      onConfirm: async (confirmPassword) => {
+        setReversing(true);
+        try {
+          await MonthEndClosing.reverseUnifiedClosing(period, { confirmPassword });
+          message.success('已反结转，系统结转凭证已撤销');
+          refresh();
+          loadSummary();
+        } catch (err) {
+          message.error((err as Error).message || '反结转失败');
+          throw err;
+        } finally {
+          setReversing(false);
+        }
+      }
     });
-    if (!ok) return;
-
-    setReversing(true);
-    try {
-      await MonthEndClosing.reverseUnifiedClosing(period);
-      message.success('已反结转，系统结转凭证已撤销');
-      refresh();
-      loadSummary();
-    } catch (err) {
-      message.error((err as Error).message || '反结转失败');
-    } finally {
-      setReversing(false);
-    }
   };
 
   const handleMarkDeclared = async () => {

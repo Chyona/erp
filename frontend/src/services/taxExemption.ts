@@ -377,7 +377,11 @@ export async function createCarryForward(period, { approve = true } = {}) {
 }
 
 /** 反结转：删除减免结转凭证，并恢复来源销售凭证的待结转状态 */
-export async function reverseCarryForward(period, carryForwardId) {
+export async function reverseCarryForward(
+  period,
+  carryForwardId,
+  options: { confirmPassword?: string } = {}
+) {
   if (period.type === 'quarter' && period.quarter) {
     if (
       await TaxDeclaration.isQuarterDeclared({
@@ -418,7 +422,7 @@ export async function reverseCarryForward(period, carryForwardId) {
   }
   await ErpApi.putMany('vouchers', linked);
 
-  await Voucher.removeCarryForwardVoucher(cf.id);
+  await Voucher.removeCarryForwardVoucher(cf.id, options);
 
   await ErpApi.addAuditLog(
     '反结转',

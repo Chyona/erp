@@ -8,12 +8,14 @@ import { ProfitLossClosing } from '../services/profitLossClosing';
 import { useApp } from '../context/AppContext';
 import { useTabDataRefresh } from '../context/PageTabsContext';
 import { confirmDanger } from '../utils/confirmAction';
+import { confirmDeleteWithPassword } from '../utils/confirmDeleteWithPassword';
 import ReportPeriodFilter from './ReportPeriodFilter';
 import {
   defaultProfitLossClosingPeriod,
   formatStoredProfitLossClosingPeriod,
   taxExemptionPeriodKey
 } from '../utils/reportPeriod';
+import { useAuth } from '../context/AuthContext';
 
 const { Text } = Typography;
 
@@ -57,6 +59,7 @@ export default function ProfitLossClosingPanel({
   onGoTaxExemption?: () => void;
 }) {
   const { message, modal } = App.useApp();
+  const { role } = useAuth();
   const { refreshKey, refresh } = useApp();
   const tabDataRefresh = useTabDataRefresh();
   const { openVoucherEdit } = useVoucherPageNavigation();
@@ -154,7 +157,9 @@ export default function ProfitLossClosingPanel({
     }
 
     const cfPeriodLabel = formatStoredProfitLossClosingPeriod(cf) || summary?.periodLabel;
-    const ok = await confirmDanger(modal, {
+    confirmDeleteWithPassword({
+      modal,
+      isAdmin: role === 'admin',
       title: '反结转',
       content: (
         <div>
@@ -169,21 +174,24 @@ export default function ProfitLossClosingPanel({
           </p>
         </div>
       ),
-      okText: '确认反结转'
+      okText: '确认反结转',
+      onConfirm: async (confirmPassword) => {
+        setReversing(true);
+        try {
+          const result = await ProfitLossClosing.reverseClosing(period, cf.id, {
+            confirmPassword
+          });
+          message.success(`已反结转，删除 ${result.voucher.voucherNo}`);
+          refresh();
+          loadSummary();
+        } catch (err) {
+          message.error((err as Error).message || '反结转失败');
+          throw err;
+        } finally {
+          setReversing(false);
+        }
+      }
     });
-    if (!ok) return;
-
-    setReversing(true);
-    try {
-      const result = await ProfitLossClosing.reverseClosing(period, cf.id);
-      message.success(`已反结转，删除 ${result.voucher.voucherNo}`);
-      refresh();
-      loadSummary();
-    } catch (err) {
-      message.error((err as Error).message || '反结转失败');
-    } finally {
-      setReversing(false);
-    }
   };
 
   const closingVoucher = summary?.closingVoucher;

@@ -173,16 +173,18 @@ type addAuditLogRequest struct {
 }
 
 type batchIDsRequest struct {
-	IDs             []string `json:"ids" binding:"required"`
-	ConfirmPassword string   `json:"confirmPassword"`
+	IDs                     []string `json:"ids" binding:"required"`
+	ConfirmPassword         string   `json:"confirmPassword"`
+	AllowCarryForwardBypass bool     `json:"allowCarryForwardBypass"`
 }
 
 // voucherBatchRequest 凭证统一批量入口：action 区分操作，ids/items 均为数组（1 条即单条）。
 type voucherBatchRequest struct {
-	Action          string          `json:"action" binding:"required"`
-	IDs             []string        `json:"ids"`
-	Items           []model.Voucher `json:"items"`
-	ConfirmPassword string          `json:"confirmPassword"`
+	Action                  string          `json:"action" binding:"required"`
+	IDs                     []string        `json:"ids"`
+	Items                   []model.Voucher `json:"items"`
+	ConfirmPassword         string          `json:"confirmPassword"`
+	AllowCarryForwardBypass bool            `json:"allowCarryForwardBypass"`
 }
 
 type batchAttachmentsRequest struct {
@@ -423,7 +425,9 @@ func (h *ErpHandler) VouchersBatch(c *gin.Context) {
 		if !h.requireAdminDeletePassword(c, req.ConfirmPassword) {
 			return
 		}
-		result, err := h.erpService.DeleteVouchersBatch(ctx, req.IDs)
+		result, err := h.erpService.DeleteVouchersBatch(ctx, req.IDs, service.DeleteVoucherOptions{
+			AllowCarryForwardBypass: req.AllowCarryForwardBypass,
+		})
 		if err != nil {
 			response.InternalError(c, err.Error())
 			return
@@ -463,7 +467,9 @@ func (h *ErpHandler) DeleteVouchersBatch(c *gin.Context) {
 	if !h.requireAdminDeletePassword(c, req.ConfirmPassword) {
 		return
 	}
-	result, err := h.erpService.DeleteVouchersBatch(c.Request.Context(), req.IDs)
+	result, err := h.erpService.DeleteVouchersBatch(c.Request.Context(), req.IDs, service.DeleteVoucherOptions{
+		AllowCarryForwardBypass: req.AllowCarryForwardBypass,
+	})
 	if err != nil {
 		response.InternalError(c, err.Error())
 		return
@@ -542,11 +548,16 @@ func (h *ErpHandler) SaveVoucher(c *gin.Context) {
 // DeleteVoucher DELETE /vouchers/:id — 删除单条凭证。
 func (h *ErpHandler) DeleteVoucher(c *gin.Context) {
 	var req struct {
-		ConfirmPassword string `json:"confirmPassword"`
+		ConfirmPassword         string `json:"confirmPassword"`
+		AllowCarryForwardBypass bool   `json:"allowCarryForwardBypass"`
 	}
 	_ = c.ShouldBindJSON(&req)
 	if req.ConfirmPassword == "" {
 		req.ConfirmPassword = c.Query("confirmPassword")
+	}
+	if !req.AllowCarryForwardBypass {
+		req.AllowCarryForwardBypass = c.Query("allowCarryForwardBypass") == "1" ||
+			c.Query("allowCarryForwardBypass") == "true"
 	}
 	if !h.requireAdminDeletePassword(c, req.ConfirmPassword) {
 		return
@@ -556,7 +567,9 @@ func (h *ErpHandler) DeleteVoucher(c *gin.Context) {
 	if existing, err := h.erpService.GetVoucher(c.Request.Context(), id); err == nil && existing != nil {
 		detail = formatVoucherAuditDetail(existing)
 	}
-	if err := h.erpService.DeleteVoucher(c.Request.Context(), id); err != nil {
+	if err := h.erpService.DeleteVoucher(c.Request.Context(), id, service.DeleteVoucherOptions{
+		AllowCarryForwardBypass: req.AllowCarryForwardBypass,
+	}); err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}

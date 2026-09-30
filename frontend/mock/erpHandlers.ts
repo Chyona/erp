@@ -801,7 +801,12 @@ export async function handleErpMockRequest(
     }
     if (method === 'POST' && path === '/vouchers/batch') {
       const body =
-        (await parseJSON<{ action?: string; ids?: string[]; items?: MockVoucher[] }>(req)) ?? {};
+        (await parseJSON<{
+          action?: string;
+          ids?: string[];
+          items?: MockVoucher[];
+          allowCarryForwardBypass?: boolean;
+        }>(req)) ?? {};
       const failed: Array<{ id: string; voucherNo?: string; message: string }> = [];
       const now = new Date().toISOString();
 
@@ -877,17 +882,19 @@ export async function handleErpMockRequest(
       if (body.action === 'delete') {
         let deleted = 0;
         let skipped = 0;
+        const allowCarryForwardBypass = Boolean(body.allowCarryForwardBypass);
         for (const id of ids) {
           const item = store.vouchers.get(id);
           if (!item) {
             skipped++;
             continue;
           }
-          if (item.status === 'locked') {
+          const carryForward = Boolean(item.isTaxExemptionCarryForward || item.isProfitLossClosing);
+          if (item.status === 'locked' && !(allowCarryForwardBypass && carryForward)) {
             failed.push({ id, voucherNo: String(item.voucherNo || ''), message: '已结账，不可删除' });
             continue;
           }
-          if (item.isTaxExemptionCarryForward || item.isProfitLossClosing) {
+          if (carryForward && !allowCarryForwardBypass) {
             failed.push({
               id,
               voucherNo: String(item.voucherNo || ''),
@@ -907,9 +914,11 @@ export async function handleErpMockRequest(
       return true;
     }
     if (method === 'DELETE' && path === '/vouchers/batch') {
-      const body = (await parseJSON<{ ids?: string[] }>(req)) ?? {};
+      const body =
+        (await parseJSON<{ ids?: string[]; allowCarryForwardBypass?: boolean }>(req)) ?? {};
       const ids = [...new Set((body.ids ?? []).filter(Boolean))];
       const failed: Array<{ id: string; voucherNo?: string; message: string }> = [];
+      const allowCarryForwardBypass = Boolean(body.allowCarryForwardBypass);
       let deleted = 0;
       let skipped = 0;
       for (const id of ids) {
@@ -918,11 +927,12 @@ export async function handleErpMockRequest(
           skipped++;
           continue;
         }
-        if (item.status === 'locked') {
+        const carryForward = Boolean(item.isTaxExemptionCarryForward || item.isProfitLossClosing);
+        if (item.status === 'locked' && !(allowCarryForwardBypass && carryForward)) {
           failed.push({ id, voucherNo: String(item.voucherNo || ''), message: '已结账，不可删除' });
           continue;
         }
-        if (item.isTaxExemptionCarryForward || item.isProfitLossClosing) {
+        if (carryForward && !allowCarryForwardBypass) {
           failed.push({
             id,
             voucherNo: String(item.voucherNo || ''),

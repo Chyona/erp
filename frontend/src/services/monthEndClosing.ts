@@ -157,7 +157,10 @@ export async function createUnifiedClosing(period: ReportPeriod, { approve = tru
 }
 
 /** 反结转：先撤销损益结转，再撤销普票减免结转 */
-export async function reverseUnifiedClosing(period: ReportPeriod) {
+export async function reverseUnifiedClosing(
+  period: ReportPeriod,
+  options: { confirmPassword?: string } = {}
+) {
   await assertPeriodNotDeclared(period);
   const summary = await getUnifiedSummary(period);
 
@@ -166,14 +169,14 @@ export async function reverseUnifiedClosing(period: ReportPeriod) {
   }
 
   if (summary.profitLossVoucher) {
-    await ProfitLossClosing.reverseClosing(period, summary.profitLossVoucher.id);
+    await ProfitLossClosing.reverseClosing(period, summary.profitLossVoucher.id, options);
   }
 
   const refreshedTax = await TaxExemption.getPeriodSummary(period);
   const taxCf =
     refreshedTax.exactCarryForwardVoucher || refreshedTax.carryForwardVoucher;
   if (taxCf) {
-    await TaxExemption.reverseCarryForward(period, taxCf.id);
+    await TaxExemption.reverseCarryForward(period, taxCf.id, options);
   }
 
   await ErpApi.addAuditLog('反结转', summary.closingLabel, summary.periodLabel);

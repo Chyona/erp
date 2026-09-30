@@ -485,7 +485,11 @@ export async function createClosing(period: ReportPeriod, { approve = true } = {
 }
 
 /** 反结转：删除指定月份的损益结转凭证 */
-export async function reverseClosing(period: ReportPeriod, closingId?: string) {
+export async function reverseClosing(
+  period: ReportPeriod,
+  closingId?: string,
+  options: { confirmPassword?: string } = {}
+) {
   if (period.type === 'quarter' && period.quarter) {
     if (
       await TaxDeclaration.isQuarterDeclared({
@@ -516,7 +520,7 @@ export async function reverseClosing(period: ReportPeriod, closingId?: string) {
     throw new Error(`${periodLabel} 不存在损益结转凭证，无法反结转`);
   }
 
-  await Voucher.removeCarryForwardVoucher(cf.id);
+  await Voucher.removeCarryForwardVoucher(cf.id, options);
 
   await ErpApi.addAuditLog('反结转', '损益结转', `删除 ${cf.voucherNo}（${periodLabel}）`);
 
