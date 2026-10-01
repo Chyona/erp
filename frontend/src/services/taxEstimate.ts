@@ -33,7 +33,8 @@ function accountStartsWith(code: string | undefined, prefix: string) {
 }
 
 function entrySideAmount(entry: { debit?: string | number; credit?: string | number }, side: 'debit' | 'credit') {
-  return Math.max(0, Number(entry[side]) || 0);
+  const n = Number(entry[side]);
+  return Number.isFinite(n) ? n : 0;
 }
 
 function voucherSearchText(voucher: VoucherRecord) {
@@ -52,7 +53,7 @@ function isCorporateIncomeTaxText(text: string) {
 }
 
 /**
- * 企业所得税计提：仅认「借 5801 / 贷 2221」类凭证。
+ * 企业所得税计提：仅认「借 5801 / 贷 2221」类凭证（含借方红字冲回）。
  * 缴纳上期（借 2221 / 贷银行，或摘要含缴纳、误记 5801）一律排除。
  */
 function sumCitAccrualExpense(vouchers: VoucherRecord[], fromDate: string, toDate: string) {
@@ -82,20 +83,22 @@ function sumCitAccrualExpense(vouchers: VoucherRecord[], fromDate: string, toDat
       }
     }
 
+    // 净发生额：正数为计提，负数为红字冲回多计提
     const net5801 = roundMoney(debit5801 - credit5801);
-    if (net5801 <= 0.005) continue;
+    if (Math.abs(net5801) <= 0.005) continue;
 
     const mentionsPay = /缴纳/.test(text);
-    const mentionsAccrue = /计提/.test(text);
+    const mentionsAccrue = /计提|冲回|红字/.test(text);
     // 缴纳凭证（含误把实缴记到 5801）不计入计提
     if (mentionsPay && !mentionsAccrue) continue;
-    if (creditBank > 0.005 && (mentionsPay || credit2221 <= 0.005)) continue;
+    if (Math.abs(creditBank) > 0.005 && (mentionsPay || Math.abs(credit2221) <= 0.005)) continue;
 
     const looksLikeAccrual =
-      (debit5801 > 0.005 && credit2221 > 0.005 && isCorporateIncomeTaxText(text)) ||
-      (mentionsAccrue && isCorporateIncomeTaxText(text) && debit5801 > 0.005) ||
-      // 标准分录借 5801 贷 2221，即使摘要较简也认（但须排除个税相关文案）
-      (debit5801 > 0.005 && credit2221 > 0.005 && !/个人所得|代扣个税/.test(text));
+      (Math.abs(debit5801) > 0.005 && Math.abs(credit2221) > 0.005) ||
+      (mentionsAccrue && isCorporateIncomeTaxText(text) && Math.abs(debit5801) > 0.005) ||
+      (Math.abs(debit5801) > 0.005 &&
+        Math.abs(credit2221) > 0.005 &&
+        !/个人所得|代扣个税/.test(text));
     if (!looksLikeAccrual) continue;
 
     total += net5801;

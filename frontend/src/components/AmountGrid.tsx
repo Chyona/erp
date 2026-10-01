@@ -28,14 +28,17 @@ export default function AmountGrid({
   const [calcOpen, setCalcOpen] = useState(false);
   const [calcSeed, setCalcSeed] = useState('');
 
+  const numericValue = parseFloat(String(value ?? ''));
+  const hasAmount = Number.isFinite(numericValue) && numericValue !== 0;
+  const isNegativeAmount = hasAmount && numericValue < 0;
   const digits = amountToDigits(String(value ?? ''));
-  const hasAmount = (parseFloat(String(value)) || 0) > 0;
-  const redClass = redLetter && hasAmount ? ' amount-grid--red-letter' : '';
+  const redClass =
+    (redLetter || isNegativeAmount) && hasAmount ? ' amount-grid--red-letter' : '';
 
   useEffect(() => {
     if (!focused && !calcOpen) {
       const n = parseFloat(String(value));
-      setEditText(Number.isFinite(n) && n > 0 ? String(n) : '');
+      setEditText(Number.isFinite(n) && n !== 0 ? String(n) : '');
     }
   }, [value, focused, calcOpen]);
 
@@ -50,12 +53,12 @@ export default function AmountGrid({
 
   const commit = (text: string) => {
     const trimmed = text.trim();
-    if (!trimmed) {
+    if (!trimmed || trimmed === '-' || trimmed === '.' || trimmed === '-.') {
       onChange?.('');
       return;
     }
     const n = parseFloat(trimmed);
-    if (!Number.isFinite(n) || n <= 0) {
+    if (!Number.isFinite(n) || n === 0) {
       onChange?.('');
       return;
     }
@@ -80,13 +83,13 @@ export default function AmountGrid({
 
   const openCalculator = () => {
     const n = parseFloat(String(value));
-    setCalcSeed(Number.isFinite(n) && n > 0 ? String(n) : editText || '');
+    setCalcSeed(Number.isFinite(n) && n !== 0 ? String(n) : editText || '');
     calcOpenRef.current = true;
     setCalcOpen(true);
   };
 
   const applyCalculator = (result: number) => {
-    if (!Number.isFinite(result) || result <= 0) {
+    if (!Number.isFinite(result) || result === 0) {
       setEditText('');
       onChange?.('');
     } else {
@@ -105,11 +108,9 @@ export default function AmountGrid({
   if (readOnly) {
     return (
       <div className={`amount-grid amount-grid--readonly${redClass}`} aria-label="金额">
+        {isNegativeAmount ? <span className="amount-grid__sign">-</span> : null}
         {AMOUNT_UNITS.map((unit, i) => (
-          <div
-            key={unit + i}
-            className={`amount-grid__cell`}
-          >
+          <div key={unit + i} className="amount-grid__cell">
             <span className="amount-grid__digit">{digits[i]}</span>
           </div>
         ))}
@@ -126,11 +127,9 @@ export default function AmountGrid({
         focusEditor();
       }}
     >
+      {isNegativeAmount && !focused ? <span className="amount-grid__sign">-</span> : null}
       {AMOUNT_UNITS.map((unit, i) => (
-        <div
-          key={unit + i}
-          className={`amount-grid__cell`}
-        >
+        <div key={unit + i} className="amount-grid__cell">
           <span className="amount-grid__digit">{digits[i]}</span>
         </div>
       ))}
@@ -179,7 +178,9 @@ export default function AmountGrid({
           tabIndex={tabIndex}
           onFocus={() => setFocused(true)}
           onBlur={handleBlur}
-          onChange={(e) => setEditText(e.target.value.replace(/[^\d.]/g, ''))}
+          onChange={(e) =>
+            setEditText(e.target.value.replace(/[^\d.\-]/g, '').replace(/(?!^)-/g, ''))
+          }
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               e.preventDefault();

@@ -68,9 +68,10 @@ function VoucherEntrySheet({
   const [summaryLibraryRow, setSummaryLibraryRow] = useState<number | null>(null);
   const [summaryDropdownRow, setSummaryDropdownRow] = useState<number | null>(null);
   const showTotalCn = totals.balanced;
-  const totalAmount = showTotalCn ? Math.max(totals.debit, totals.credit) : 0;
-  const totalDebitDisplay = totals.debit > 0 ? totals.debit : '';
-  const totalCreditDisplay = totals.credit > 0 ? totals.credit : '';
+  const totalAmount = showTotalCn ? Math.max(Math.abs(totals.debit), Math.abs(totals.credit)) : 0;
+  const totalDebitDisplay = totals.debit !== 0 ? totals.debit : '';
+  const totalCreditDisplay = totals.credit !== 0 ? totals.credit : '';
+  const totalsAreRed = redLetter || totals.debit < 0 || totals.credit < 0;
 
   return (
     <div className={`voucher-sheet${readOnly ? ' voucher-sheet--readonly' : ''}${redLetter ? ' voucher-sheet--red-letter' : ''}`}>
@@ -166,7 +167,7 @@ function VoucherEntrySheet({
                       const raw = entry[side];
                       if (raw === '' || raw === undefined || raw === null) return '';
                       const n = parseFloat(String(raw));
-                      return Number.isFinite(n) && n > 0 ? raw : '';
+                      return Number.isFinite(n) && n !== 0 ? raw : '';
                     };
                     const accountPreview =
                       entry && [entry.accountCode, entry.accountName].filter(Boolean).join(' ');
@@ -346,16 +347,18 @@ function VoucherEntrySheet({
                     <td colSpan={3} className="voucher-sheet__total-label">
                       <span className="voucher-sheet__total-text">合计：</span>
                       <span
-                        className={`voucher-sheet__total-cn${redLetter ? ' voucher-sheet__total-cn--red' : ''}`}
+                        className={`voucher-sheet__total-cn${totalsAreRed ? ' voucher-sheet__total-cn--red' : ''}`}
                       >
-                        {totalAmount > 0 ? amountToChineseUppercase(totalAmount, redLetter) : ''}
+                        {totalAmount > 0
+                          ? amountToChineseUppercase(totalAmount, totalsAreRed)
+                          : ''}
                       </span>
                     </td>
                     <td colSpan={11} className="voucher-sheet__td-amount">
-                      <AmountGrid value={totalDebitDisplay} readOnly redLetter={redLetter} />
+                      <AmountGrid value={totalDebitDisplay} readOnly redLetter={totalsAreRed} />
                     </td>
                     <td colSpan={11} className="voucher-sheet__td-amount">
-                      <AmountGrid value={totalCreditDisplay} readOnly redLetter={redLetter} />
+                      <AmountGrid value={totalCreditDisplay} readOnly redLetter={totalsAreRed} />
                     </td>
                   </tr>
                 </tfoot>

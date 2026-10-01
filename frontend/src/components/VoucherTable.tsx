@@ -113,11 +113,15 @@ function buildGroupedRows(vouchers, showSubtotal) {
 function formatAmount(value: number | string, voucher?: Pick<VoucherRecord, 'reversedFromId' | 'reversedFromNo' | 'remark' | 'entries'>) {
   const num = parseFloat(String(value));
   if (!num) return '';
-  const text = num.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  if (voucher && Voucher.isRedLetterVoucher(voucher)) {
-    return <span className="voucher-amount--red">{text}</span>;
+  const text = Math.abs(num).toLocaleString('zh-CN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+  const signedText = num < 0 ? `-${text}` : text;
+  if (num < 0 || (voucher && Voucher.isRedLetterVoucher(voucher))) {
+    return <span className="voucher-amount--red">{signedText}</span>;
   }
-  return text;
+  return signedText;
 }
 
 function mergeCell(rowSpan) {

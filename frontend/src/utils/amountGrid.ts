@@ -83,14 +83,14 @@ export function formatAccountingPeriod(date) {
   return `${d.year()}年第${d.month() + 1}期`;
 }
 
-/** 安全计算金额表达式，如 100+20.5*2 */
+/** 安全计算金额表达式，如 100+20.5*2；支持红字负数结果 */
 export function evaluateAmountExpression(raw: string): number | null {
   const expr = String(raw || '').trim();
   if (!expr) return null;
   if (!/^[\d+\-*/().\s]+$/.test(expr)) return null;
   try {
     const result = Function(`"use strict"; return (${expr})`)();
-    if (typeof result !== 'number' || !Number.isFinite(result) || result < 0) return null;
+    if (typeof result !== 'number' || !Number.isFinite(result) || result === 0) return null;
     return Math.round(result * 100) / 100;
   } catch {
     return null;

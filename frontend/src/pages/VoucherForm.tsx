@@ -627,7 +627,7 @@ export default function VoucherForm() {
           fieldValue =
             value === '' || value === undefined || value === null
               ? ''
-              : Number.isFinite(n) && n > 0
+              : Number.isFinite(n) && n !== 0
                 ? Math.round(n * 100) / 100
                 : '';
         }

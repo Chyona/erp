@@ -212,8 +212,8 @@ function isBlankVoucherEntry(e: VoucherEntry): boolean {
   return (
     !e.accountId &&
     !String(e.summary || '').trim() &&
-    debit <= 0 &&
-    credit <= 0
+    Math.abs(debit) < 0.005 &&
+    Math.abs(credit) < 0.005
   );
 }
 

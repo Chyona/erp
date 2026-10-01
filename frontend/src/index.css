@@ -7216,6 +7216,19 @@ body,
   font-weight: 600;
 }
 
+.amount-grid__sign {
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+  color: #cf1322;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1;
+  pointer-events: none;
+}
+
 .voucher-sheet__total-cn--red {
   color: #cf1322;
   font-weight: 600;
