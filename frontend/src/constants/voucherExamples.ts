@@ -110,17 +110,6 @@ export const VOUCHER_EXAMPLES = [
     ]
   },
   {
-    key: 'income',
-    category: '主营收入',
-    title: '收到项目款（不开票）',
-    businessType: '销售收入',
-    remark: '未开票收款，价税合一记收入',
-    entries: [
-      { summary: '收到XX项目开发款', accountCode: '1002', debit: 1000, credit: 0 },
-      { summary: '确认主营业务收入', accountCode: '5001', debit: 0, credit: 1000 }
-    ]
-  },
-  {
     key: 'income-special',
     category: '主营收入',
     title: '收到项目款（开具专票）',
@@ -135,6 +124,17 @@ export const VOUCHER_EXAMPLES = [
     ]
   },
   {
+    key: 'income',
+    category: '主营收入',
+    title: '收到项目款（不开票）',
+    businessType: '销售收入',
+    remark: '未开票收款，价税合一记收入',
+    entries: [
+      { summary: '收到XX项目开发款', accountCode: '1002', debit: 1000, credit: 0 },
+      { summary: '确认主营业务收入', accountCode: '5001', debit: 0, credit: 1000 }
+    ]
+  },
+  {
     key: 'wecom-withdraw',
     category: '主营收入',
     title: '企业微信提现到公账',
@@ -144,10 +144,10 @@ export const VOUCHER_EXAMPLES = [
     remark:
       '企业微信提现至对公账户。提现总额中，对已知客户开票的部分按发票金额拆分确认主营业务收入并计提销项税额；未知客户（匿名充值）的部分全额确认主营业务收入，不计提销项税。',
     entries: [
-      { summary: '【提现】企业微信提现到公账', accountCode: '1002', debit: 2994, credit: 0 },
-      { summary: '确认主营业务收入（企业微信提现）', accountCode: '5001', debit: 0, credit: 2984.89 },
-      { summary: '销项税额（普票，发票号xxx，金额20）', accountCode: '2221', debit: 0, credit: 0.2 },
-      { summary: '销项税额（普票，发票号xxx，金额900）', accountCode: '2221', debit: 0, credit: 8.91 }
+      { summary: '【提现】企业微信提现到公账', accountCode: '1002', debit: 678.64, credit: 0 },
+      { summary: '【提现】手续费', accountCode: '5603', debit: 1.36, credit: 0 },
+      { summary: '确认主营业务收入（企业微信提现）', accountCode: '5001', debit: 0, credit: 673.27 },
+      { summary: '销项税额（普票）', accountCode: '2221', debit: 0, credit: 6.73 }
     ]
   },
   {
@@ -162,8 +162,8 @@ export const VOUCHER_EXAMPLES = [
     entries: [
       { summary: '【提现】微信商户平台提现到公账', accountCode: '1002', debit: 1558, credit: 0 },
       { summary: '确认主营业务收入（微信商户平台提现）', accountCode: '5001', debit: 0, credit: 1556.84 },
-      { summary: '销项税额（普票，发票号xxx，金额58）', accountCode: '2221', debit: 0, credit: 0.58 },
-      { summary: '销项税额（普票，发票号xxx，金额58）', accountCode: '2221', debit: 0, credit: 0.58 }
+      { summary: '销项税额（普票）', accountCode: '2221', debit: 0, credit: 0.58 },
+      { summary: '销项税额（普票）', accountCode: '2221', debit: 0, credit: 0.58 }
     ]
   },
   {
@@ -184,7 +184,7 @@ export const VOUCHER_EXAMPLES = [
     businessType: '税费缴纳',
     remark: '根据季度末申报表计算的当期应纳附加税额进行计提。建议在企业所得税计提前完成，以使当期利润更为准确。',
     entries: [
-      { summary: '计提2026年Q1附加税（预估数）', accountCode: '5403', debit: 36, credit: 0 },
+      { summary: '计提本期附加税（预估数）', accountCode: '5403', debit: 36, credit: 0 },
       { summary: '应交附加税（预估数）', accountCode: '2221', debit: 0, credit: 36 }
     ]
   },
@@ -195,8 +195,8 @@ export const VOUCHER_EXAMPLES = [
     businessType: '税费缴纳',
     remark: '附加税已于季末计提；申报缴纳时冲减计提的 2221 应交税费，与增值税一并从银行账户划扣',
     entries: [
-      { summary: '缴纳2026年Q1增值税', accountCode: '2221', debit: 300, credit: 0 },
-      { summary: '缴纳2026年Q1附加税', accountCode: '2221', debit: 36, credit: 0 },
+      { summary: '缴纳上期增值税', accountCode: '2221', debit: 300, credit: 0 },
+      { summary: '缴纳上期附加税', accountCode: '2221', debit: 36, credit: 0 },
       { summary: '银行转账（增值税及附加税合计）', accountCode: '1002', debit: 0, credit: 336 }
     ]
   },
@@ -218,7 +218,7 @@ export const VOUCHER_EXAMPLES = [
     businessType: '税费缴纳',
     remark: '公账缴纳已计提的企业所得税',
     entries: [
-      { summary: '缴纳2026年Q1企业所得税', accountCode: '2221', debit: 5000, credit: 0 },
+      { summary: '缴纳上期企业所得税', accountCode: '2221', debit: 5000, credit: 0 },
       { summary: '银行转账（缴纳企业所得税）', accountCode: '1002', debit: 0, credit: 5000 }
     ]
   },

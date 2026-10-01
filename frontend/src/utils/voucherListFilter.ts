@@ -3,6 +3,7 @@ import {
   matchVoucherAmount,
   parseCodeRanges,
   parseNumberRanges,
+  parseOrKeywords,
   parseVoucherNum
 } from './voucherFilter';
 import type { Voucher, VoucherFilters } from '../types';
@@ -38,10 +39,13 @@ export function applyVoucherFilters(
     list = list.filter((v) => numberRanges.includes(parseVoucherNum(v.voucherNumber)));
   }
 
-  const summaryKw = (filters.summary || '').trim().toLowerCase();
-  if (summaryKw) {
+  const summaryKws = parseOrKeywords(filters.summary || '');
+  if (summaryKws) {
     list = list.filter((v) =>
-      v.entries.some((e) => (e.summary || '').toLowerCase().includes(summaryKw))
+      v.entries.some((e) => {
+        const text = (e.summary || '').toLowerCase();
+        return summaryKws.some((kw) => text.includes(kw));
+      })
     );
   }
 
@@ -70,6 +74,11 @@ export function applyVoucherFilters(
   const remarkKw = (filters.remark || '').trim().toLowerCase();
   if (remarkKw) {
     list = list.filter((v) => (v.remark || '').toLowerCase().includes(remarkKw));
+  }
+
+  const invoiceKw = (filters.invoiceNumber || '').trim().replace(/\D/g, '');
+  if (invoiceKw) {
+    list = list.filter((v) => (v.invoiceNumbers || '').replace(/\D/g, '').includes(invoiceKw));
   }
 
   if (filters.keyword) {

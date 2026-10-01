@@ -746,6 +746,7 @@ export async function handleErpMockRequest(
             businessType: u.searchParams.get('business_type') || '',
             signatory: u.searchParams.get('signatory') || '',
             remark: u.searchParams.get('remark') || '',
+            invoiceNumber: u.searchParams.get('invoice_number') || '',
             keyword: u.searchParams.get('keyword') || ''
           };
           const { applyVoucherFilters, paginateVouchers } = await import(

@@ -1468,10 +1468,11 @@ export const Salary = {
       const laborAccrualLinked = hasLink('laborAccrual');
       const ssLinked = hasLink('socialSecurity');
       const hfLinked = hasLink('housingFund');
-      if (accrualLinked && salaryGross > 0.005) salaryLinked = true;
-      if (laborAccrualLinked && laborGross > 0.005) laborLinked = true;
-      if (ssLinked && employerCosts.socialSecurity > 0.005) socialSecurityLinked = true;
-      if (hfLinked && employerCosts.housingFund > 0.005) housingFundLinked = true;
+      // 只要工资表已关联对应凭证，即视为已入账（不要求表内金额 > 0）
+      if (accrualLinked) salaryLinked = true;
+      if (laborAccrualLinked) laborLinked = true;
+      if (ssLinked) socialSecurityLinked = true;
+      if (hfLinked) housingFundLinked = true;
 
       const monthSalary = accrualLinked ? 0 : salaryGross;
       const monthLabor = laborAccrualLinked ? 0 : laborGross;
@@ -1506,6 +1507,86 @@ export const Salary = {
       ),
       monthCount
     };
+  },
+
+  /**
+   * 判断某月人力成本是否已入账：
+   * 1) 工资表已关联对应类型凭证；或
+   * 2) 该月凭证中已有计提工资/劳务/社保/公积金分录
+   */
+  async getMonthBookingFlags(periodKey: string): Promise<{
+    periodKey: string;
+    salaryLinked: boolean;
+    laborLinked: boolean;
+    socialSecurityLinked: boolean;
+    housingFundLinked: boolean;
+  }> {
+    const empty = {
+      periodKey,
+      salaryLinked: false,
+      laborLinked: false,
+      socialSecurityLinked: false,
+      housingFundLinked: false
+    };
+    if (!periodKey) return empty;
+
+    const sheet = await this.getUnbookedPayrollCostSummary(periodKey, periodKey);
+    let salaryLinked = sheet.salaryLinked;
+    let laborLinked = sheet.laborLinked;
+    let socialSecurityLinked = sheet.socialSecurityLinked;
+    let housingFundLinked = sheet.housingFundLinked;
+
+    if (salaryLinked && laborLinked && socialSecurityLinked && housingFundLinked) {
+      return { periodKey, salaryLinked, laborLinked, socialSecurityLinked, housingFundLinked };
+    }
+
+    const startDate = `${periodKey}-01`;
+    const endDate = (() => {
+      const [y, m] = periodKey.split('-').map(Number);
+      const last = new Date(y, m, 0).getDate();
+      return `${periodKey}-${String(last).padStart(2, '0')}`;
+    })();
+    const vouchers = await Voucher.getAll({ startDate, endDate });
+
+    for (const voucher of vouchers) {
+      if (voucher.isProfitLossClosing || voucher.isTaxExemptionCarryForward) continue;
+      const entries = voucher.entries || [];
+      const texts = entries.map((entry) => String(entry.summary || '')).join(' ');
+      const hasCredit = (code: string) =>
+        entries.some(
+          (entry) =>
+            String(entry.accountCode || '') === code && Number(entry.credit || 0) > 0.005
+        );
+      const hasDebit = (codePrefix: string) =>
+        entries.some(
+          (entry) =>
+            String(entry.accountCode || '').startsWith(codePrefix) &&
+            Number(entry.debit || 0) > 0.005
+        );
+
+      if (
+        !salaryLinked &&
+        ((/计提/.test(texts) && /工资|薪酬/.test(texts) && hasCredit('2211')) ||
+          (hasCredit('2211') && hasDebit('5401') && /工资|薪酬|应发/.test(texts)))
+      ) {
+        salaryLinked = true;
+      }
+      if (
+        !laborLinked &&
+        ((/计提/.test(texts) && /劳务/.test(texts) && (hasCredit('2241') || hasCredit('2211'))) ||
+          (hasCredit('2241') && /劳务/.test(texts)))
+      ) {
+        laborLinked = true;
+      }
+      if (!socialSecurityLinked && /社保/.test(texts) && (hasDebit('5401') || hasDebit('5602') || hasDebit('2211'))) {
+        socialSecurityLinked = true;
+      }
+      if (!housingFundLinked && /公积/.test(texts) && (hasDebit('5401') || hasDebit('5602') || hasDebit('2211'))) {
+        housingFundLinked = true;
+      }
+    }
+
+    return { periodKey, salaryLinked, laborLinked, socialSecurityLinked, housingFundLinked };
   },
 
   async getPeriodStats(year: number) {

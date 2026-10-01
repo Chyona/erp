@@ -31,6 +31,7 @@ type VoucherListQuery struct {
 	BusinessType  string
 	Signatory     string
 	Remark        string
+	InvoiceNumber string
 	Keyword       string
 }
 
@@ -77,8 +78,9 @@ func filterVouchers(items []model.Voucher, q VoucherListQuery) []model.Voucher {
 	out := make([]model.Voucher, 0, len(items))
 	numberRanges := parseNumberRanges(q.VoucherNumber)
 	codeRanges := parseCodeRanges(q.AccountCode)
-	summaryKw := strings.ToLower(strings.TrimSpace(q.Summary))
+	summaryKws := parseOrKeywords(q.Summary)
 	remarkKw := strings.ToLower(strings.TrimSpace(q.Remark))
+	invoiceKw := digitsOnly(q.InvoiceNumber)
 	keywordKw := strings.ToLower(strings.TrimSpace(q.Keyword))
 	amountMin, hasMin := parseOptionalFloat(q.AmountMin)
 	amountMax, hasMax := parseOptionalFloat(q.AmountMax)
@@ -101,7 +103,7 @@ func filterVouchers(items []model.Voucher, q VoucherListQuery) []model.Voucher {
 			continue
 		}
 		entries := parseVoucherEntries(item.Entries)
-		if summaryKw != "" && !entrySummaryMatches(entries, summaryKw) {
+		if summaryKws != nil && !entrySummaryMatches(entries, summaryKws) {
 			continue
 		}
 		if codeRanges != nil && !entryCodeMatches(entries, codeRanges) {
@@ -117,6 +119,9 @@ func filterVouchers(items []model.Voucher, q VoucherListQuery) []model.Voucher {
 			continue
 		}
 		if remarkKw != "" && !strings.Contains(strings.ToLower(item.Remark), remarkKw) {
+			continue
+		}
+		if invoiceKw != "" && !strings.Contains(digitsOnly(item.InvoiceNumbers), invoiceKw) {
 			continue
 		}
 		if keywordKw != "" && !keywordMatches(item, entries, keywordKw) {
@@ -138,13 +143,40 @@ func parseVoucherEntries(raw []byte) []voucherEntry {
 	return entries
 }
 
-func entrySummaryMatches(entries []voucherEntry, kw string) bool {
+func entrySummaryMatches(entries []voucherEntry, kws []string) bool {
 	for _, e := range entries {
-		if strings.Contains(strings.ToLower(e.Summary), kw) {
-			return true
+		text := strings.ToLower(e.Summary)
+		for _, kw := range kws {
+			if strings.Contains(text, kw) {
+				return true
+			}
 		}
 	}
 	return false
+}
+
+func parseOrKeywords(text string) []string {
+	raw := strings.TrimSpace(text)
+	if raw == "" {
+		return nil
+	}
+	parts := strings.FieldsFunc(raw, func(r rune) bool {
+		return r == ',' || r == '，'
+	})
+	out := make([]string, 0, len(parts))
+	seen := make(map[string]bool, len(parts))
+	for _, part := range parts {
+		kw := strings.ToLower(strings.TrimSpace(part))
+		if kw == "" || seen[kw] {
+			continue
+		}
+		seen[kw] = true
+		out = append(out, kw)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func entryCodeMatches(entries []voucherEntry, codes map[string]bool) bool {
@@ -255,6 +287,16 @@ func sortVouchersDesc(items []model.Voucher) {
 }
 
 var voucherDigitsRe = regexp.MustCompile(`\d+`)
+
+func digitsOnly(value string) string {
+	var b strings.Builder
+	for _, r := range value {
+		if r >= '0' && r <= '9' {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
 
 func parseVoucherNum(value string) int {
 	match := voucherDigitsRe.FindString(value)

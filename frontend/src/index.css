@@ -2385,14 +2385,11 @@ body,
 
 .voucher-grouped-table__invoice-numbers {
   display: block;
-  white-space: normal;
-  word-break: break-all;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   line-height: 1.35;
-  overflow: visible;
-}
-
-.voucher-grouped-table__invoice-numbers-line {
-  display: block;
 }
 
 .voucher-grouped-table .ant-table-tbody>tr>td[rowspan].voucher-grouped-table__invoice-col {
@@ -2403,15 +2400,19 @@ body,
 .voucher-grouped-table__remark {
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
+  -webkit-line-clamp: 6;
   overflow: hidden;
-  white-space: normal;
+  white-space: pre-wrap;
   word-break: break-word;
   line-height: 1.35;
 }
 
 .voucher-grouped-table .ant-table-tbody>tr>td[rowspan].voucher-grouped-table__remark-col {
   vertical-align: middle;
+}
+
+.voucher-grouped-table .ant-table-tbody>tr>td.voucher-grouped-table__remark-col {
+  white-space: normal;
 }
 
 .voucher-grouped-table__subtotal-label {

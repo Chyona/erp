@@ -553,6 +553,22 @@
   font-size: 15px;
 }
 
+.tax-estimate-view__value--stacked {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  min-width: 160px;
+}
+
+.tax-estimate-view__relief-amount {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
 .tax-estimate-view__row--emphasize .tax-estimate-view__value {
   font-size: 16px;
   color: #1d4ed8;

@@ -17,14 +17,17 @@ import { Reports as ReportsService } from '../services/reports';
 import {
   DEFAULT_CIT_RATE_PERCENT,
   DEFAULT_SURCHARGE_RATES,
+  DEFAULT_SURCHARGE_RELIEF,
   TaxEstimate,
   applyEstimateRates,
   type CitPayrollAdjustmentValues,
   type SurchargeRatePercents,
+  type SurchargeReliefOptions,
   type TaxEstimateResult
 } from '../services/taxEstimate';
 import { ExportUtil } from '../services/export';
 import { Voucher } from '../services/voucher';
+import { TaxDeclaration } from '../services/taxDeclaration';
 import ScrollTable from '../components/ScrollTable';
 import PageTableLayout from '../components/PageTableLayout';
 import BalanceSheetView from '../components/BalanceSheetView';
@@ -435,9 +438,13 @@ function BalanceSheetTab({ dateRange, refreshToken, period, virtualClosing }) {
 function TaxEstimateTab({ dateRange, refreshToken, period, virtualClosing }) {
   const [baseData, setBaseData] = useState<TaxEstimateResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [settled, setSettled] = useState(false);
   const [citRatePercent, setCitRatePercent] = useState(DEFAULT_CIT_RATE_PERCENT);
   const [surchargeRates, setSurchargeRates] = useState<SurchargeRatePercents>({
     ...DEFAULT_SURCHARGE_RATES
+  });
+  const [surchargeRelief, setSurchargeRelief] = useState<SurchargeReliefOptions>({
+    ...DEFAULT_SURCHARGE_RELIEF
   });
   const [payrollAdjustment, setPayrollAdjustment] = useState<CitPayrollAdjustmentValues>({
     unbookedSalaryGross: 0,
@@ -461,10 +468,14 @@ function TaxEstimateTab({ dateRange, refreshToken, period, virtualClosing }) {
     try {
       const start = dateRange[0].format('YYYY-MM-DD');
       const end = dateRange[1].format('YYYY-MM-DD');
+      const periodSettled = await TaxDeclaration.isReportPeriodDeclared(period);
+      setSettled(periodSettled);
       const result = await TaxEstimate.getTaxEstimate(period, start, end, {
-        virtualClosing,
+        virtualClosing: periodSettled ? false : virtualClosing,
+        settled: periodSettled,
         citRatePercent,
-        surchargeRates
+        surchargeRates,
+        surchargeRelief
       });
       setBaseData(result);
       syncPayrollFromResult(result);
@@ -485,10 +496,18 @@ function TaxEstimateTab({ dateRange, refreshToken, period, virtualClosing }) {
         ? applyEstimateRates(baseData, {
             citRatePercent,
             surchargeRates,
-            payrollAdjustment
+            surchargeRelief,
+            payrollAdjustment: settled
+              ? {
+                  unbookedSalaryGross: 0,
+                  unbookedLaborGross: 0,
+                  unbookedCompanySocialSecurity: 0,
+                  unbookedCompanyHousingFund: 0
+                }
+              : payrollAdjustment
           })
         : null,
-    [baseData, citRatePercent, surchargeRates, payrollAdjustment]
+    [baseData, citRatePercent, surchargeRates, surchargeRelief, payrollAdjustment, settled]
   );
 
   return (
@@ -496,14 +515,17 @@ function TaxEstimateTab({ dateRange, refreshToken, period, virtualClosing }) {
       <TaxEstimateView
         data={data}
         loading={loading}
+        settled={settled}
         citRatePercent={citRatePercent}
         onCitRateChange={setCitRatePercent}
         surchargeRates={surchargeRates}
         onSurchargeRatesChange={setSurchargeRates}
+        surchargeRelief={surchargeRelief}
+        onSurchargeReliefChange={setSurchargeRelief}
         payrollAdjustment={payrollAdjustment}
         onPayrollAdjustmentChange={setPayrollAdjustment}
         onResetPayrollAdjustment={
-          baseData ? () => syncPayrollFromResult(baseData) : undefined
+          settled || !baseData ? undefined : () => syncPayrollFromResult(baseData)
         }
       />
     </div>

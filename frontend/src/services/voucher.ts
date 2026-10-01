@@ -711,6 +711,7 @@ function buildVoucherListQuery(filters: VoucherFilters, page: number, pageSize: 
   if (filters.businessType) params.set('business_type', filters.businessType);
   if (filters.signatory) params.set('signatory', filters.signatory);
   if (filters.remark) params.set('remark', filters.remark);
+  if (filters.invoiceNumber) params.set('invoice_number', filters.invoiceNumber);
   if (filters.keyword) params.set('keyword', filters.keyword);
   return params.toString();
 }
@@ -734,9 +735,20 @@ async function listPage(
     return { list, total, page: safePage, pageSize: safeSize };
   }
 
+  // 始终再做一次客户端筛选：后端未识别的新字段（如发票号）会被过滤掉，查无则不展示数据
+  const rawList = data.list || [];
+  const list = applyVoucherFilters(rawList, filters);
+  const serverTotal = data.total ?? 0;
+  const total =
+    list.length === rawList.length
+      ? serverTotal
+      : list.length === 0
+        ? 0
+        : list.length;
+
   return {
-    list: data.list || [],
-    total: data.total ?? 0,
+    list,
+    total,
     page: data.page ?? page,
     pageSize: data.page_size ?? pageSize
   };

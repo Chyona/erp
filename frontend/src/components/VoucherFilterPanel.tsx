@@ -34,7 +34,8 @@ export const EMPTY_VOUCHER_FILTERS: VoucherFilters = {
   amountMax: '',
   businessType: '',
   signatory: '',
-  remark: ''
+  remark: '',
+  invoiceNumber: ''
 };
 
 type VoucherFilterPanelProps = {
@@ -96,10 +97,10 @@ export default function VoucherFilterPanel({
         />
       </FilterRow>
 
-      <FilterRow label="摘要">
+      <FilterRow label="摘要" hint="例：工资, 社保（逗号分隔为或关系）">
         <Input
           allowClear
-          placeholder="请输入内容"
+          placeholder="请输入摘要，多个用逗号分隔"
           value={value.summary || ''}
           onChange={(e) => patch({ summary: e.target.value })}
           onPressEnter={onSearch}
@@ -160,6 +161,16 @@ export default function VoucherFilterPanel({
               placeholder="请输入内容"
               value={value.remark || ''}
               onChange={(e) => patch({ remark: e.target.value })}
+              onPressEnter={onSearch}
+            />
+          </FilterRow>
+
+          <FilterRow label="发票号" hint="支持完整或连续部分号码">
+            <Input
+              allowClear
+              placeholder="请输入发票号"
+              value={value.invoiceNumber || ''}
+              onChange={(e) => patch({ invoiceNumber: e.target.value })}
               onPressEnter={onSearch}
             />
           </FilterRow>

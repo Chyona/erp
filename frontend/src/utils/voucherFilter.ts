@@ -1,3 +1,19 @@
+/** 解析逗号分隔关键词（中英文逗号），用于摘要等文本「或」匹配 */
+export function parseOrKeywords(text: string): string[] | null {
+  const raw = String(text || '').trim();
+  if (!raw) return null;
+
+  const result: string[] = [];
+  const seen = new Set<string>();
+  for (const part of raw.split(/[,，]/)) {
+    const segment = part.trim().toLowerCase();
+    if (!segment || seen.has(segment)) continue;
+    seen.add(segment);
+    result.push(segment);
+  }
+  return result.length ? result : null;
+}
+
 /** 解析逗号分隔或范围表达式，如 1, 3, 5-7 */
 export function parseNumberRanges(text: string): number[] | null {
   const raw = String(text || '').trim();

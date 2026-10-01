@@ -55,6 +55,26 @@ async function isPayrollPeriodDeclared(periodKey: string): Promise<boolean> {
   return isQuarterDeclared(quarterFromPeriodKey(periodKey));
 }
 
+/** 报表/税费预估期间是否已结项（所属季度已申报） */
+async function isReportPeriodDeclared(period: {
+  type: string;
+  year: number;
+  month?: number;
+  quarter?: number;
+}): Promise<boolean> {
+  if (period.type === 'quarter' && period.quarter) {
+    return isQuarterDeclared({ type: 'quarter', year: period.year, quarter: period.quarter });
+  }
+  if (period.month) {
+    return isQuarterDeclared({
+      type: 'quarter',
+      year: period.year,
+      quarter: Math.ceil(period.month / 3)
+    });
+  }
+  return false;
+}
+
 async function assertPayrollPeriodNotDeclared(periodKey: string): Promise<void> {
   if (!(await isPayrollPeriodDeclared(periodKey))) return;
   const period = quarterFromPeriodKey(periodKey);
@@ -144,6 +164,7 @@ export const TaxDeclaration = {
   getDeclaredQuarters,
   isQuarterDeclared,
   isPayrollPeriodDeclared,
+  isReportPeriodDeclared,
   assertPayrollPeriodNotDeclared,
   isDateInDeclaredQuarter,
   assertDateNotInDeclaredQuarter,

@@ -38,7 +38,8 @@ function countActiveFilters(filters: VoucherFilters) {
     'amountMax',
     'businessType',
     'signatory',
-    'remark'
+    'remark',
+    'invoiceNumber'
   ];
   return keys.filter((key) => {
     const value = filters[key];

@@ -182,21 +182,10 @@ function renderMultilineText(value: string | undefined, splitPattern = /[,，、
     .filter(Boolean);
   if (!parts.length) return '';
   const text = parts.join('、');
-  if (parts.length === 1) {
-    return (
-      <EllipsisText className="voucher-grouped-table__invoice-numbers" tooltip={text}>
-        {parts[0]}
-      </EllipsisText>
-    );
-  }
   return (
-    <span className="voucher-grouped-table__invoice-numbers">
-      {parts.map((part, index) => (
-        <span key={`${part}-${index}`} className="voucher-grouped-table__invoice-numbers-line">
-          {part}
-        </span>
-      ))}
-    </span>
+    <EllipsisText className="voucher-grouped-table__invoice-numbers" tooltip={text}>
+      {text}
+    </EllipsisText>
   );
 }
 
@@ -855,12 +844,13 @@ export default function VoucherTable({
     {
       title: '备注',
       key: 'remark',
-      ellipsis: true,
       className: 'voucher-grouped-table__remark-col',
       onCell: (record) => resolveCellProps(record, 'remark', true),
       render: (_, record) => {
         if (isEmptyPlaceholderRow(record)) return null;
-        return record.voucher.remark || '';
+        const remark = record.voucher.remark || '';
+        if (!remark) return '';
+        return <div className="voucher-grouped-table__remark">{remark}</div>;
       }
     },
     {

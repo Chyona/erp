@@ -351,6 +351,7 @@ func (h *ErpHandler) ListVouchers(c *gin.Context) {
 			BusinessType:  c.Query("business_type"),
 			Signatory:     c.Query("signatory"),
 			Remark:        c.Query("remark"),
+			InvoiceNumber: c.Query("invoice_number"),
 			Keyword:       c.Query("keyword"),
 		}
 		items, total, err := h.erpService.ListVouchersPage(c.Request.Context(), q)

@@ -101,6 +101,8 @@ export interface VoucherFilters {
   businessType?: string;
   signatory?: string;
   remark?: string;
+  /** 发票号（模糊匹配，支持部分号码） */
+  invoiceNumber?: string;
 }
 
 export interface Attachment {
