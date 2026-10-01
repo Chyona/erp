@@ -272,13 +272,13 @@ export default function PayrollSheetListPanel({ readOnly = false }: { readOnly?:
       align: 'center'
     },
     {
-      title: '应发工资汇总',
+      title: '应发工资',
       dataIndex: 'grossTotal',
       align: 'right',
       render: (value) => Salary.formatMoneyDisplay(value)
     },
     {
-      title: '实发工资汇总',
+      title: '实发工资',
       dataIndex: 'netSalary',
       align: 'right',
       render: (value) => Salary.formatMoneyDisplay(value)
@@ -290,13 +290,13 @@ export default function PayrollSheetListPanel({ readOnly = false }: { readOnly?:
       align: 'center'
     },
     {
-      title: '应发劳务汇总',
+      title: '应发劳务费',
       dataIndex: 'laborGrossTotal',
       align: 'right',
       render: (value) => Salary.formatMoneyDisplay(value)
     },
     {
-      title: '实发劳务汇总',
+      title: '实发劳务费',
       dataIndex: 'laborNetTotal',
       align: 'right',
       render: (value) => Salary.formatMoneyDisplay(value)

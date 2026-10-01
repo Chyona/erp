@@ -49,12 +49,13 @@ function downloadBlob(content, filename, type = 'text/plain;charset=utf-8') {
 const VOUCHER_EXPORT_HEADERS = [
   '凭证字号',
   '日期',
-  '业务类型',
+  '季度',
   '摘要',
-  '科目编码',
   '科目名称',
+  '科目编码',
   '借方金额',
   '贷方金额',
+  '业务类型',
   '附件数',
   '发票号',
   '校验码',
@@ -65,7 +66,7 @@ const VOUCHER_EXPORT_HEADERS = [
 ] as const;
 
 /** Excel 列宽（字符宽度），避免打开后日期变成 ####、摘要被截断 */
-const VOUCHER_EXPORT_COL_WIDTHS = [12, 12, 12, 28, 10, 18, 14, 14, 10, 20, 22, 10, 12, 12, 28];
+const VOUCHER_EXPORT_COL_WIDTHS = [12, 12, 10, 28, 18, 10, 14, 14, 12, 10, 20, 22, 10, 12, 12, 28];
 
 /** 财务报表导出中的凭证分录表（无业务类型列；日期后含季度；科目名称在编码前） */
 const REPORT_VOUCHER_EXPORT_HEADERS = [
@@ -115,12 +116,13 @@ function buildVoucherExportRows(vouchers) {
       rows.push([
         v.voucherNo,
         v.date,
-        v.businessType || '',
+        formatVoucherDateQuarter(v.date),
         e.summary || '',
-        e.accountCode || '',
         e.accountName || '',
+        e.accountCode || '',
         Number(e.debit) || 0,
         Number(e.credit) || 0,
+        v.businessType || '',
         attachmentCount,
         v.invoiceNumbers || '',
         v.checksum || '',
